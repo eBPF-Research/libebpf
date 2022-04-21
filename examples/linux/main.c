@@ -116,7 +116,6 @@ int main(int argc, char **argv)
 		mem_filename = argv[2];
 	}
 
-
 	size_t mem_len = 0;
 	void *mem = NULL;
 	if (mem_filename != NULL) {

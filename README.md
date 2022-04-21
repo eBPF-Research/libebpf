@@ -3,6 +3,7 @@
 
 #### Design  
 1. VM-centrate  
+```
 struct ebpf_env {
     void *helpers;
     int err_code;
@@ -24,7 +25,9 @@ env -> mutiple vm
 vm -> env
 
 one ebpf_prog <=> one vm instance
+```
 
 2. Prog-centrate
+```
 ebpf_vm_run(ebpf_env *env, u8 *code, int codelen, u8 *mem, int memlen);
-
+```

@@ -316,8 +316,9 @@ u64 ebpf_vm_exec(const struct ebpf_vm *vm, void *mem, u32 mem_len) {
 			DST = *(u64*)(uintptr)(SRC + inst.offset);
 			break;
 		case EBPF_OP_LDXW:
-			BOUNDS_CHECK_LOAD(4);
+			//BOUNDS_CHECK_LOAD(4);
 			DST = *(u32*)(uintptr)(SRC + inst.offset);
+			printf("LDXW=%u------%d\n", DST, __LINE__);
 			break;
 		case EBPF_OP_LDXH:
 			BOUNDS_CHECK_LOAD(2);
@@ -444,9 +445,11 @@ u64 ebpf_vm_exec(const struct ebpf_vm *vm, void *mem, u32 mem_len) {
 
 		// 64
 		case EBPF_OP_JSGT_IMM:
-			if ((s64)DST > SRC) {
+			if ((s64)DST > IMM) {
 				pc += inst.offset;
+				printf("val: %u--====---%d %d SRC=%u\n", (s64)DST, __LINE__, inst.offset, IMM);
 			}
+			// printf("val: %u----------%d\n", (s64)DST, __LINE__);
 			break;
 		case EBPF_OP_JSGT_REG:
 			if ((s64)DST > (s64)SRC) {
