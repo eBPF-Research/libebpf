@@ -1,3 +1,36 @@
-build
-bin
-.vscode
+[Bb]uild/*
+[Dd]ocs/*
+CMakeCache.*
+CMakeFiles/*
+[Tt]esting/*
+ebpf_code.h
+vm-exten.btf
+
+### VisualStudioCode ###
+.vscode/settings.json
+.vscode/extensions.json
+
+### VisualStudioCode Patch ###
+# Ignore all local history of files
+.history
+*.o
+*.pyc
+*.core
+core.*
+*.cache
+
+example/libffi/test
+test/man
+test/lib
+test/bin
+test/lib64
+.test_log
+test/share
+bpftool
+bpftoolx
+a.out
+documents/dlsym/dlsym
+documents/elfoffset/myprogram
+documents/elfoffset/*.txt
+documents/elfoffset/maps
+Catch2

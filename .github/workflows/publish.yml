@@ -1,0 +1,27 @@
+name: Build extensions
+
+on:
+  push:
+    branches: "master"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, '[ci skip]')"
+    strategy:
+      matrix:
+        target: [ x86_64-unknown-linux-gnu ]
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: 'recursive'
+
+    - name: install deps
+      run: |
+        sudo apt-get install -y --no-install-recommends \
+        libelf1 libelf-dev zlib1g-dev libclang-13-dev \
+        make git clang llvm pkg-config build-essential pahole
+
+    - name: build package
+      run:  make build-runtime

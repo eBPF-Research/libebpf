@@ -1,9 +1,0 @@
-{
-    "files.associations": {
-        "ebpf_allocator.h": "c",
-        "ebpf.h": "c",
-        "jit.h": "c",
-        "ebpf_vm.h": "c",
-        "stdint.h": "c"
-    }
-}
