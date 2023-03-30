@@ -25,7 +25,7 @@
 #include <getopt.h>
 #include <errno.h>
 #include <math.h>
-#include "libebpf.h"
+#include "libebpf/libebpf.h"
 
 // #if defined(UBPF_HAS_ELF_H)
 #include <elf.h>

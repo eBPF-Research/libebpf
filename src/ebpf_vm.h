@@ -18,7 +18,7 @@
 #ifndef ebpf_INST_H
 #define ebpf_INST_H
 
-#include <libebpf.h>
+#include <libebpf/libebpf.h>
 #include "ebpf_inst.h"
 
 struct ebpf_inst;
