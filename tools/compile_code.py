@@ -25,14 +25,17 @@ BYTE_CODE
 
 CODE_FILE = "ebpf_code.h"
 CODEO = "code.o"
-OUTPUT = "prog.bin"
+OUTPUT = None # "prog.bin"
 
 def save_byte_code(byte_code):
-	out_path = os.path.abspath(os.getcwd() + "/" + CODE_FILE)
+	out_path = CODE_FILE
 	# unsigned char str
-	# uc_str = str(byte_code)[2:-1]
 	uc_str = "".join('\\x{:02x}'.format(c) for c in byte_code)
+	# padding = 8 - (len(uc_str) % 8)
+	# uc_str += "".join('\\x00' * padding)
+	# print("padding", padding, "total", len(uc_str))
 	# print(byte_code, uc_str)
+	print("code bytes: ", len(byte_code), len(uc_str));
 	code_lines = []
 	pos, li_sz = 0, 100
 	while pos < len(uc_str):
@@ -42,8 +45,8 @@ def save_byte_code(byte_code):
 	code = CODE_TEMPLATE.replace("BYTE_CODE", fmt_str)
 	print("save byte code to", out_path)
 	print(fmt_str)
-	# with open(out_path, "w") as fp:
-		# fp.write(code)
+	with open(out_path, "w") as fp:
+		fp.write(code)
 
 def bytes_to_str_escape(bys):
 	return "".join('\\x{:02x}'.format(c) for c in bys)
@@ -61,16 +64,13 @@ def dump_elf_text(prog):
 		# md = Cs(CS_ARCH_X86, CS_MODE_64)
 		# for i in md.disasm(ops, addr):        
 		# 	print(f'0x{i.address:x}:\t{i.mnemonic}\t{i.op_str}')
-		out = OUTPUT
-		with open(out, "wb") as fp:
-			fp.write(ops)
-		print("write binary to:", out)
 		write_binary(ops)
 
 def write_binary(ops):
 	save_byte_code(ops)
-	with open(OUTPUT, "wb") as fp:
-		fp.write(ops)
+	if OUTPUT:
+		with open(OUTPUT, "wb") as fp:
+			fp.write(ops)
 	print("disassemble: ")
 	data = ubpf.disassembler.disassemble(ops)
 	for pc, li in enumerate(data.split("\n")):
@@ -112,7 +112,8 @@ def setup_args():
 	parser = argparse.ArgumentParser(prog="compile_ebpf", epilog="e.g. python3 compile_ebpf.py -s code.c")
 	parser.add_argument("-s", "--src", metavar="src", help="choose ebpf src.")
 	parser.add_argument("-a", "--asm", metavar="asm", help="compile asm.")
-	parser.add_argument("-o", "--output", metavar="output", help="set output file.")
+	parser.add_argument("-o", "--output", metavar="output", help="set output bin file.")
+	parser.add_argument("-f", "--headerfile", metavar="header", help="set output header file.")
 	args = parser.parse_args()
 	if len(sys.argv) == 1:
 	# if not any(vars(args).values()):
@@ -125,6 +126,9 @@ def main():
 	if args.output:
 		global OUTPUT
 		OUTPUT = args.output
+	if args.headerfile:
+		global CODE_FILE
+		CODE_FILE = args.headerfile
 	if args.src:
 		compile_code(args.src)
 	elif args.asm:
