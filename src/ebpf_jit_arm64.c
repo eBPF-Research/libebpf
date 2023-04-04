@@ -180,6 +180,7 @@ enum AddSubOpcode
     AS_SUBS = 3
 };
 
+
 /* Get the value of the size bit in most instruction encodings (bit 31). */
 static uint32_t
 sz(bool sixty_four)
