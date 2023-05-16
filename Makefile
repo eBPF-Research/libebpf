@@ -1,4 +1,4 @@
-.PHONY: install coverage test docs help
+.PHONY: install coverage test docs help build
 .DEFAULT_GOAL := help
 
 define BROWSER_PYSCRIPT
@@ -50,6 +50,10 @@ docs: ## generate Doxygen HTML documentation, including API docs
 	cmake --build build --config Release
 	cmake --build build --target doxygen-docs
 	$(BROWSER) docs/html/index.html
+
+build: ## build the package
+	cmake -Bbuild
+	cmake --build build --config Debug
 
 install: ## install the package to the `INSTALL_LOCATION`
 	rm -rf build/
