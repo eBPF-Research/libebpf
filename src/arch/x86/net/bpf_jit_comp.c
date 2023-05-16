@@ -9,13 +9,7 @@
 #include <linux/filter.h>
 #include <linux/if_vlan.h>
 #include <linux/bpf.h>
-#include <linux/memory.h>
-#include <linux/sort.h>
-#include <asm/extable.h>
-#include <asm/set_memory.h>
-#include <asm/nospec-branch.h>
-#include <asm/text-patching.h>
-#include <asm/asm-prototypes.h>
+#include <linux/bpf_c.h>
 
 static u8 *emit_code(u8 *ptr, u32 bytes, unsigned int len)
 {
