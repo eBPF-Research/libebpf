@@ -7,7 +7,7 @@
 #ifndef _BPF_JIT_H
 #define _BPF_JIT_H
 
-#include <asm/insn.h>
+#include <type-fixes.h>
 
 /* 5-bit Register Operand */
 #define A64_R(x)	AARCH64_INSN_REG_##x

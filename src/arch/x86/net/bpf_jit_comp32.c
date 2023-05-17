@@ -9,13 +9,13 @@
  * Shubham Bansal <illusionist.neo@gmail.com>
  */
 
-#include <linux/netdevice.h>
-#include <linux/filter.h>
-#include <linux/if_vlan.h>
-#include <asm/cacheflush.h>
-#include <asm/set_memory.h>
-#include <asm/nospec-branch.h>
-#include <linux/bpf.h>
+#include "type-fixes.h"
+#include <string.h>
+#include <stdio.h>
+#include <asm/ptrace.h>
+#include <uapi/linux/errno.h>
+#include "linux-header/filter.h"
+#include "linux-header/bpf.h"
 
 /*
  * eBPF prog stack layout:
