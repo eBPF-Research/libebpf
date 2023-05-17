@@ -6,21 +6,10 @@
  * Copyright (c) 2011 Mircea Gherzan <mgherzan@gmail.com>
  */
 
-#include <linux/bpf.h>
-#include <linux/bitops.h>
-#include <linux/compiler.h>
-#include <linux/errno.h>
-#include <linux/filter.h>
-#include <linux/netdevice.h>
-#include <linux/string.h>
-#include <linux/slab.h>
-#include <linux/if_vlan.h>
-
-#include <asm/cacheflush.h>
-#include <asm/hwcap.h>
-#include <asm/opcodes.h>
-#include <asm/system_info.h>
-
+#include <linux-header/bpf.h>
+#include <uapi/linux/errno.h>
+#include <linux-header/filter.h>
+#include <string.h>
 #include "bpf_jit_32.h"
 
 /*
@@ -346,7 +335,8 @@ static void jit_fill_hole(void *area, unsigned int size)
 #endif
 
 /* total stack size used in JITed code */
-#define _STACK_SIZE	(ctx->prog->aux->stack_depth + SCRATCH_SIZE)
+// #define _STACK_SIZE	(ctx->prog->aux->stack_depth + SCRATCH_SIZE)
+#define _STACK_SIZE	(512 + SCRATCH_SIZE)
 #define STACK_SIZE	ALIGN(_STACK_SIZE, STACK_ALIGNMENT)
 
 #if __LINUX_ARM_ARCH__ < 7
@@ -434,9 +424,9 @@ static inline void emit_mov_i(const u8 rd, u32 val, struct jit_ctx *ctx)
 
 static void emit_bx_r(u8 tgt_reg, struct jit_ctx *ctx)
 {
-	if (elf_hwcap & HWCAP_THUMB)
-		emit(ARM_BX(tgt_reg), ctx);
-	else
+	// if (elf_hwcap & HWCAP_THUMB)
+	// 	emit(ARM_BX(tgt_reg), ctx);
+	// else
 		emit(ARM_MOV_R(ARM_PC, tgt_reg), ctx);
 }
 
@@ -534,16 +524,16 @@ static const s8 *arm_bpf_get_reg64(const s8 *reg, const s8 *tmp,
 				   struct jit_ctx *ctx)
 {
 	if (is_stacked(reg[1])) {
-		if (__LINUX_ARM_ARCH__ >= 6 ||
-		    ctx->cpu_architecture >= CPU_ARCH_ARMv5TE) {
+		// if (__LINUX_ARM_ARCH__ >= 6 ||
+		    // ctx->cpu_architecture >= CPU_ARCH_ARMv5TE) {
 			emit(ARM_LDRD_I(tmp[1], ARM_FP,
 					EBPF_SCRATCH_TO_ARM_FP(reg[1])), ctx);
-		} else {
-			emit(ARM_LDR_I(tmp[1], ARM_FP,
-				       EBPF_SCRATCH_TO_ARM_FP(reg[1])), ctx);
-			emit(ARM_LDR_I(tmp[0], ARM_FP,
-				       EBPF_SCRATCH_TO_ARM_FP(reg[0])), ctx);
-		}
+		// } else {
+		// 	emit(ARM_LDR_I(tmp[1], ARM_FP,
+		// 		       EBPF_SCRATCH_TO_ARM_FP(reg[1])), ctx);
+		// 	emit(ARM_LDR_I(tmp[0], ARM_FP,
+		// 		       EBPF_SCRATCH_TO_ARM_FP(reg[0])), ctx);
+		// }
 		reg = tmp;
 	}
 	return reg;
@@ -565,16 +555,16 @@ static void arm_bpf_put_reg64(const s8 *reg, const s8 *src,
 			      struct jit_ctx *ctx)
 {
 	if (is_stacked(reg[1])) {
-		if (__LINUX_ARM_ARCH__ >= 6 ||
-		    ctx->cpu_architecture >= CPU_ARCH_ARMv5TE) {
+		// if (__LINUX_ARM_ARCH__ >= 6 ||
+		    // ctx->cpu_architecture >= CPU_ARCH_ARMv5TE) {
 			emit(ARM_STRD_I(src[1], ARM_FP,
 				       EBPF_SCRATCH_TO_ARM_FP(reg[1])), ctx);
-		} else {
-			emit(ARM_STR_I(src[1], ARM_FP,
-				       EBPF_SCRATCH_TO_ARM_FP(reg[1])), ctx);
-			emit(ARM_STR_I(src[0], ARM_FP,
-				       EBPF_SCRATCH_TO_ARM_FP(reg[0])), ctx);
-		}
+		// } else {
+		// 	emit(ARM_STR_I(src[1], ARM_FP,
+		// 		       EBPF_SCRATCH_TO_ARM_FP(reg[1])), ctx);
+		// 	emit(ARM_STR_I(src[0], ARM_FP,
+		// 		       EBPF_SCRATCH_TO_ARM_FP(reg[0])), ctx);
+		// }
 	} else {
 		if (reg[1] != src[1])
 			emit(ARM_MOV_R(reg[1], src[1]), ctx);
@@ -733,8 +723,8 @@ static inline void emit_a32_alu_r64(const bool is64, const s8 dst[],
 
 		/* ALU operation */
 		emit_alu_r(rd[1], rs, true, false, op, ctx);
-		if (!ctx->prog->aux->verifier_zext)
-			emit_a32_mov_i(rd[0], 0, ctx);
+		// if (!ctx->prog->aux->verifier_zext)
+		// 	emit_a32_mov_i(rd[0], 0, ctx);
 	}
 
 	arm_bpf_put_reg64(dst, rd, ctx);
@@ -756,15 +746,17 @@ static inline void emit_a32_mov_r64(const bool is64, const s8 dst[],
 				  struct jit_ctx *ctx) {
 	if (!is64) {
 		emit_a32_mov_r(dst_lo, src_lo, ctx);
-		if (!ctx->prog->aux->verifier_zext)
-			/* Zero out high 4 bytes */
-			emit_a32_mov_i(dst_hi, 0, ctx);
-	} else if (__LINUX_ARM_ARCH__ < 6 &&
-		   ctx->cpu_architecture < CPU_ARCH_ARMv5TE) {
-		/* complete 8 byte move */
-		emit_a32_mov_r(dst_lo, src_lo, ctx);
-		emit_a32_mov_r(dst_hi, src_hi, ctx);
-	} else if (is_stacked(src_lo) && is_stacked(dst_lo)) {
+		// if (!ctx->prog->aux->verifier_zext)
+		// 	/* Zero out high 4 bytes */
+		// 	emit_a32_mov_i(dst_hi, 0, ctx);
+	} 
+	// else if (__LINUX_ARM_ARCH__ < 6 &&
+	// 	   ctx->cpu_architecture < CPU_ARCH_ARMv5TE) {
+	// 	/* complete 8 byte move */
+	// 	emit_a32_mov_r(dst_lo, src_lo, ctx);
+	// 	emit_a32_mov_r(dst_hi, src_hi, ctx);
+	// } 
+	else if (is_stacked(src_lo) && is_stacked(dst_lo)) {
 		const u8 *tmp = bpf2a32[TMP_REG_1];
 
 		emit(ARM_LDRD_I(tmp[1], ARM_FP, EBPF_SCRATCH_TO_ARM_FP(src_lo)), ctx);
@@ -1078,20 +1070,20 @@ static inline void emit_ldx_r(const s8 dst[], const s8 src,
 	case BPF_B:
 		/* Load a Byte */
 		emit(ARM_LDRB_I(rd[1], rm, off), ctx);
-		if (!ctx->prog->aux->verifier_zext)
-			emit_a32_mov_i(rd[0], 0, ctx);
+		// if (!ctx->prog->aux->verifier_zext)
+		// 	emit_a32_mov_i(rd[0], 0, ctx);
 		break;
 	case BPF_H:
 		/* Load a HalfWord */
 		emit(ARM_LDRH_I(rd[1], rm, off), ctx);
-		if (!ctx->prog->aux->verifier_zext)
-			emit_a32_mov_i(rd[0], 0, ctx);
+		// if (!ctx->prog->aux->verifier_zext)
+		// 	emit_a32_mov_i(rd[0], 0, ctx);
 		break;
 	case BPF_W:
 		/* Load a Word */
 		emit(ARM_LDR_I(rd[1], rm, off), ctx);
-		if (!ctx->prog->aux->verifier_zext)
-			emit_a32_mov_i(rd[0], 0, ctx);
+		// if (!ctx->prog->aux->verifier_zext)
+		// 	emit_a32_mov_i(rd[0], 0, ctx);
 		break;
 	case BPF_DW:
 		/* Load a Double Word */
@@ -1145,86 +1137,86 @@ static inline void emit_ar_r(const u8 rd, const u8 rt, const u8 rm,
 	}
 }
 
-static int out_offset = -1; /* initialized on the first pass of build_body() */
-static int emit_bpf_tail_call(struct jit_ctx *ctx)
-{
+// static int out_offset = -1; /* initialized on the first pass of build_body() */
+// static int emit_bpf_tail_call(struct jit_ctx *ctx)
+// {
 
-	/* bpf_tail_call(void *prog_ctx, struct bpf_array *array, u64 index) */
-	const s8 *r2 = bpf2a32[BPF_REG_2];
-	const s8 *r3 = bpf2a32[BPF_REG_3];
-	const s8 *tmp = bpf2a32[TMP_REG_1];
-	const s8 *tmp2 = bpf2a32[TMP_REG_2];
-	const s8 *tcc = bpf2a32[TCALL_CNT];
-	const s8 *tc;
-	const int idx0 = ctx->idx;
-#define cur_offset (ctx->idx - idx0)
-#define jmp_offset (out_offset - (cur_offset) - 2)
-	u32 lo, hi;
-	s8 r_array, r_index;
-	int off;
+// 	/* bpf_tail_call(void *prog_ctx, struct bpf_array *array, u64 index) */
+// 	const s8 *r2 = bpf2a32[BPF_REG_2];
+// 	const s8 *r3 = bpf2a32[BPF_REG_3];
+// 	const s8 *tmp = bpf2a32[TMP_REG_1];
+// 	const s8 *tmp2 = bpf2a32[TMP_REG_2];
+// 	const s8 *tcc = bpf2a32[TCALL_CNT];
+// 	const s8 *tc;
+// 	const int idx0 = ctx->idx;
+// #define cur_offset (ctx->idx - idx0)
+// #define jmp_offset (out_offset - (cur_offset) - 2)
+// 	u32 lo, hi;
+// 	s8 r_array, r_index;
+// 	int off;
 
-	/* if (index >= array->map.max_entries)
-	 *	goto out;
-	 */
-	BUILD_BUG_ON(offsetof(struct bpf_array, map.max_entries) >
-		     ARM_INST_LDST__IMM12);
-	off = offsetof(struct bpf_array, map.max_entries);
-	r_array = arm_bpf_get_reg32(r2[1], tmp2[0], ctx);
-	/* index is 32-bit for arrays */
-	r_index = arm_bpf_get_reg32(r3[1], tmp2[1], ctx);
-	/* array->map.max_entries */
-	emit(ARM_LDR_I(tmp[1], r_array, off), ctx);
-	/* index >= array->map.max_entries */
-	emit(ARM_CMP_R(r_index, tmp[1]), ctx);
-	_emit(ARM_COND_CS, ARM_B(jmp_offset), ctx);
+// 	/* if (index >= array->map.max_entries)
+// 	 *	goto out;
+// 	 */
+// 	BUILD_BUG_ON(offsetof(struct bpf_array, map.max_entries) >
+// 		     ARM_INST_LDST__IMM12);
+// 	off = offsetof(struct bpf_array, map.max_entries);
+// 	r_array = arm_bpf_get_reg32(r2[1], tmp2[0], ctx);
+// 	/* index is 32-bit for arrays */
+// 	r_index = arm_bpf_get_reg32(r3[1], tmp2[1], ctx);
+// 	/* array->map.max_entries */
+// 	emit(ARM_LDR_I(tmp[1], r_array, off), ctx);
+// 	/* index >= array->map.max_entries */
+// 	emit(ARM_CMP_R(r_index, tmp[1]), ctx);
+// 	_emit(ARM_COND_CS, ARM_B(jmp_offset), ctx);
 
-	/* tmp2[0] = array, tmp2[1] = index */
+// 	/* tmp2[0] = array, tmp2[1] = index */
 
-	/* if (tail_call_cnt > MAX_TAIL_CALL_CNT)
-	 *	goto out;
-	 * tail_call_cnt++;
-	 */
-	lo = (u32)MAX_TAIL_CALL_CNT;
-	hi = (u32)((u64)MAX_TAIL_CALL_CNT >> 32);
-	tc = arm_bpf_get_reg64(tcc, tmp, ctx);
-	emit(ARM_CMP_I(tc[0], hi), ctx);
-	_emit(ARM_COND_EQ, ARM_CMP_I(tc[1], lo), ctx);
-	_emit(ARM_COND_HI, ARM_B(jmp_offset), ctx);
-	emit(ARM_ADDS_I(tc[1], tc[1], 1), ctx);
-	emit(ARM_ADC_I(tc[0], tc[0], 0), ctx);
-	arm_bpf_put_reg64(tcc, tmp, ctx);
+// 	/* if (tail_call_cnt > MAX_TAIL_CALL_CNT)
+// 	 *	goto out;
+// 	 * tail_call_cnt++;
+// 	 */
+// 	lo = (u32)MAX_TAIL_CALL_CNT;
+// 	hi = (u32)((u64)MAX_TAIL_CALL_CNT >> 32);
+// 	tc = arm_bpf_get_reg64(tcc, tmp, ctx);
+// 	emit(ARM_CMP_I(tc[0], hi), ctx);
+// 	_emit(ARM_COND_EQ, ARM_CMP_I(tc[1], lo), ctx);
+// 	_emit(ARM_COND_HI, ARM_B(jmp_offset), ctx);
+// 	emit(ARM_ADDS_I(tc[1], tc[1], 1), ctx);
+// 	emit(ARM_ADC_I(tc[0], tc[0], 0), ctx);
+// 	arm_bpf_put_reg64(tcc, tmp, ctx);
 
-	/* prog = array->ptrs[index]
-	 * if (prog == NULL)
-	 *	goto out;
-	 */
-	BUILD_BUG_ON(imm8m(offsetof(struct bpf_array, ptrs)) < 0);
-	off = imm8m(offsetof(struct bpf_array, ptrs));
-	emit(ARM_ADD_I(tmp[1], r_array, off), ctx);
-	emit(ARM_LDR_R_SI(tmp[1], tmp[1], r_index, SRTYPE_ASL, 2), ctx);
-	emit(ARM_CMP_I(tmp[1], 0), ctx);
-	_emit(ARM_COND_EQ, ARM_B(jmp_offset), ctx);
+// 	/* prog = array->ptrs[index]
+// 	 * if (prog == NULL)
+// 	 *	goto out;
+// 	 */
+// 	BUILD_BUG_ON(imm8m(offsetof(struct bpf_array, ptrs)) < 0);
+// 	off = imm8m(offsetof(struct bpf_array, ptrs));
+// 	emit(ARM_ADD_I(tmp[1], r_array, off), ctx);
+// 	emit(ARM_LDR_R_SI(tmp[1], tmp[1], r_index, SRTYPE_ASL, 2), ctx);
+// 	emit(ARM_CMP_I(tmp[1], 0), ctx);
+// 	_emit(ARM_COND_EQ, ARM_B(jmp_offset), ctx);
 
-	/* goto *(prog->bpf_func + prologue_size); */
-	BUILD_BUG_ON(offsetof(struct bpf_prog, bpf_func) >
-		     ARM_INST_LDST__IMM12);
-	off = offsetof(struct bpf_prog, bpf_func);
-	emit(ARM_LDR_I(tmp[1], tmp[1], off), ctx);
-	emit(ARM_ADD_I(tmp[1], tmp[1], ctx->prologue_bytes), ctx);
-	emit_bx_r(tmp[1], ctx);
+// 	/* goto *(prog->bpf_func + prologue_size); */
+// 	BUILD_BUG_ON(offsetof(struct bpf_prog, bpf_func) >
+// 		     ARM_INST_LDST__IMM12);
+// 	off = offsetof(struct bpf_prog, bpf_func);
+// 	emit(ARM_LDR_I(tmp[1], tmp[1], off), ctx);
+// 	emit(ARM_ADD_I(tmp[1], tmp[1], ctx->prologue_bytes), ctx);
+// 	emit_bx_r(tmp[1], ctx);
 
-	/* out: */
-	if (out_offset == -1)
-		out_offset = cur_offset;
-	if (cur_offset != out_offset) {
-		pr_err_once("tail_call out_offset = %d, expected %d!\n",
-			    cur_offset, out_offset);
-		return -1;
-	}
-	return 0;
-#undef cur_offset
-#undef jmp_offset
-}
+// 	/* out: */
+// 	if (out_offset == -1)
+// 		out_offset = cur_offset;
+// 	if (cur_offset != out_offset) {
+// 		pr_err_once("tail_call out_offset = %d, expected %d!\n",
+// 			    cur_offset, out_offset);
+// 		return -1;
+// 	}
+// 	return 0;
+// #undef cur_offset
+// #undef jmp_offset
+// }
 
 /* 0xabcd => 0xcdab */
 static inline void emit_rev16(const u8 rd, const u8 rn, struct jit_ctx *ctx)
@@ -1459,8 +1451,8 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
 		}
 		emit_udivmod(rd_lo, rd_lo, rt, ctx, BPF_OP(code));
 		arm_bpf_put_reg32(dst_lo, rd_lo, ctx);
-		if (!ctx->prog->aux->verifier_zext)
-			emit_a32_mov_i(dst_hi, 0, ctx);
+		// if (!ctx->prog->aux->verifier_zext)
+		// 	emit_a32_mov_i(dst_hi, 0, ctx);
 		break;
 	case BPF_ALU64 | BPF_DIV | BPF_K:
 	case BPF_ALU64 | BPF_DIV | BPF_X:
@@ -1477,8 +1469,8 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
 			return -EINVAL;
 		if (imm)
 			emit_a32_alu_i(dst_lo, imm, ctx, BPF_OP(code));
-		if (!ctx->prog->aux->verifier_zext)
-			emit_a32_mov_i(dst_hi, 0, ctx);
+		// if (!ctx->prog->aux->verifier_zext)
+		// 	emit_a32_mov_i(dst_hi, 0, ctx);
 		break;
 	/* dst = dst << imm */
 	case BPF_ALU64 | BPF_LSH | BPF_K:
@@ -1513,8 +1505,8 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
 	/* dst = ~dst */
 	case BPF_ALU | BPF_NEG:
 		emit_a32_alu_i(dst_lo, 0, ctx, BPF_OP(code));
-		if (!ctx->prog->aux->verifier_zext)
-			emit_a32_mov_i(dst_hi, 0, ctx);
+		// if (!ctx->prog->aux->verifier_zext)
+		// 	emit_a32_mov_i(dst_hi, 0, ctx);
 		break;
 	/* dst = ~dst (64 bit) */
 	case BPF_ALU64 | BPF_NEG:
@@ -1570,13 +1562,13 @@ emit_bswap_uxt:
 #else /* ARMv6+ */
 			emit(ARM_UXTH(rd[1], rd[1]), ctx);
 #endif
-			if (!ctx->prog->aux->verifier_zext)
-				emit(ARM_EOR_R(rd[0], rd[0], rd[0]), ctx);
+			// if (!ctx->prog->aux->verifier_zext)
+			// 	emit(ARM_EOR_R(rd[0], rd[0], rd[0]), ctx);
 			break;
 		case 32:
 			/* zero-extend 32 bits into 64 bits */
-			if (!ctx->prog->aux->verifier_zext)
-				emit(ARM_EOR_R(rd[0], rd[0], rd[0]), ctx);
+			// if (!ctx->prog->aux->verifier_zext)
+			// 	emit(ARM_EOR_R(rd[0], rd[0], rd[0]), ctx);
 			break;
 		case 64:
 			/* nop */
@@ -1873,45 +1865,45 @@ bool bpf_jit_needs_zext(void)
 
 struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog)
 {
-	struct bpf_prog *tmp, *orig_prog = prog;
-	struct bpf_binary_header *header;
-	bool tmp_blinded = false;
-	struct jit_ctx ctx;
-	unsigned int tmp_idx;
-	unsigned int image_size;
-	u8 *image_ptr;
+	// struct bpf_prog *tmp, *orig_prog = prog;
+	// struct bpf_binary_header *header;
+	// bool tmp_blinded = false;
+	// struct jit_ctx ctx;
+	// unsigned int tmp_idx;
+	// unsigned int image_size;
+	// u8 *image_ptr;
 
-	/* If BPF JIT was not enabled then we must fall back to
-	 * the interpreter.
-	 */
-	if (!prog->jit_requested)
-		return orig_prog;
+	// /* If BPF JIT was not enabled then we must fall back to
+	//  * the interpreter.
+	//  */
+	// if (!prog->jit_requested)
+	// 	return orig_prog;
 
-	/* If constant blinding was enabled and we failed during blinding
-	 * then we must fall back to the interpreter. Otherwise, we save
-	 * the new JITed code.
-	 */
-	tmp = bpf_jit_blind_constants(prog);
+	// /* If constant blinding was enabled and we failed during blinding
+	//  * then we must fall back to the interpreter. Otherwise, we save
+	//  * the new JITed code.
+	//  */
+	// tmp = bpf_jit_blind_constants(prog);
 
-	if (IS_ERR(tmp))
-		return orig_prog;
-	if (tmp != prog) {
-		tmp_blinded = true;
-		prog = tmp;
-	}
+	// if (IS_ERR(tmp))
+	// 	return orig_prog;
+	// if (tmp != prog) {
+	// 	tmp_blinded = true;
+	// 	prog = tmp;
+	// }
 
-	memset(&ctx, 0, sizeof(ctx));
-	ctx.prog = prog;
-	ctx.cpu_architecture = cpu_architecture();
+	// memset(&ctx, 0, sizeof(ctx));
+	// ctx.prog = prog;
+	// ctx.cpu_architecture = cpu_architecture();
 
-	/* Not able to allocate memory for offsets[] , then
-	 * we must fall back to the interpreter
-	 */
-	ctx.offsets = kcalloc(prog->len, sizeof(int), GFP_KERNEL);
-	if (ctx.offsets == NULL) {
-		prog = orig_prog;
-		goto out;
-	}
+	// /* Not able to allocate memory for offsets[] , then
+	//  * we must fall back to the interpreter
+	//  */
+	// ctx.offsets = kcalloc(prog->len, sizeof(int), GFP_KERNEL);
+	// if (ctx.offsets == NULL) {
+	// 	prog = orig_prog;
+	// 	goto out;
+	// }
 
 	/* 1) fake pass to find in the length of the JITed code,
 	 * to compute ctx->offsets and other context variables
@@ -1923,101 +1915,102 @@ struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog)
 	 * being successful in the second pass, so just fall back
 	 * to the interpreter.
 	 */
-	if (build_body(&ctx)) {
-		prog = orig_prog;
-		goto out_off;
-	}
+// 	if (build_body(&ctx)) {
+// 		prog = orig_prog;
+// 		goto out_off;
+// 	}
 
-	tmp_idx = ctx.idx;
-	build_prologue(&ctx);
-	ctx.prologue_bytes = (ctx.idx - tmp_idx) * 4;
+// 	tmp_idx = ctx.idx;
+// 	build_prologue(&ctx);
+// 	ctx.prologue_bytes = (ctx.idx - tmp_idx) * 4;
 
-	ctx.epilogue_offset = ctx.idx;
+// 	ctx.epilogue_offset = ctx.idx;
 
-#if __LINUX_ARM_ARCH__ < 7
-	tmp_idx = ctx.idx;
-	build_epilogue(&ctx);
-	ctx.epilogue_bytes = (ctx.idx - tmp_idx) * 4;
+// #if __LINUX_ARM_ARCH__ < 7
+// 	tmp_idx = ctx.idx;
+// 	build_epilogue(&ctx);
+// 	ctx.epilogue_bytes = (ctx.idx - tmp_idx) * 4;
 
-	ctx.idx += ctx.imm_count;
-	if (ctx.imm_count) {
-		ctx.imms = kcalloc(ctx.imm_count, sizeof(u32), GFP_KERNEL);
-		if (ctx.imms == NULL) {
-			prog = orig_prog;
-			goto out_off;
-		}
-	}
-#else
-	/* there's nothing about the epilogue on ARMv7 */
-	build_epilogue(&ctx);
-#endif
-	/* Now we can get the actual image size of the JITed arm code.
-	 * Currently, we are not considering the THUMB-2 instructions
-	 * for jit, although it can decrease the size of the image.
-	 *
-	 * As each arm instruction is of length 32bit, we are translating
-	 * number of JITed intructions into the size required to store these
-	 * JITed code.
-	 */
-	image_size = sizeof(u32) * ctx.idx;
+// 	ctx.idx += ctx.imm_count;
+// 	if (ctx.imm_count) {
+// 		ctx.imms = kcalloc(ctx.imm_count, sizeof(u32), GFP_KERNEL);
+// 		if (ctx.imms == NULL) {
+// 			prog = orig_prog;
+// 			goto out_off;
+// 		}
+// 	}
+// #else
+// 	/* there's nothing about the epilogue on ARMv7 */
+// 	build_epilogue(&ctx);
+// #endif
+// 	/* Now we can get the actual image size of the JITed arm code.
+// 	 * Currently, we are not considering the THUMB-2 instructions
+// 	 * for jit, although it can decrease the size of the image.
+// 	 *
+// 	 * As each arm instruction is of length 32bit, we are translating
+// 	 * number of JITed intructions into the size required to store these
+// 	 * JITed code.
+// 	 */
+// 	image_size = sizeof(u32) * ctx.idx;
 
-	/* Now we know the size of the structure to make */
-	header = bpf_jit_binary_alloc(image_size, &image_ptr,
-				      sizeof(u32), jit_fill_hole);
-	/* Not able to allocate memory for the structure then
-	 * we must fall back to the interpretation
-	 */
-	if (header == NULL) {
-		prog = orig_prog;
-		goto out_imms;
-	}
+// 	/* Now we know the size of the structure to make */
+// 	header = bpf_jit_binary_alloc(image_size, &image_ptr,
+// 				      sizeof(u32), jit_fill_hole);
+// 	/* Not able to allocate memory for the structure then
+// 	 * we must fall back to the interpretation
+// 	 */
+// 	if (header == NULL) {
+// 		prog = orig_prog;
+// 		goto out_imms;
+// 	}
 
-	/* 2.) Actual pass to generate final JIT code */
-	ctx.target = (u32 *) image_ptr;
-	ctx.idx = 0;
+// 	/* 2.) Actual pass to generate final JIT code */
+// 	ctx.target = (u32 *) image_ptr;
+// 	ctx.idx = 0;
 
-	build_prologue(&ctx);
+// 	build_prologue(&ctx);
 
-	/* If building the body of the JITed code fails somehow,
-	 * we fall back to the interpretation.
-	 */
-	if (build_body(&ctx) < 0) {
-		image_ptr = NULL;
-		bpf_jit_binary_free(header);
-		prog = orig_prog;
-		goto out_imms;
-	}
-	build_epilogue(&ctx);
+// 	/* If building the body of the JITed code fails somehow,
+// 	 * we fall back to the interpretation.
+// 	 */
+// 	if (build_body(&ctx) < 0) {
+// 		image_ptr = NULL;
+// 		bpf_jit_binary_free(header);
+// 		prog = orig_prog;
+// 		goto out_imms;
+// 	}
+// 	build_epilogue(&ctx);
 
-	/* 3.) Extra pass to validate JITed Code */
-	if (validate_code(&ctx)) {
-		image_ptr = NULL;
-		bpf_jit_binary_free(header);
-		prog = orig_prog;
-		goto out_imms;
-	}
-	flush_icache_range((u32)header, (u32)(ctx.target + ctx.idx));
+// 	/* 3.) Extra pass to validate JITed Code */
+// 	if (validate_code(&ctx)) {
+// 		image_ptr = NULL;
+// 		bpf_jit_binary_free(header);
+// 		prog = orig_prog;
+// 		goto out_imms;
+// 	}
+// 	flush_icache_range((u32)header, (u32)(ctx.target + ctx.idx));
 
-	if (bpf_jit_enable > 1)
-		/* there are 2 passes here */
-		bpf_jit_dump(prog->len, image_size, 2, ctx.target);
+// 	if (bpf_jit_enable > 1)
+// 		/* there are 2 passes here */
+// 		bpf_jit_dump(prog->len, image_size, 2, ctx.target);
 
-	bpf_jit_binary_lock_ro(header);
-	prog->bpf_func = (void *)ctx.target;
-	prog->jited = 1;
-	prog->jited_len = image_size;
+// 	bpf_jit_binary_lock_ro(header);
+// 	prog->bpf_func = (void *)ctx.target;
+// 	prog->jited = 1;
+// 	prog->jited_len = image_size;
 
-out_imms:
-#if __LINUX_ARM_ARCH__ < 7
-	if (ctx.imm_count)
-		kfree(ctx.imms);
-#endif
-out_off:
-	kfree(ctx.offsets);
-out:
-	if (tmp_blinded)
-		bpf_jit_prog_release_other(prog, prog == orig_prog ?
-					   tmp : orig_prog);
-	return prog;
+// out_imms:
+// #if __LINUX_ARM_ARCH__ < 7
+// 	if (ctx.imm_count)
+// 		kfree(ctx.imms);
+// #endif
+// out_off:
+// 	kfree(ctx.offsets);
+// out:
+// 	if (tmp_blinded)
+// 		bpf_jit_prog_release_other(prog, prog == orig_prog ?
+// 					   tmp : orig_prog);
+// 	return prog;
+	return NULL;
 }
 

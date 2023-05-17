@@ -27,5 +27,8 @@ LINUX_CFLAGS_EXTRA = $(LINUX_CFLAGS) -fno-PIE -ffunction-sections -fdata-section
 arch/arm64/net/bpf_jit_comp.o: arch/arm64/net/bpf_jit_comp.c
 	$(CC) $(LINUX_CFLAGS_EXTRA) -Iarch/arm64 -DCONFIG_ARM64_BTI_KERNEL=1 -g -c $< -o $@
 
- arch/x86/net/bpf_jit_comp.o: arch/x86/net/bpf_jit_comp.c
+arch/arm/net/bpf_jit_32.o: arch/arm/net/bpf_jit_32.c
+	$(CC) $(LINUX_CFLAGS_EXTRA) -Iarch/arm -g -c $< -o $@
+
+arch/x86/net/bpf_jit_comp.o: arch/x86/net/bpf_jit_comp.c
 	$(CC) $(LINUX_CFLAGS_EXTRA) -g -c $< -o $@
