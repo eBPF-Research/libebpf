@@ -3,15 +3,9 @@
 
 .PHONY: build-arch
 LINUX_CFLAGS :=  \
-	-isystem $(shell $(LLVM_CONFIG) --prefix)/lib/clang/$(shell $(LLVM_CONFIG) --version)/include \
-	-Iarch/riscv/include \
-	-Iarch/riscv/include/generated \
 	-I../include \
-	-Iarch/riscv/include/uapi \
-	-Iarch/riscv/include/generated/uapi \
-	-I../include/uapi \
-	-I../include/generated/uapi \
 	-I. \
+	-DCONFIG_BPF_JIT \
 	-fno-omit-frame-pointer \
 	-fno-strict-overflow \
 	-fshort-wchar \

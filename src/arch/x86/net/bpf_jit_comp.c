@@ -5,11 +5,13 @@
  * Copyright (C) 2011-2013 Eric Dumazet (eric.dumazet@gmail.com)
  * Internal BPF Copyright (c) 2011-2014 PLUMgrid, http://plumgrid.com
  */
-#include <linux/netdevice.h>
-#include <linux/filter.h>
-#include <linux/if_vlan.h>
-#include <linux/bpf.h>
-#include <linux/bpf_c.h>
+#include "type-fixes.h"
+#include <string.h>
+#include <stdio.h>
+#include <asm/ptrace.h>
+#include <uapi/linux/errno.h>
+#include "linux-header/filter.h"
+#include "linux-header/bpf.h"
 
 static u8 *emit_code(u8 *ptr, u32 bytes, unsigned int len)
 {
@@ -124,13 +126,13 @@ static const int reg2hex[] = {
 };
 
 static const int reg2pt_regs[] = {
-	[BPF_REG_0] = offsetof(struct pt_regs, ax),
-	[BPF_REG_1] = offsetof(struct pt_regs, di),
-	[BPF_REG_2] = offsetof(struct pt_regs, si),
-	[BPF_REG_3] = offsetof(struct pt_regs, dx),
-	[BPF_REG_4] = offsetof(struct pt_regs, cx),
+	[BPF_REG_0] = offsetof(struct pt_regs, rax),
+	[BPF_REG_1] = offsetof(struct pt_regs, rdi),
+	[BPF_REG_2] = offsetof(struct pt_regs, rsi),
+	[BPF_REG_3] = offsetof(struct pt_regs, rdx),
+	[BPF_REG_4] = offsetof(struct pt_regs, rcx),
 	[BPF_REG_5] = offsetof(struct pt_regs, r8),
-	[BPF_REG_6] = offsetof(struct pt_regs, bx),
+	[BPF_REG_6] = offsetof(struct pt_regs, rbx),
 	[BPF_REG_7] = offsetof(struct pt_regs, r13),
 	[BPF_REG_8] = offsetof(struct pt_regs, r14),
 	[BPF_REG_9] = offsetof(struct pt_regs, r15),
@@ -230,8 +232,8 @@ static void emit_prologue(u8 **pprog, u32 stack_depth, bool ebpf_from_cbpf)
 	/* BPF trampoline can be made to work without these nops,
 	 * but let's waste 5 bytes for now and optimize later
 	 */
-	memcpy(prog, ideal_nops[NOP_ATOMIC5], cnt);
-	prog += cnt;
+	// memcpy(prog, ideal_nops[NOP_ATOMIC5], cnt);
+	// prog += cnt;
 	EMIT1(0x55);             /* push rbp */
 	EMIT3(0x48, 0x89, 0xE5); /* mov rbp, rsp */
 	/* sub rsp, rounded_stack_depth */
@@ -272,206 +274,6 @@ static int emit_call(u8 **pprog, void *func, void *ip)
 static int emit_jump(u8 **pprog, void *func, void *ip)
 {
 	return emit_patch(pprog, func, ip, 0xE9);
-}
-
-static int __bpf_arch_text_poke(void *ip, enum bpf_text_poke_type t,
-				void *old_addr, void *new_addr,
-				const bool text_live)
-{
-	const u8 *nop_insn = ideal_nops[NOP_ATOMIC5];
-	u8 old_insn[X86_PATCH_SIZE];
-	u8 new_insn[X86_PATCH_SIZE];
-	u8 *prog;
-	int ret;
-
-	memcpy(old_insn, nop_insn, X86_PATCH_SIZE);
-	if (old_addr) {
-		prog = old_insn;
-		ret = t == BPF_MOD_CALL ?
-		      emit_call(&prog, old_addr, ip) :
-		      emit_jump(&prog, old_addr, ip);
-		if (ret)
-			return ret;
-	}
-
-	memcpy(new_insn, nop_insn, X86_PATCH_SIZE);
-	if (new_addr) {
-		prog = new_insn;
-		ret = t == BPF_MOD_CALL ?
-		      emit_call(&prog, new_addr, ip) :
-		      emit_jump(&prog, new_addr, ip);
-		if (ret)
-			return ret;
-	}
-
-	ret = -EBUSY;
-	mutex_lock(&text_mutex);
-	if (memcmp(ip, old_insn, X86_PATCH_SIZE))
-		goto out;
-	if (memcmp(ip, new_insn, X86_PATCH_SIZE)) {
-		if (text_live)
-			text_poke_bp(ip, new_insn, X86_PATCH_SIZE, NULL);
-		else
-			memcpy(ip, new_insn, X86_PATCH_SIZE);
-	}
-	ret = 0;
-out:
-	mutex_unlock(&text_mutex);
-	return ret;
-}
-
-int bpf_arch_text_poke(void *ip, enum bpf_text_poke_type t,
-		       void *old_addr, void *new_addr)
-{
-	if (!is_kernel_text((long)ip) &&
-	    !is_bpf_text_address((long)ip))
-		/* BPF poking in modules is not supported */
-		return -EINVAL;
-
-	return __bpf_arch_text_poke(ip, t, old_addr, new_addr, true);
-}
-
-/*
- * Generate the following code:
- *
- * ... bpf_tail_call(void *ctx, struct bpf_array *array, u64 index) ...
- *   if (index >= array->map.max_entries)
- *     goto out;
- *   if (++tail_call_cnt > MAX_TAIL_CALL_CNT)
- *     goto out;
- *   prog = array->ptrs[index];
- *   if (prog == NULL)
- *     goto out;
- *   goto *(prog->bpf_func + prologue_size);
- * out:
- */
-static void emit_bpf_tail_call_indirect(u8 **pprog)
-{
-	u8 *prog = *pprog;
-	int label1, label2, label3;
-	int cnt = 0;
-
-	/*
-	 * rdi - pointer to ctx
-	 * rsi - pointer to bpf_array
-	 * rdx - index in bpf_array
-	 */
-
-	/*
-	 * if (index >= array->map.max_entries)
-	 *	goto out;
-	 */
-	EMIT2(0x89, 0xD2);                        /* mov edx, edx */
-	EMIT3(0x39, 0x56,                         /* cmp dword ptr [rsi + 16], edx */
-	      offsetof(struct bpf_array, map.max_entries));
-#define OFFSET1 (41 + RETPOLINE_RAX_BPF_JIT_SIZE) /* Number of bytes to jump */
-	EMIT2(X86_JBE, OFFSET1);                  /* jbe out */
-	label1 = cnt;
-
-	/*
-	 * if (tail_call_cnt > MAX_TAIL_CALL_CNT)
-	 *	goto out;
-	 */
-	EMIT2_off32(0x8B, 0x85, -36 - MAX_BPF_STACK); /* mov eax, dword ptr [rbp - 548] */
-	EMIT3(0x83, 0xF8, MAX_TAIL_CALL_CNT);     /* cmp eax, MAX_TAIL_CALL_CNT */
-#define OFFSET2 (30 + RETPOLINE_RAX_BPF_JIT_SIZE)
-	EMIT2(X86_JA, OFFSET2);                   /* ja out */
-	label2 = cnt;
-	EMIT3(0x83, 0xC0, 0x01);                  /* add eax, 1 */
-	EMIT2_off32(0x89, 0x85, -36 - MAX_BPF_STACK); /* mov dword ptr [rbp -548], eax */
-
-	/* prog = array->ptrs[index]; */
-	EMIT4_off32(0x48, 0x8B, 0x84, 0xD6,       /* mov rax, [rsi + rdx * 8 + offsetof(...)] */
-		    offsetof(struct bpf_array, ptrs));
-
-	/*
-	 * if (prog == NULL)
-	 *	goto out;
-	 */
-	EMIT3(0x48, 0x85, 0xC0);		  /* test rax,rax */
-#define OFFSET3 (8 + RETPOLINE_RAX_BPF_JIT_SIZE)
-	EMIT2(X86_JE, OFFSET3);                   /* je out */
-	label3 = cnt;
-
-	/* goto *(prog->bpf_func + prologue_size); */
-	EMIT4(0x48, 0x8B, 0x40,                   /* mov rax, qword ptr [rax + 32] */
-	      offsetof(struct bpf_prog, bpf_func));
-	EMIT4(0x48, 0x83, 0xC0, PROLOGUE_SIZE);   /* add rax, prologue_size */
-
-	/*
-	 * Wow we're ready to jump into next BPF program
-	 * rdi == ctx (1st arg)
-	 * rax == prog->bpf_func + prologue_size
-	 */
-	RETPOLINE_RAX_BPF_JIT();
-
-	/* out: */
-	BUILD_BUG_ON(cnt - label1 != OFFSET1);
-	BUILD_BUG_ON(cnt - label2 != OFFSET2);
-	BUILD_BUG_ON(cnt - label3 != OFFSET3);
-	*pprog = prog;
-}
-
-static void emit_bpf_tail_call_direct(struct bpf_jit_poke_descriptor *poke,
-				      u8 **pprog, int addr, u8 *image)
-{
-	u8 *prog = *pprog;
-	int cnt = 0;
-
-	/*
-	 * if (tail_call_cnt > MAX_TAIL_CALL_CNT)
-	 *	goto out;
-	 */
-	EMIT2_off32(0x8B, 0x85, -36 - MAX_BPF_STACK); /* mov eax, dword ptr [rbp - 548] */
-	EMIT3(0x83, 0xF8, MAX_TAIL_CALL_CNT);         /* cmp eax, MAX_TAIL_CALL_CNT */
-	EMIT2(X86_JA, 14);                            /* ja out */
-	EMIT3(0x83, 0xC0, 0x01);                      /* add eax, 1 */
-	EMIT2_off32(0x89, 0x85, -36 - MAX_BPF_STACK); /* mov dword ptr [rbp -548], eax */
-
-	poke->ip = image + (addr - X86_PATCH_SIZE);
-	poke->adj_off = PROLOGUE_SIZE;
-
-	memcpy(prog, ideal_nops[NOP_ATOMIC5], X86_PATCH_SIZE);
-	prog += X86_PATCH_SIZE;
-	/* out: */
-
-	*pprog = prog;
-}
-
-static void bpf_tail_call_direct_fixup(struct bpf_prog *prog)
-{
-	struct bpf_jit_poke_descriptor *poke;
-	struct bpf_array *array;
-	struct bpf_prog *target;
-	int i, ret;
-
-	for (i = 0; i < prog->aux->size_poke_tab; i++) {
-		poke = &prog->aux->poke_tab[i];
-		WARN_ON_ONCE(READ_ONCE(poke->ip_stable));
-
-		if (poke->reason != BPF_POKE_REASON_TAIL_CALL)
-			continue;
-
-		array = container_of(poke->tail_call.map, struct bpf_array, map);
-		mutex_lock(&array->aux->poke_mutex);
-		target = array->ptrs[poke->tail_call.key];
-		if (target) {
-			/* Plain memcpy is used when image is not live yet
-			 * and still not locked as read-only. Once poke
-			 * location is active (poke->ip_stable), any parallel
-			 * bpf_arch_text_poke() might occur still on the
-			 * read-write image until we finally locked it as
-			 * read-only. Both modifications on the given image
-			 * are under text_mutex to avoid interference.
-			 */
-			ret = __bpf_arch_text_poke(poke->ip, BPF_MOD_JUMP, NULL,
-						   (u8 *)target->bpf_func +
-						   poke->adj_off, false);
-			BUG_ON(ret < 0);
-		}
-		WRITE_ONCE(poke->ip_stable, true);
-		mutex_unlock(&array->aux->poke_mutex);
-	}
 }
 
 static void emit_mov_imm32(u8 **pprog, bool sign_propagate,
@@ -634,18 +436,6 @@ static void emit_stx(u8 **pprog, u32 size, u32 dst_reg, u32 src_reg, int off)
 	*pprog = prog;
 }
 
-static bool ex_handler_bpf(const struct exception_table_entry *x,
-			   struct pt_regs *regs, int trapnr,
-			   unsigned long error_code, unsigned long fault_addr)
-{
-	u32 reg = x->fixup >> 8;
-
-	/* jump over faulting load and clear dest register */
-	*(unsigned long *)((void *)regs + reg) = 0;
-	regs->ip += x->fixup & 0xff;
-	return true;
-}
-
 static int do_jit(struct bpf_prog *bpf_prog, int *addrs, u8 *image,
 		  int oldproglen, struct jit_context *ctx)
 {
@@ -657,7 +447,7 @@ static int do_jit(struct bpf_prog *bpf_prog, int *addrs, u8 *image,
 	int proglen = 0;
 	u8 *prog = temp;
 
-	emit_prologue(&prog, bpf_prog->aux->stack_depth,
+	emit_prologue(&prog, 512, // bpf_prog->aux->stack_depth,
 		      bpf_prog_was_classic(bpf_prog));
 	addrs[0] = prog - temp;
 
@@ -1033,46 +823,47 @@ st:			if (is_imm8(insn->off))
 		case BPF_LDX | BPF_PROBE_MEM | BPF_DW:
 			emit_ldx(&prog, BPF_SIZE(insn->code), dst_reg, src_reg, insn->off);
 			if (BPF_MODE(insn->code) == BPF_PROBE_MEM) {
-				struct exception_table_entry *ex;
-				u8 *_insn = image + proglen;
-				s64 delta;
+				printf("BPF_MODE(insn->code) == BPF_PROBE_MEM unsupported.");
+				// struct exception_table_entry *ex;
+				// u8 *_insn = image + proglen;
+				// s64 delta;
 
-				if (!bpf_prog->aux->extable)
-					break;
+				// if (!bpf_prog->aux->extable)
+				// 	break;
 
-				if (excnt >= bpf_prog->aux->num_exentries) {
-					pr_err("ex gen bug\n");
-					return -EFAULT;
-				}
-				ex = &bpf_prog->aux->extable[excnt++];
+				// if (excnt >= bpf_prog->aux->num_exentries) {
+				// 	pr_err("ex gen bug\n");
+				// 	return -EFAULT;
+				// }
+				// ex = &bpf_prog->aux->extable[excnt++];
 
-				delta = _insn - (u8 *)&ex->insn;
-				if (!is_simm32(delta)) {
-					pr_err("extable->insn doesn't fit into 32-bit\n");
-					return -EFAULT;
-				}
-				ex->insn = delta;
+				// delta = _insn - (u8 *)&ex->insn;
+				// if (!is_simm32(delta)) {
+				// 	pr_err("extable->insn doesn't fit into 32-bit\n");
+				// 	return -EFAULT;
+				// }
+				// ex->insn = delta;
 
-				delta = (u8 *)ex_handler_bpf - (u8 *)&ex->handler;
-				if (!is_simm32(delta)) {
-					pr_err("extable->handler doesn't fit into 32-bit\n");
-					return -EFAULT;
-				}
-				ex->handler = delta;
+				// delta = (u8 *)ex_handler_bpf - (u8 *)&ex->handler;
+				// if (!is_simm32(delta)) {
+				// 	pr_err("extable->handler doesn't fit into 32-bit\n");
+				// 	return -EFAULT;
+				// }
+				// ex->handler = delta;
 
-				if (dst_reg > BPF_REG_9) {
-					pr_err("verifier error\n");
-					return -EFAULT;
-				}
-				/*
-				 * Compute size of x86 insn and its target dest x86 register.
-				 * ex_handler_bpf() will use lower 8 bits to adjust
-				 * pt_regs->ip to jump over this x86 instruction
-				 * and upper bits to figure out which pt_regs to zero out.
-				 * End result: x86 insn "mov rbx, qword ptr [rax+0x14]"
-				 * of 4 bytes will be ignored and rbx will be zero inited.
-				 */
-				ex->fixup = (prog - temp) | (reg2pt_regs[dst_reg] << 8);
+				// if (dst_reg > BPF_REG_9) {
+				// 	pr_err("verifier error\n");
+				// 	return -EFAULT;
+				// }
+				// /*
+				//  * Compute size of x86 insn and its target dest x86 register.
+				//  * ex_handler_bpf() will use lower 8 bits to adjust
+				//  * pt_regs->ip to jump over this x86 instruction
+				//  * and upper bits to figure out which pt_regs to zero out.
+				//  * End result: x86 insn "mov rbx, qword ptr [rax+0x14]"
+				//  * of 4 bytes will be ignored and rbx will be zero inited.
+				//  */
+				// ex->fixup = (prog - temp) | (reg2pt_regs[dst_reg] << 8);
 			}
 			break;
 
@@ -1101,11 +892,12 @@ xadd:			if (is_imm8(insn->off))
 			break;
 
 		case BPF_JMP | BPF_TAIL_CALL:
-			if (imm32)
-				emit_bpf_tail_call_direct(&bpf_prog->aux->poke_tab[imm32 - 1],
-							  &prog, addrs[i], image);
-			else
-				emit_bpf_tail_call_indirect(&prog);
+			printf("BPF_TAIL_CALL unsupported.");
+			// if (imm32)
+			// 	emit_bpf_tail_call_direct(&bpf_prog->aux->poke_tab[imm32 - 1],
+			// 				  &prog, addrs[i], image);
+			// else
+			// 	emit_bpf_tail_call_indirect(&prog);
 			break;
 
 			/* cond jump */
@@ -1327,10 +1119,10 @@ emit_jmp:
 		prog = temp;
 	}
 
-	if (image && excnt != bpf_prog->aux->num_exentries) {
-		pr_err("extable is not populated\n");
-		return -EFAULT;
-	}
+	// if (image && excnt != bpf_prog->aux->num_exentries) {
+	// 	pr_err("extable is not populated\n");
+	// 	return -EFAULT;
+	// }
 	return proglen;
 }
 
@@ -1417,11 +1209,11 @@ static void emit_nops(u8 **pprog, unsigned int len)
 	while (len > 0) {
 		noplen = len;
 
-		if (noplen > ASM_NOP_MAX)
-			noplen = ASM_NOP_MAX;
-
+		// if (noplen > ASM_NOP_MAX)
+		// 	noplen = ASM_NOP_MAX;
+		
 		for (i = 0; i < noplen; i++)
-			EMIT1(ideal_nops[noplen][i]);
+			__asm__ __volatile__("nop");
 		len -= noplen;
 	}
 
@@ -1503,185 +1295,6 @@ static int invoke_bpf_mod_ret(const struct btf_func_model *m, u8 **pprog,
 
 	*pprog = prog;
 	return 0;
-}
-
-/* Example:
- * __be16 eth_type_trans(struct sk_buff *skb, struct net_device *dev);
- * its 'struct btf_func_model' will be nr_args=2
- * The assembly code when eth_type_trans is executing after trampoline:
- *
- * push rbp
- * mov rbp, rsp
- * sub rsp, 16                     // space for skb and dev
- * push rbx                        // temp regs to pass start time
- * mov qword ptr [rbp - 16], rdi   // save skb pointer to stack
- * mov qword ptr [rbp - 8], rsi    // save dev pointer to stack
- * call __bpf_prog_enter           // rcu_read_lock and preempt_disable
- * mov rbx, rax                    // remember start time in bpf stats are enabled
- * lea rdi, [rbp - 16]             // R1==ctx of bpf prog
- * call addr_of_jited_FENTRY_prog
- * movabsq rdi, 64bit_addr_of_struct_bpf_prog  // unused if bpf stats are off
- * mov rsi, rbx                    // prog start time
- * call __bpf_prog_exit            // rcu_read_unlock, preempt_enable and stats math
- * mov rdi, qword ptr [rbp - 16]   // restore skb pointer from stack
- * mov rsi, qword ptr [rbp - 8]    // restore dev pointer from stack
- * pop rbx
- * leave
- * ret
- *
- * eth_type_trans has 5 byte nop at the beginning. These 5 bytes will be
- * replaced with 'call generated_bpf_trampoline'. When it returns
- * eth_type_trans will continue executing with original skb and dev pointers.
- *
- * The assembly code when eth_type_trans is called from trampoline:
- *
- * push rbp
- * mov rbp, rsp
- * sub rsp, 24                     // space for skb, dev, return value
- * push rbx                        // temp regs to pass start time
- * mov qword ptr [rbp - 24], rdi   // save skb pointer to stack
- * mov qword ptr [rbp - 16], rsi   // save dev pointer to stack
- * call __bpf_prog_enter           // rcu_read_lock and preempt_disable
- * mov rbx, rax                    // remember start time if bpf stats are enabled
- * lea rdi, [rbp - 24]             // R1==ctx of bpf prog
- * call addr_of_jited_FENTRY_prog  // bpf prog can access skb and dev
- * movabsq rdi, 64bit_addr_of_struct_bpf_prog  // unused if bpf stats are off
- * mov rsi, rbx                    // prog start time
- * call __bpf_prog_exit            // rcu_read_unlock, preempt_enable and stats math
- * mov rdi, qword ptr [rbp - 24]   // restore skb pointer from stack
- * mov rsi, qword ptr [rbp - 16]   // restore dev pointer from stack
- * call eth_type_trans+5           // execute body of eth_type_trans
- * mov qword ptr [rbp - 8], rax    // save return value
- * call __bpf_prog_enter           // rcu_read_lock and preempt_disable
- * mov rbx, rax                    // remember start time in bpf stats are enabled
- * lea rdi, [rbp - 24]             // R1==ctx of bpf prog
- * call addr_of_jited_FEXIT_prog   // bpf prog can access skb, dev, return value
- * movabsq rdi, 64bit_addr_of_struct_bpf_prog  // unused if bpf stats are off
- * mov rsi, rbx                    // prog start time
- * call __bpf_prog_exit            // rcu_read_unlock, preempt_enable and stats math
- * mov rax, qword ptr [rbp - 8]    // restore eth_type_trans's return value
- * pop rbx
- * leave
- * add rsp, 8                      // skip eth_type_trans's frame
- * ret                             // return to its caller
- */
-int arch_prepare_bpf_trampoline(void *image, void *image_end,
-				const struct btf_func_model *m, u32 flags,
-				struct bpf_tramp_progs *tprogs,
-				void *orig_call)
-{
-	int ret, i, cnt = 0, nr_args = m->nr_args;
-	int stack_size = nr_args * 8;
-	struct bpf_tramp_progs *fentry = &tprogs[BPF_TRAMP_FENTRY];
-	struct bpf_tramp_progs *fexit = &tprogs[BPF_TRAMP_FEXIT];
-	struct bpf_tramp_progs *fmod_ret = &tprogs[BPF_TRAMP_MODIFY_RETURN];
-	u8 **branches = NULL;
-	u8 *prog;
-
-	/* x86-64 supports up to 6 arguments. 7+ can be added in the future */
-	if (nr_args > 6)
-		return -ENOTSUPP;
-
-	if ((flags & BPF_TRAMP_F_RESTORE_REGS) &&
-	    (flags & BPF_TRAMP_F_SKIP_FRAME))
-		return -EINVAL;
-
-	if (flags & BPF_TRAMP_F_CALL_ORIG)
-		stack_size += 8; /* room for return value of orig_call */
-
-	if (flags & BPF_TRAMP_F_SKIP_FRAME)
-		/* skip patched call instruction and point orig_call to actual
-		 * body of the kernel function.
-		 */
-		orig_call += X86_PATCH_SIZE;
-
-	prog = image;
-
-	EMIT1(0x55);		 /* push rbp */
-	EMIT3(0x48, 0x89, 0xE5); /* mov rbp, rsp */
-	EMIT4(0x48, 0x83, 0xEC, stack_size); /* sub rsp, stack_size */
-	EMIT1(0x53);		 /* push rbx */
-
-	save_regs(m, &prog, nr_args, stack_size);
-
-	if (fentry->nr_progs)
-		if (invoke_bpf(m, &prog, fentry, stack_size))
-			return -EINVAL;
-
-	if (fmod_ret->nr_progs) {
-		branches = kcalloc(fmod_ret->nr_progs, sizeof(u8 *),
-				   GFP_KERNEL);
-		if (!branches)
-			return -ENOMEM;
-
-		if (invoke_bpf_mod_ret(m, &prog, fmod_ret, stack_size,
-				       branches)) {
-			ret = -EINVAL;
-			goto cleanup;
-		}
-	}
-
-	if (flags & BPF_TRAMP_F_CALL_ORIG) {
-		if (fentry->nr_progs || fmod_ret->nr_progs)
-			restore_regs(m, &prog, nr_args, stack_size);
-
-		/* call original function */
-		if (emit_call(&prog, orig_call, prog)) {
-			ret = -EINVAL;
-			goto cleanup;
-		}
-		/* remember return value in a stack for bpf prog to access */
-		emit_stx(&prog, BPF_DW, BPF_REG_FP, BPF_REG_0, -8);
-	}
-
-	if (fmod_ret->nr_progs) {
-		/* From Intel 64 and IA-32 Architectures Optimization
-		 * Reference Manual, 3.4.1.4 Code Alignment, Assembly/Compiler
-		 * Coding Rule 11: All branch targets should be 16-byte
-		 * aligned.
-		 */
-		emit_align(&prog, 16);
-		/* Update the branches saved in invoke_bpf_mod_ret with the
-		 * aligned address of do_fexit.
-		 */
-		for (i = 0; i < fmod_ret->nr_progs; i++)
-			emit_cond_near_jump(&branches[i], prog, branches[i],
-					    X86_JNE);
-	}
-
-	if (fexit->nr_progs)
-		if (invoke_bpf(m, &prog, fexit, stack_size)) {
-			ret = -EINVAL;
-			goto cleanup;
-		}
-
-	if (flags & BPF_TRAMP_F_RESTORE_REGS)
-		restore_regs(m, &prog, nr_args, stack_size);
-
-	/* This needs to be done regardless. If there were fmod_ret programs,
-	 * the return value is only updated on the stack and still needs to be
-	 * restored to R0.
-	 */
-	if (flags & BPF_TRAMP_F_CALL_ORIG)
-		/* restore original return value back into RAX */
-		emit_ldx(&prog, BPF_DW, BPF_REG_0, BPF_REG_FP, -8);
-
-	EMIT1(0x5B); /* pop rbx */
-	EMIT1(0xC9); /* leave */
-	if (flags & BPF_TRAMP_F_SKIP_FRAME)
-		/* skip our return address and return to parent */
-		EMIT4(0x48, 0x83, 0xC4, 8); /* add rsp, 8 */
-	EMIT1(0xC3); /* ret */
-	/* Make sure the trampoline generation logic doesn't overflow */
-	if (WARN_ON_ONCE(prog > (u8 *)image_end - BPF_INSN_SAFETY)) {
-		ret = -EFAULT;
-		goto cleanup;
-	}
-	ret = prog - (u8 *)image;
-
-cleanup:
-	kfree(branches);
-	return ret;
 }
 
 static int emit_fallback_jump(u8 **pprog)
@@ -1804,148 +1417,137 @@ struct x64_jit_data {
 
 struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog)
 {
-	struct bpf_binary_header *header = NULL;
-	struct bpf_prog *tmp, *orig_prog = prog;
-	struct x64_jit_data *jit_data;
-	int proglen, oldproglen = 0;
-	struct jit_context ctx = {};
-	bool tmp_blinded = false;
-	bool extra_pass = false;
-	u8 *image = NULL;
-	int *addrs;
-	int pass;
-	int i;
+	return NULL;
+// 	struct bpf_binary_header *header = NULL;
+// 	struct bpf_prog *tmp, *orig_prog = prog;
+// 	struct x64_jit_data *jit_data;
+// 	int proglen, oldproglen = 0;
+// 	struct jit_context ctx = {};
+// 	bool tmp_blinded = false;
+// 	bool extra_pass = false;
+// 	u8 *image = NULL;
+// 	int *addrs;
+// 	int pass;
+// 	int i;
 
-	if (!prog->jit_requested)
-		return orig_prog;
+// 	if (!prog->jit_requested)
+// 		return orig_prog;
 
-	tmp = bpf_jit_blind_constants(prog);
-	/*
-	 * If blinding was requested and we failed during blinding,
-	 * we must fall back to the interpreter.
-	 */
-	if (IS_ERR(tmp))
-		return orig_prog;
-	if (tmp != prog) {
-		tmp_blinded = true;
-		prog = tmp;
-	}
+// 	jit_data = prog->aux->jit_data;
+// 	if (!jit_data) {
+// 		jit_data = kzalloc(sizeof(*jit_data), GFP_KERNEL);
+// 		if (!jit_data) {
+// 			prog = orig_prog;
+// 			goto out;
+// 		}
+// 		prog->aux->jit_data = jit_data;
+// 	}
+// 	addrs = jit_data->addrs;
+// 	if (addrs) {
+// 		ctx = jit_data->ctx;
+// 		oldproglen = jit_data->proglen;
+// 		image = jit_data->image;
+// 		header = jit_data->header;
+// 		extra_pass = true;
+// 		goto skip_init_addrs;
+// 	}
+// 	addrs = kmalloc_array(prog->len + 1, sizeof(*addrs), GFP_KERNEL);
+// 	if (!addrs) {
+// 		prog = orig_prog;
+// 		goto out_addrs;
+// 	}
 
-	jit_data = prog->aux->jit_data;
-	if (!jit_data) {
-		jit_data = kzalloc(sizeof(*jit_data), GFP_KERNEL);
-		if (!jit_data) {
-			prog = orig_prog;
-			goto out;
-		}
-		prog->aux->jit_data = jit_data;
-	}
-	addrs = jit_data->addrs;
-	if (addrs) {
-		ctx = jit_data->ctx;
-		oldproglen = jit_data->proglen;
-		image = jit_data->image;
-		header = jit_data->header;
-		extra_pass = true;
-		goto skip_init_addrs;
-	}
-	addrs = kmalloc_array(prog->len + 1, sizeof(*addrs), GFP_KERNEL);
-	if (!addrs) {
-		prog = orig_prog;
-		goto out_addrs;
-	}
+// 	/*
+// 	 * Before first pass, make a rough estimation of addrs[]
+// 	 * each BPF instruction is translated to less than 64 bytes
+// 	 */
+// 	for (proglen = 0, i = 0; i <= prog->len; i++) {
+// 		proglen += 64;
+// 		addrs[i] = proglen;
+// 	}
+// 	ctx.cleanup_addr = proglen;
+// skip_init_addrs:
 
-	/*
-	 * Before first pass, make a rough estimation of addrs[]
-	 * each BPF instruction is translated to less than 64 bytes
-	 */
-	for (proglen = 0, i = 0; i <= prog->len; i++) {
-		proglen += 64;
-		addrs[i] = proglen;
-	}
-	ctx.cleanup_addr = proglen;
-skip_init_addrs:
+// 	/*
+// 	 * JITed image shrinks with every pass and the loop iterates
+// 	 * until the image stops shrinking. Very large BPF programs
+// 	 * may converge on the last pass. In such case do one more
+// 	 * pass to emit the final image.
+// 	 */
+// 	for (pass = 0; pass < 20 || image; pass++) {
+// 		proglen = do_jit(prog, addrs, image, oldproglen, &ctx);
+// 		if (proglen <= 0) {
+// out_image:
+// 			image = NULL;
+// 			if (header)
+// 				bpf_jit_binary_free(header);
+// 			prog = orig_prog;
+// 			goto out_addrs;
+// 		}
+// 		if (image) {
+// 			if (proglen != oldproglen) {
+// 				pr_err("bpf_jit: proglen=%d != oldproglen=%d\n",
+// 				       proglen, oldproglen);
+// 				goto out_image;
+// 			}
+// 			break;
+// 		}
+// 		if (proglen == oldproglen) {
+// 			/*
+// 			 * The number of entries in extable is the number of BPF_LDX
+// 			 * insns that access kernel memory via "pointer to BTF type".
+// 			 * The verifier changed their opcode from LDX|MEM|size
+// 			 * to LDX|PROBE_MEM|size to make JITing easier.
+// 			 */
+// 			u32 align = __alignof__(struct exception_table_entry);
+// 			u32 extable_size = prog->aux->num_exentries *
+// 				sizeof(struct exception_table_entry);
 
-	/*
-	 * JITed image shrinks with every pass and the loop iterates
-	 * until the image stops shrinking. Very large BPF programs
-	 * may converge on the last pass. In such case do one more
-	 * pass to emit the final image.
-	 */
-	for (pass = 0; pass < 20 || image; pass++) {
-		proglen = do_jit(prog, addrs, image, oldproglen, &ctx);
-		if (proglen <= 0) {
-out_image:
-			image = NULL;
-			if (header)
-				bpf_jit_binary_free(header);
-			prog = orig_prog;
-			goto out_addrs;
-		}
-		if (image) {
-			if (proglen != oldproglen) {
-				pr_err("bpf_jit: proglen=%d != oldproglen=%d\n",
-				       proglen, oldproglen);
-				goto out_image;
-			}
-			break;
-		}
-		if (proglen == oldproglen) {
-			/*
-			 * The number of entries in extable is the number of BPF_LDX
-			 * insns that access kernel memory via "pointer to BTF type".
-			 * The verifier changed their opcode from LDX|MEM|size
-			 * to LDX|PROBE_MEM|size to make JITing easier.
-			 */
-			u32 align = __alignof__(struct exception_table_entry);
-			u32 extable_size = prog->aux->num_exentries *
-				sizeof(struct exception_table_entry);
+// 			/* allocate module memory for x86 insns and extable */
+// 			header = bpf_jit_binary_alloc(roundup(proglen, align) + extable_size,
+// 						      &image, align, jit_fill_hole);
+// 			if (!header) {
+// 				prog = orig_prog;
+// 				goto out_addrs;
+// 			}
+// 			prog->aux->extable = (void *) image + roundup(proglen, align);
+// 		}
+// 		oldproglen = proglen;
+// 		cond_resched();
+// 	}
 
-			/* allocate module memory for x86 insns and extable */
-			header = bpf_jit_binary_alloc(roundup(proglen, align) + extable_size,
-						      &image, align, jit_fill_hole);
-			if (!header) {
-				prog = orig_prog;
-				goto out_addrs;
-			}
-			prog->aux->extable = (void *) image + roundup(proglen, align);
-		}
-		oldproglen = proglen;
-		cond_resched();
-	}
+// 	if (bpf_jit_enable > 1)
+// 		bpf_jit_dump(prog->len, proglen, pass + 1, image);
 
-	if (bpf_jit_enable > 1)
-		bpf_jit_dump(prog->len, proglen, pass + 1, image);
+// 	if (image) {
+// 		if (!prog->is_func || extra_pass) {
+// 			bpf_tail_call_direct_fixup(prog);
+// 			bpf_jit_binary_lock_ro(header);
+// 		} else {
+// 			jit_data->addrs = addrs;
+// 			jit_data->ctx = ctx;
+// 			jit_data->proglen = proglen;
+// 			jit_data->image = image;
+// 			jit_data->header = header;
+// 		}
+// 		prog->bpf_func = (void *)image;
+// 		prog->jited = 1;
+// 		prog->jited_len = proglen;
+// 	} else {
+// 		prog = orig_prog;
+// 	}
 
-	if (image) {
-		if (!prog->is_func || extra_pass) {
-			bpf_tail_call_direct_fixup(prog);
-			bpf_jit_binary_lock_ro(header);
-		} else {
-			jit_data->addrs = addrs;
-			jit_data->ctx = ctx;
-			jit_data->proglen = proglen;
-			jit_data->image = image;
-			jit_data->header = header;
-		}
-		prog->bpf_func = (void *)image;
-		prog->jited = 1;
-		prog->jited_len = proglen;
-	} else {
-		prog = orig_prog;
-	}
-
-	if (!image || !prog->is_func || extra_pass) {
-		if (image)
-			bpf_prog_fill_jited_linfo(prog, addrs + 1);
-out_addrs:
-		kfree(addrs);
-		kfree(jit_data);
-		prog->aux->jit_data = NULL;
-	}
-out:
-	if (tmp_blinded)
-		bpf_jit_prog_release_other(prog, prog == orig_prog ?
-					   tmp : orig_prog);
-	return prog;
+// 	if (!image || !prog->is_func || extra_pass) {
+// 		if (image)
+// 			bpf_prog_fill_jited_linfo(prog, addrs + 1);
+// out_addrs:
+// 		kfree(addrs);
+// 		kfree(jit_data);
+// 		prog->aux->jit_data = NULL;
+// 	}
+// out:
+// 	if (tmp_blinded)
+// 		bpf_jit_prog_release_other(prog, prog == orig_prog ?
+// 					   tmp : orig_prog);
+// 	return prog;
 }

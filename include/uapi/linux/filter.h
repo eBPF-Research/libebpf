@@ -6,7 +6,6 @@
 #ifndef _UAPI__LINUX_FILTER_H__
 #define _UAPI__LINUX_FILTER_H__
 
-#include <linux/compiler.h>
 #include <linux/types.h>
 #include <linux/bpf_common.h>
 
@@ -30,7 +29,7 @@ struct sock_filter {	/* Filter block */
 
 struct sock_fprog {	/* Required for SO_ATTACH_FILTER. */
 	unsigned short		len;	/* Number of filter blocks */
-	struct sock_filter __user *filter;
+	struct sock_filter *filter;
 };
 
 /* ret - BPF_K and BPF_X also apply */
