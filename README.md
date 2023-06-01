@@ -1,36 +1,14 @@
-## Embedded eBPF library for IoT Devices  
+## 代码清理计划
 
+1. 每种架构尽量只保留一个头文件
+将和Linux Kernel相关的删掉。
+#include <linux-header/bpf.h>
+#include <uapi/linux/errno.h>
+#include <linux-header/filter.h>
 
-#### Design  
+https://github.com/eBPF-Research/libebpf/blob/master/src/ebpf_jit_x86_64.h
 
-1. VM-centrate  
+2. 其他makefile和文档尽可能简洁
 
-```
-struct ebpf_env {
-    void *helpers;
-    int err_code;
-    char err_msg[32];
-    int ref_cnt;
-};
-struct ebpf_vm {
-    u8 code;
-    int code_len;
-    int pc;
-};
-u64 ebpf_vm_exec(void *mem, int mem_size);
-u64 ebpf_vm_jit_run();
-
-struct ebpf_prog {
-    ebpf_vm *vm;
-}
-env -> mutiple vm
-vm -> env
-
-one ebpf_prog <=> one vm instance
-```
-
-2. Prog-centrate
-```
-ebpf_vm_run(ebpf_env *env, u8 *code, int codelen, u8 *mem, int memlen);
-```
-
+3. 单元测试
+qemu-user
