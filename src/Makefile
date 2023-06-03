@@ -39,4 +39,4 @@ bpf_jit_comp32.o: bpf_jit_comp32.c ../include/linux-bpf.h
 	$(CC) $(LINUX_CFLAGS_EXTRA) -g -c $< -o $@
 
 clean:
-	rm arch/arm64/net/bpf_jit_comp.o arch/arm/net/bpf_jit_32.o bpf_jit_comp.o
+	rm arch/arm64/net/bpf_jit_comp.o arch/arm/net/bpf_jit_32.o bpf_jit_comp.o bpf_jit_comp32.o

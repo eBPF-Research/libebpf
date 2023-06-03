@@ -10,11 +10,10 @@
  */
 
 #include "type-fixes.h"
+#include "linux-errno.h"
+#include "linux-bpf.h"
 #include <string.h>
 #include <stdio.h>
-#include <uapi/linux/errno.h>
-#include "linux-header/filter.h"
-#include "linux-header/bpf.h"
 
 /*
  * eBPF prog stack layout:

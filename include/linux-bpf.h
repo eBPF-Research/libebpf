@@ -1199,56 +1199,6 @@ typedef u32 (*bpf_convert_ctx_access_t)(enum bpf_access_type type,
 u64 bpf_event_output(struct bpf_map *map, u64 flags, void *meta, u64 meta_size,
 		     void *ctx, u64 ctx_size, bpf_ctx_copy_t ctx_copy);
 
-/* To be used by __cgroup_bpf_run_filter_skb for EGRESS BPF progs
- * so BPF programs can request cwr for TCP packets.
- *
- * Current cgroup skb programs can only return 0 or 1 (0 to drop the
- * packet. This macro changes the behavior so the low order bit
- * indicates whether the packet should be dropped (0) or not (1)
- * and the next bit is a congestion notification bit. This could be
- * used by TCP to call tcp_enter_cwr()
- *
- * Hence, new allowed return values of CGROUP EGRESS BPF programs are:
- *   0: drop packet
- *   1: keep packet
- *   2: drop packet and cn
- *   3: keep packet and cn
- *
- * This macro then converts it to one of the NET_XMIT or an error
- * code that is then interpreted as drop packet (and no cn):
- *   0: NET_XMIT_SUCCESS  skb should be transmitted
- *   1: NET_XMIT_DROP     skb should be dropped and cn
- *   2: NET_XMIT_CN       skb should be transmitted and cn
- *   3: -EPERM            skb should be dropped
- */
-#define BPF_PROG_CGROUP_INET_EGRESS_RUN_ARRAY(array, ctx, func)		\
-	({						\
-		struct bpf_prog_array_item *_item;	\
-		struct bpf_prog *_prog;			\
-		struct bpf_prog_array *_array;		\
-		u32 ret;				\
-		u32 _ret = 1;				\
-		u32 _cn = 0;				\
-		migrate_disable();			\
-		rcu_read_lock();			\
-		_array = rcu_dereference(array);	\
-		_item = &_array->items[0];		\
-		while ((_prog = READ_ONCE(_item->prog))) {		\
-			bpf_cgroup_storage_set(_item->cgroup_storage);	\
-			ret = func(_prog, ctx);		\
-			_ret &= (ret & 1);		\
-			_cn |= (ret & 2);		\
-			_item++;			\
-		}					\
-		rcu_read_unlock();			\
-		migrate_enable();			\
-		if (_ret)				\
-			_ret = (_cn ? NET_XMIT_CN : NET_XMIT_SUCCESS);	\
-		else					\
-			_ret = (_cn ? NET_XMIT_DROP : -EPERM);		\
-		_ret;					\
-	})
-
 #define BPF_PROG_RUN_ARRAY(array, ctx, func)		\
 	__BPF_PROG_RUN_ARRAY(array, ctx, func, false)
 
@@ -1256,54 +1206,6 @@ u64 bpf_event_output(struct bpf_map *map, u64 flags, void *meta, u64 meta_size,
 	__BPF_PROG_RUN_ARRAY(array, ctx, func, true)
 
 bool bpf_prog_get_ok(struct bpf_prog *, enum bpf_prog_type *, bool);
-
-/* verifier prototypes for helper functions called from eBPF programs */
-extern const struct bpf_func_proto bpf_map_lookup_elem_proto;
-extern const struct bpf_func_proto bpf_map_update_elem_proto;
-extern const struct bpf_func_proto bpf_map_delete_elem_proto;
-extern const struct bpf_func_proto bpf_map_push_elem_proto;
-extern const struct bpf_func_proto bpf_map_pop_elem_proto;
-extern const struct bpf_func_proto bpf_map_peek_elem_proto;
-
-extern const struct bpf_func_proto bpf_get_prandom_u32_proto;
-extern const struct bpf_func_proto bpf_get_smp_processor_id_proto;
-extern const struct bpf_func_proto bpf_get_numa_node_id_proto;
-extern const struct bpf_func_proto bpf_tail_call_proto;
-extern const struct bpf_func_proto bpf_ktime_get_ns_proto;
-extern const struct bpf_func_proto bpf_ktime_get_boot_ns_proto;
-extern const struct bpf_func_proto bpf_get_current_pid_tgid_proto;
-extern const struct bpf_func_proto bpf_get_current_uid_gid_proto;
-extern const struct bpf_func_proto bpf_get_current_comm_proto;
-extern const struct bpf_func_proto bpf_get_stackid_proto;
-extern const struct bpf_func_proto bpf_get_stack_proto;
-extern const struct bpf_func_proto bpf_get_task_stack_proto;
-extern const struct bpf_func_proto bpf_sock_map_update_proto;
-extern const struct bpf_func_proto bpf_sock_hash_update_proto;
-extern const struct bpf_func_proto bpf_get_current_cgroup_id_proto;
-extern const struct bpf_func_proto bpf_get_current_ancestor_cgroup_id_proto;
-extern const struct bpf_func_proto bpf_msg_redirect_hash_proto;
-extern const struct bpf_func_proto bpf_msg_redirect_map_proto;
-extern const struct bpf_func_proto bpf_sk_redirect_hash_proto;
-extern const struct bpf_func_proto bpf_sk_redirect_map_proto;
-extern const struct bpf_func_proto bpf_spin_lock_proto;
-extern const struct bpf_func_proto bpf_spin_unlock_proto;
-extern const struct bpf_func_proto bpf_get_local_storage_proto;
-extern const struct bpf_func_proto bpf_strtol_proto;
-extern const struct bpf_func_proto bpf_strtoul_proto;
-extern const struct bpf_func_proto bpf_tcp_sock_proto;
-extern const struct bpf_func_proto bpf_jiffies64_proto;
-extern const struct bpf_func_proto bpf_get_ns_current_pid_tgid_proto;
-extern const struct bpf_func_proto bpf_event_output_data_proto;
-extern const struct bpf_func_proto bpf_ringbuf_output_proto;
-extern const struct bpf_func_proto bpf_ringbuf_reserve_proto;
-extern const struct bpf_func_proto bpf_ringbuf_submit_proto;
-extern const struct bpf_func_proto bpf_ringbuf_discard_proto;
-extern const struct bpf_func_proto bpf_ringbuf_query_proto;
-extern const struct bpf_func_proto bpf_skc_to_tcp6_sock_proto;
-extern const struct bpf_func_proto bpf_skc_to_tcp_sock_proto;
-extern const struct bpf_func_proto bpf_skc_to_tcp_timewait_sock_proto;
-extern const struct bpf_func_proto bpf_skc_to_tcp_request_sock_proto;
-extern const struct bpf_func_proto bpf_skc_to_udp6_sock_proto;
 
 /* Shared helpers among cBPF and eBPF. */
 void bpf_user_rnd_init_once(void);
@@ -1778,7 +1680,6 @@ struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog);
 void bpf_jit_compile(struct bpf_prog *prog);
 bool bpf_jit_needs_zext(void);
 bool bpf_helper_changes_pkt_data(void *func);
-
 
 #ifdef CONFIG_BPF_JIT
 extern int bpf_jit_enable;
