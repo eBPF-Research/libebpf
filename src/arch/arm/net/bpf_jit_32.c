@@ -6,9 +6,8 @@
  * Copyright (c) 2011 Mircea Gherzan <mgherzan@gmail.com>
  */
 
-#include <linux-header/bpf.h>
-#include <uapi/linux/errno.h>
-#include <linux-header/filter.h>
+#include "linux-bpf.h"
+#include "linux-errno.h"
 #include <string.h>
 #include "bpf_jit_32.h"
 

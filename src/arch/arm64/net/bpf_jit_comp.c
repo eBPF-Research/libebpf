@@ -7,8 +7,7 @@
 
 #define pr_fmt(fmt) "bpf_jit: " fmt
 
-#include <linux-header/bpf.h>
-#include <linux-header/filter.h>
+#include "linux-bpf.h"
 #include <asm/insn.h>
 #include <string.h>
 #include <limits.h>

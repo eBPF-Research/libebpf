@@ -12,7 +12,6 @@
 #include "type-fixes.h"
 #include <string.h>
 #include <stdio.h>
-#include <asm/ptrace.h>
 #include <uapi/linux/errno.h>
 #include "linux-header/filter.h"
 #include "linux-header/bpf.h"
