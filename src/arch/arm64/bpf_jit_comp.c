@@ -7,8 +7,9 @@
 
 #define pr_fmt(fmt) "bpf_jit: " fmt
 
+#include "type-fixes.h"
+#include "linux-errno.h"
 #include "linux-bpf.h"
-#include <asm/insn.h>
 #include <string.h>
 #include <limits.h>
 #include <unistd.h>

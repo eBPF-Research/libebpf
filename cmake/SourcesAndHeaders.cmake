@@ -8,7 +8,7 @@ ${srcfiles}
 )
 
 set(exe_sources
-    example/test_vm.c
+    example/main.c
 		${sources}
 )
 
