@@ -1335,6 +1335,87 @@ void __bpf_prog_exit(struct bpf_prog *prog, u64 start);
 		offsetof(TYPE, MEMBER);						\
 	})
 
+struct bpf_prog_aux {
+	u32 used_map_cnt;
+	u32 used_btf_cnt;
+	u32 max_ctx_offset;
+	u32 max_pkt_offset;
+	u32 max_tp_access;
+	u32 stack_depth;
+	u32 id;
+	u32 func_cnt; /* used by non-func prog as the number of func progs */
+	u32 func_idx; /* 0 for non-func prog, the index in func array for func prog */
+	u32 attach_btf_id; /* in-kernel BTF type id to attach to */
+	u32 ctx_arg_info_size;
+	u32 max_rdonly_access;
+	u32 max_rdwr_access;
+	struct btf *attach_btf;
+	const struct bpf_ctx_arg_aux *ctx_arg_info;
+	struct bpf_prog *dst_prog;
+	struct bpf_trampoline *dst_trampoline;
+	enum bpf_prog_type saved_dst_prog_type;
+	enum bpf_attach_type saved_dst_attach_type;
+	bool verifier_zext; /* Zero extensions has been inserted by verifier. */
+	bool dev_bound; /* Program is bound to the netdev. */
+	bool offload_requested; /* Program is bound and offloaded to the netdev. */
+	bool attach_btf_trace; /* true if attaching to BTF-enabled raw tp */
+	bool func_proto_unreliable;
+	bool sleepable;
+	bool tail_call_reachable;
+	bool xdp_has_frags;
+	/* BTF_KIND_FUNC_PROTO for valid attach_btf_id */
+	const struct btf_type *attach_func_proto;
+	/* function name for valid attach_btf_id */
+	const char *attach_func_name;
+	struct bpf_prog **func;
+	void *jit_data; /* JIT specific data. arch dependent */
+	struct bpf_jit_poke_descriptor *poke_tab;
+	struct bpf_kfunc_desc_tab *kfunc_tab;
+	struct bpf_kfunc_btf_tab *kfunc_btf_tab;
+	u32 size_poke_tab;
+	const struct bpf_prog_ops *ops;
+	struct bpf_map **used_maps;
+	struct btf_mod_pair *used_btfs;
+	struct bpf_prog *prog;
+	struct user_struct *user;
+	u64 load_time; /* ns since boottime */
+	u32 verified_insns;
+	int cgroup_atype; /* enum cgroup_bpf_attach_type */
+	struct bpf_map *cgroup_storage[MAX_BPF_CGROUP_STORAGE_TYPE];
+	char name[BPF_OBJ_NAME_LEN];
+#ifdef CONFIG_SECURITY
+	void *security;
+#endif
+	struct bpf_prog_offload *offload;
+	struct btf *btf;
+	struct bpf_func_info *func_info;
+	struct bpf_func_info_aux *func_info_aux;
+	/* bpf_line_info loaded from userspace.  linfo->insn_off
+	 * has the xlated insn offset.
+	 * Both the main and sub prog share the same linfo.
+	 * The subprog can access its first linfo by
+	 * using the linfo_idx.
+	 */
+	struct bpf_line_info *linfo;
+	/* jited_linfo is the jited addr of the linfo.  It has a
+	 * one to one mapping to linfo:
+	 * jited_linfo[i] is the jited addr for the linfo[i]->insn_off.
+	 * Both the main and sub prog share the same jited_linfo.
+	 * The subprog can access its first jited_linfo by
+	 * using the linfo_idx.
+	 */
+	void **jited_linfo;
+	u32 func_info_cnt;
+	u32 nr_linfo;
+	/* subprog can use linfo_idx to access its first linfo and
+	 * jited_linfo.
+	 * main prog always has linfo_idx == 0
+	 */
+	u32 linfo_idx;
+	u32 num_exentries;
+	struct exception_table_entry *extable;
+};
+
 struct bpf_prog {
 	u16			pages;		/* Number of allocated pages */
 	u16			jited:1,	/* Is our filter JIT'ed? */
@@ -1361,7 +1442,6 @@ struct bpf_prog {
 	struct bpf_insn		insnsi[];
 };
 
-
 u64 __bpf_call_base(u64 r1, u64 r2, u64 r3, u64 r4, u64 r5);
 #define __bpf_call_base_args \
 	((u64 (*)(u64, u64, u64, u64, u64, const struct bpf_insn *)) \
@@ -1372,13 +1452,20 @@ void bpf_jit_compile(struct bpf_prog *prog);
 bool bpf_jit_needs_zext(void);
 bool bpf_helper_changes_pkt_data(void *func);
 
-#ifdef CONFIG_BPF_JIT
 extern int bpf_jit_enable;
 extern int bpf_jit_harden;
 extern int bpf_jit_kallsyms;
 extern long bpf_jit_limit;
 
 typedef void (*bpf_jit_fill_hole_t)(void *area, unsigned int size);
+
+/* Some arches need doubleword alignment for their instructions and/or data */
+#define BPF_IMAGE_ALIGNMENT 8
+
+struct bpf_binary_header {
+	u32 size;
+	u8 image[] __attribute__((aligned(BPF_IMAGE_ALIGNMENT)));
+};
 
 struct bpf_binary_header *
 bpf_jit_binary_alloc(unsigned int proglen, u8 **image_ptr,
@@ -1476,73 +1563,20 @@ bpf_address_lookup(unsigned long addr, unsigned long *size,
 void bpf_prog_kallsyms_add(struct bpf_prog *fp);
 void bpf_prog_kallsyms_del(struct bpf_prog *fp);
 
-#else /* CONFIG_BPF_JIT */
-
-static inline bool ebpf_jit_enabled(void)
+static inline unsigned int bpf_prog_size(unsigned int proglen)
 {
-	return false;
+	return max(sizeof(struct bpf_prog),
+		   offsetof(struct bpf_prog, insns[proglen]));
 }
 
-static inline bool bpf_jit_blinding_enabled(struct bpf_prog *prog)
+static inline bool bpf_prog_was_classic(const struct bpf_prog *prog)
 {
-	return false;
+	/* When classic BPF programs have been loaded and the arch
+	 * does not have a classic BPF JIT (anymore), they have been
+	 * converted via bpf_migrate_filter() to eBPF and thus always
+	 * have an unspec program type.
+	 */
+	return prog->type == BPF_PROG_TYPE_UNSPEC;
 }
-
-static inline bool bpf_prog_ebpf_jited(const struct bpf_prog *fp)
-{
-	return false;
-}
-
-static inline int
-bpf_jit_add_poke_descriptor(struct bpf_prog *prog,
-			    struct bpf_jit_poke_descriptor *poke)
-{
-	return -ENOTSUPP;
-}
-
-static inline void bpf_jit_free(struct bpf_prog *fp)
-{
-	bpf_prog_unlock_free(fp);
-}
-
-static inline bool bpf_jit_kallsyms_enabled(void)
-{
-	return false;
-}
-
-static inline const char *
-__bpf_address_lookup(unsigned long addr, unsigned long *size,
-		     unsigned long *off, char *sym)
-{
-	return NULL;
-}
-
-static inline bool is_bpf_text_address(unsigned long addr)
-{
-	return false;
-}
-
-static inline int bpf_get_kallsym(unsigned int symnum, unsigned long *value,
-				  char *type, char *sym)
-{
-	return -ERANGE;
-}
-
-static inline const char *
-bpf_address_lookup(unsigned long addr, unsigned long *size,
-		   unsigned long *off, char **modname, char *sym)
-{
-	return NULL;
-}
-
-static inline void bpf_prog_kallsyms_add(struct bpf_prog *fp)
-{
-}
-
-static inline void bpf_prog_kallsyms_del(struct bpf_prog *fp)
-{
-}
-
-#endif /* CONFIG_BPF_JIT */
 
 #endif /* _LINUX_BPF_H */

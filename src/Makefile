@@ -32,10 +32,10 @@ arch/arm64/bpf_jit_comp.o: arch/arm64/bpf_jit_comp.c ../include/linux-bpf.h
 arch/arm/bpf_jit_32.o: arch/arm/bpf_jit_32.c ../include/linux-bpf.h
 	$(CC) $(LINUX_CFLAGS_EXTRA) -Iarch/arm -g -c $< -o $@
 
-bpf_jit_comp.o: bpf_jit_comp.c ../include/linux-bpf.h
+bpf_jit_comp.o: arch/x86/bpf_jit_comp.c ../include/linux-bpf.h
 	$(CC) $(LINUX_CFLAGS_EXTRA) -g -c $< -o $@
 
-bpf_jit_comp32.o: bpf_jit_comp32.c ../include/linux-bpf.h
+bpf_jit_comp32.o: arch/x86/bpf_jit_comp32.c ../include/linux-bpf.h
 	$(CC) $(LINUX_CFLAGS_EXTRA) -g -c $< -o $@
 
 clean:
