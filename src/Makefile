@@ -24,12 +24,12 @@ LINUX_CFLAGS_EXTRA = $(LINUX_CFLAGS) -fno-PIE -ffunction-sections -fdata-section
 %.o: %.c arch/riscv/net/bpf_jit.h
 	$(CC) $(LINUX_CFLAGS_EXTRA) -g -c $< -o $@
 
-build-arch: arch/arm64/net/bpf_jit_comp.o arch/arm/net/bpf_jit_32.o bpf_jit_comp.o
+build-arch: arch/arm64/bpf_jit_comp.o arch/arm/bpf_jit_32.o bpf_jit_comp.o
 
-arch/arm64/net/bpf_jit_comp.o: arch/arm64/net/bpf_jit_comp.c ../include/linux-bpf.h
+arch/arm64/bpf_jit_comp.o: arch/arm64/bpf_jit_comp.c ../include/linux-bpf.h
 	$(CC) $(LINUX_CFLAGS_EXTRA) -Iarch/arm64 -DCONFIG_ARM64_BTI_KERNEL=1 -g -c $< -o $@
 
-arch/arm/net/bpf_jit_32.o: arch/arm/net/bpf_jit_32.c ../include/linux-bpf.h
+arch/arm/bpf_jit_32.o: arch/arm/bpf_jit_32.c ../include/linux-bpf.h
 	$(CC) $(LINUX_CFLAGS_EXTRA) -Iarch/arm -g -c $< -o $@
 
 bpf_jit_comp.o: bpf_jit_comp.c ../include/linux-bpf.h
@@ -39,4 +39,4 @@ bpf_jit_comp32.o: bpf_jit_comp32.c ../include/linux-bpf.h
 	$(CC) $(LINUX_CFLAGS_EXTRA) -g -c $< -o $@
 
 clean:
-	rm arch/arm64/net/bpf_jit_comp.o arch/arm/net/bpf_jit_32.o bpf_jit_comp.o bpf_jit_comp32.o
+	rm arch/arm64/bpf_jit_comp.o arch/arm/bpf_jit_32.o bpf_jit_comp.o bpf_jit_comp32.o
