@@ -12,6 +12,7 @@
 #include "linux-bpf.h"
 #include <string.h>
 #include <limits.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include "bpf_jit.h"
 
@@ -19,6 +20,24 @@
 #define TMP_REG_2 (MAX_BPF_JIT_REG + 1)
 #define TCALL_CNT (MAX_BPF_JIT_REG + 2)
 #define TMP_REG_3 (MAX_BPF_JIT_REG + 3)
+
+struct exception_table_entry
+{
+	int insn, fixup;
+	short type, data;
+};
+
+#define ARCH_HAS_RELATIVE_EXTABLE
+
+#define swap_ex_entry_fixup(a, b, tmp, delta)		\
+do {							\
+	(a)->fixup = (b)->fixup + (delta);		\
+	(b)->fixup = (tmp).fixup - (delta);		\
+	(a)->type = (b)->type;				\
+	(b)->type = (tmp).type;				\
+	(a)->data = (b)->data;				\
+	(b)->data = (tmp).data;				\
+} while (0)
 
 /* Map BPF registers to A64 registers */
 static const int bpf2a64[] = {
@@ -908,159 +927,155 @@ struct arm64_jit_data {
 
 struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog)
 {
-// 	int image_size, prog_size, extable_size;
-// 	struct bpf_prog *tmp, *orig_prog = prog;
-// 	struct bpf_binary_header *header;
-// 	struct arm64_jit_data *jit_data;
-// 	bool was_classic = bpf_prog_was_classic(prog);
-// 	bool tmp_blinded = false;
-// 	bool extra_pass = false;
-// 	struct jit_ctx ctx;
-// 	u8 *image_ptr;
+	int image_size, prog_size, extable_size;
+	struct bpf_prog *tmp, *orig_prog = prog;
+	struct bpf_binary_header *header;
+	struct arm64_jit_data *jit_data;
+	bool was_classic = bpf_prog_was_classic(prog);
+	bool tmp_blinded = false;
+	bool extra_pass = false;
+	struct jit_ctx ctx;
+	u8 *image_ptr;
 
-// 	if (!prog->jit_requested)
-// 		return orig_prog;
+	if (!prog->jit_requested)
+		return orig_prog;
 
-// 	tmp = bpf_jit_blind_constants(prog);
-// 	/* If blinding was requested and we failed during blinding,
-// 	 * we must fall back to the interpreter.
-// 	 */
-// 	if (IS_ERR(tmp))
-// 		return orig_prog;
-// 	if (tmp != prog) {
-// 		tmp_blinded = true;
-// 		prog = tmp;
-// 	}
+	tmp = bpf_jit_blind_constants(prog);
+	/* If blinding was requested and we failed during blinding,
+	 * we must fall back to the interpreter.
+	 */
+	if (IS_ERR(tmp))
+		return orig_prog;
+	if (tmp != prog) {
+		tmp_blinded = true;
+		prog = tmp;
+	}
 
-// 	jit_data = prog->aux->jit_data;
-// 	if (!jit_data) {
-// 		jit_data = kzalloc(sizeof(*jit_data), GFP_KERNEL);
-// 		if (!jit_data) {
-// 			prog = orig_prog;
-// 			goto out;
-// 		}
-// 		prog->aux->jit_data = jit_data;
-// 	}
-// 	if (jit_data->ctx.offset) {
-// 		ctx = jit_data->ctx;
-// 		image_ptr = jit_data->image;
-// 		header = jit_data->header;
-// 		extra_pass = true;
-// 		prog_size = sizeof(u32) * ctx.idx;
-// 		goto skip_init_ctx;
-// 	}
-// 	memset(&ctx, 0, sizeof(ctx));
-// 	ctx.prog = prog;
+	jit_data = prog->aux->jit_data;
+	if (!jit_data) {
+		jit_data = malloc(sizeof(*jit_data));
+		if (!jit_data) {
+			prog = orig_prog;
+			goto out;
+		}
+		prog->aux->jit_data = jit_data;
+	}
+	if (jit_data->ctx.offset) {
+		ctx = jit_data->ctx;
+		image_ptr = jit_data->image;
+		header = jit_data->header;
+		extra_pass = true;
+		prog_size = sizeof(u32) * ctx.idx;
+		goto skip_init_ctx;
+	}
+	memset(&ctx, 0, sizeof(ctx));
+	ctx.prog = prog;
 
-// 	ctx.offset = kcalloc(prog->len + 1, sizeof(int), GFP_KERNEL);
-// 	if (ctx.offset == NULL) {
-// 		prog = orig_prog;
-// 		goto out_off;
-// 	}
+	ctx.offset = calloc(prog->len + 1, sizeof(int));
+	if (ctx.offset == NULL) {
+		prog = orig_prog;
+		goto out_off;
+	}
 
-// 	/* 1. Initial fake pass to compute ctx->idx. */
+	/* 1. Initial fake pass to compute ctx->idx. */
 
-// 	/* Fake pass to fill in ctx->offset. */
-// 	if (build_body(&ctx, extra_pass)) {
-// 		prog = orig_prog;
-// 		goto out_off;
-// 	}
+	/* Fake pass to fill in ctx->offset. */
+	if (build_body(&ctx, extra_pass)) {
+		prog = orig_prog;
+		goto out_off;
+	}
 
-// 	if (build_prologue(&ctx, was_classic)) {
-// 		prog = orig_prog;
-// 		goto out_off;
-// 	}
+	if (build_prologue(&ctx, was_classic)) {
+		prog = orig_prog;
+		goto out_off;
+	}
 
-// 	ctx.epilogue_offset = ctx.idx;
-// 	build_epilogue(&ctx);
+	ctx.epilogue_offset = ctx.idx;
+	build_epilogue(&ctx);
 
-// 	extable_size = prog->aux->num_exentries *
-// 		sizeof(struct exception_table_entry);
+	extable_size = prog->aux->num_exentries *
+		sizeof(struct exception_table_entry);
 
-// 	/* Now we know the actual image size. */
-// 	prog_size = sizeof(u32) * ctx.idx;
-// 	image_size = prog_size + extable_size;
-// 	header = bpf_jit_binary_alloc(image_size, &image_ptr,
-// 				      sizeof(u32), jit_fill_hole);
-// 	if (header == NULL) {
-// 		prog = orig_prog;
-// 		goto out_off;
-// 	}
+	/* Now we know the actual image size. */
+	prog_size = sizeof(u32) * ctx.idx;
+	image_size = prog_size + extable_size;
+	header = bpf_jit_binary_alloc(image_size, &image_ptr,
+				      sizeof(u32), jit_fill_hole);
+	if (header == NULL) {
+		prog = orig_prog;
+		goto out_off;
+	}
 
-// 	/* 2. Now, the actual pass. */
+	/* 2. Now, the actual pass. */
 
-// 	ctx.image = (__le32 *)image_ptr;
-// 	if (extable_size)
-// 		prog->aux->extable = (void *)image_ptr + prog_size;
-// skip_init_ctx:
-// 	ctx.idx = 0;
-// 	ctx.exentry_idx = 0;
+	ctx.image = (__le32 *)image_ptr;
+	if (extable_size)
+		prog->aux->extable = (void *)image_ptr + prog_size;
+skip_init_ctx:
+	ctx.idx = 0;
+	ctx.exentry_idx = 0;
 
-// 	build_prologue(&ctx, was_classic);
+	build_prologue(&ctx, was_classic);
 
-// 	if (build_body(&ctx, extra_pass)) {
-// 		bpf_jit_binary_free(header);
-// 		prog = orig_prog;
-// 		goto out_off;
-// 	}
+	if (build_body(&ctx, extra_pass)) {
+		bpf_jit_binary_free(header);
+		prog = orig_prog;
+		goto out_off;
+	}
 
-// 	build_epilogue(&ctx);
+	build_epilogue(&ctx);
 
-// 	/* 3. Extra pass to validate JITed code. */
-// 	if (validate_code(&ctx)) {
-// 		bpf_jit_binary_free(header);
-// 		prog = orig_prog;
-// 		goto out_off;
-// 	}
+	/* 3. Extra pass to validate JITed code. */
+	if (validate_code(&ctx)) {
+		bpf_jit_binary_free(header);
+		prog = orig_prog;
+		goto out_off;
+	}
 
-// 	/* And we're done. */
-// 	if (bpf_jit_enable > 1)
-// 		bpf_jit_dump(prog->len, prog_size, 2, ctx.image);
+	/* And we're done. */
+	if (bpf_jit_enable > 1)
+		bpf_jit_dump(prog->len, prog_size, 2, ctx.image);
 
-// 	bpf_flush_icache(header, ctx.image + ctx.idx);
+	bpf_flush_icache(header, ctx.image + ctx.idx);
 
-// 	if (!prog->is_func || extra_pass) {
-// 		if (extra_pass && ctx.idx != jit_data->ctx.idx) {
-// 			pr_err_once("multi-func JIT bug %d != %d\n",
-// 				    ctx.idx, jit_data->ctx.idx);
-// 			bpf_jit_binary_free(header);
-// 			prog->bpf_func = NULL;
-// 			prog->jited = 0;
-// 			goto out_off;
-// 		}
-// 		bpf_jit_binary_lock_ro(header);
-// 	} else {
-// 		jit_data->ctx = ctx;
-// 		jit_data->image = image_ptr;
-// 		jit_data->header = header;
-// 	}
-// 	prog->bpf_func = (void *)ctx.image;
-// 	prog->jited = 1;
-// 	prog->jited_len = prog_size;
+	if (!prog->is_func || extra_pass) {
+		if (extra_pass && ctx.idx != jit_data->ctx.idx) {
+			pr_err_once("multi-func JIT bug %d != %d\n",
+				    ctx.idx, jit_data->ctx.idx);
+			bpf_jit_binary_free(header);
+			prog->bpf_func = NULL;
+			prog->jited = 0;
+			goto out_off;
+		}
+		bpf_jit_binary_lock_ro(header);
+	} else {
+		jit_data->ctx = ctx;
+		jit_data->image = image_ptr;
+		jit_data->header = header;
+	}
+	prog->bpf_func = (void *)ctx.image;
+	prog->jited = 1;
+	prog->jited_len = prog_size;
 
-// 	if (!prog->is_func || extra_pass) {
-// 		bpf_prog_fill_jited_linfo(prog, ctx.offset + 1);
-// out_off:
-// 		kfree(ctx.offset);
-// 		kfree(jit_data);
-// 		prog->aux->jit_data = NULL;
-// 	}
-// out:
-// 	if (tmp_blinded)
-// 		bpf_jit_prog_release_other(prog, prog == orig_prog ?
-// 					   tmp : orig_prog);
-	return NULL;
+	if (!prog->is_func || extra_pass) {
+		bpf_prog_fill_jited_linfo(prog, ctx.offset + 1);
+out_off:
+		kfree(ctx.offset);
+		kfree(jit_data);
+		prog->aux->jit_data = NULL;
+	}
+out:
+	if (tmp_blinded)
+		bpf_jit_prog_release_other(prog, prog == orig_prog ?
+					   tmp : orig_prog);
 }
 
-// void *bpf_jit_alloc_exec(unsigned long size)
-// {
-// 	return __vmalloc_node_range(size, PAGE_SIZE, BPF_JIT_REGION_START,
-// 				    BPF_JIT_REGION_END, GFP_KERNEL,
-// 				    PAGE_KERNEL, 0, NUMA_NO_NODE,
-// 				    __builtin_return_address(0));
-// }
+void *bpf_jit_alloc_exec(unsigned long size)
+{
+	return malloc(size);
+}
 
-// void bpf_jit_free_exec(void *addr)
-// {
-// 	return vfree(addr);
-// }
+void bpf_jit_free_exec(void *addr)
+{
+	return free(addr);
+}

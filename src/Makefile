@@ -38,5 +38,8 @@ arch/x86/bpf_jit_comp.o: arch/x86/bpf_jit_comp.c ../include/linux-bpf.h
 arch/x86/bpf_jit_comp32.o: arch/x86/bpf_jit_comp32.c ../include/linux-bpf.h
 	$(CC) $(LINUX_CFLAGS_EXTRA) -g -c $< -o $@
 
+core.o: core.c
+	$(CC) $(LINUX_CFLAGS_EXTRA) -Iarch/x86 -g -c $< -o $@
+
 clean:
 	rm arch/arm64/bpf_jit_comp.o arch/arm/bpf_jit_32.o arch/x86/bpf_jit_comp.o arch/x86/bpf_jit_comp32.o
