@@ -1,8 +1,9 @@
 #include "type-fixes.h"
 #include "linux-errno.h"
 #include "linux-bpf.h"
-#include "bpf_jit.h"
+#include "bpf_jit_arch.h"
 #include <stdlib.h>
+#include <string.h>
 
 struct bpf_binary_header *
 bpf_jit_binary_alloc(unsigned int proglen, u8 **image_ptr,
@@ -80,7 +81,7 @@ struct bpf_prog *bpf_prog_alloc_no_stats(unsigned int size)
 
 	aux = malloc(sizeof(*aux));
 	if (aux == NULL) {
-		vfree(fp);
+		free(fp);
 		return NULL;
 	}
 	fp->pages = size / PAGE_SIZE;
@@ -94,7 +95,6 @@ struct bpf_prog *bpf_prog_alloc_no_stats(unsigned int size)
 struct bpf_prog *bpf_prog_alloc(unsigned int size)
 {
 	struct bpf_prog *prog;
-	int cpu;
 
 	prog = bpf_prog_alloc_no_stats(size);
 	if (!prog)
@@ -121,11 +121,11 @@ void bpf_prog_jit_attempt_done(struct bpf_prog *prog)
 {
 	if (prog->aux->jited_linfo &&
 	    (!prog->jited || !prog->aux->jited_linfo[0])) {
-		kvfree(prog->aux->jited_linfo);
+		free(prog->aux->jited_linfo);
 		prog->aux->jited_linfo = NULL;
 	}
 
-	kfree(prog->aux->kfunc_tab);
+	free(prog->aux->kfunc_tab);
 	prog->aux->kfunc_tab = NULL;
 }
 
@@ -185,8 +185,8 @@ void bpf_prog_fill_jited_linfo(struct bpf_prog *prog,
 void __bpf_prog_free(struct bpf_prog *fp)
 {
 	if (fp->aux) {
-		kfree(fp->aux->poke_tab);
-		kfree(fp->aux);
+		free(fp->aux->poke_tab);
+		free(fp->aux);
 	}
 	free(fp);
 }

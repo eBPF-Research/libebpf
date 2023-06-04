@@ -9,7 +9,7 @@
  * the BPF JIT compiler for 32-bit ARM by Shubham Bansal and Mircea Gherzan.
  */
 
-#include "bpf_jit.h"
+#include "bpf_jit_arch.h"
 
 /*
  * Stack layout during BPF program execution:
@@ -1086,7 +1086,7 @@ int bpf_jit_emit_insn(const struct bpf_insn *insn, struct rv_jit_context *ctx,
 			/* Do nothing. */
 			break;
 		default:
-			pr_err("bpf-jit: BPF_END imm %d invalid\n", imm);
+			printf("bpf-jit: BPF_END imm %d invalid\n", imm);
 			return -1;
 		}
 
@@ -1120,7 +1120,7 @@ int bpf_jit_emit_insn(const struct bpf_insn *insn, struct rv_jit_context *ctx,
 			emit_rev32(hi(rd), ctx);
 			break;
 		default:
-			pr_err("bpf-jit: BPF_END imm %d invalid\n", imm);
+			printf("bpf-jit: BPF_END imm %d invalid\n", imm);
 			return -1;
 		}
 
@@ -1278,7 +1278,7 @@ notsupported:
 		return -EFAULT;
 
 	default:
-		pr_err("bpf-jit: unknown opcode %02x\n", code);
+		printf("bpf-jit: unknown opcode %02x\n", code);
 		return -EINVAL;
 	}
 

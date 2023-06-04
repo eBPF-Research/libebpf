@@ -14,7 +14,7 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include "bpf_jit.h"
+#include "bpf_jit_arch.h"
 
 #define TMP_REG_1 (MAX_BPF_JIT_REG + 0)
 #define TMP_REG_2 (MAX_BPF_JIT_REG + 1)
@@ -259,7 +259,7 @@ static int build_prologue(struct jit_ctx *ctx, bool ebpf_from_cbpf)
 
 		cur_offset = ctx->idx - idx0;
 		if (cur_offset != PROLOGUE_OFFSET) {
-			pr_err_once("PROLOGUE_OFFSET = %d, expected %d!\n",
+			printf_once("PROLOGUE_OFFSET = %d, expected %d!\n",
 				    cur_offset, PROLOGUE_OFFSET);
 			return -1;
 		}
@@ -849,7 +849,7 @@ emit_cond_jmp:
 		break;
 
 	default:
-		pr_err_once("unknown opcode %02x\n", code);
+		printf_once("unknown opcode %02x\n", code);
 		return -EINVAL;
 	}
 
@@ -1040,7 +1040,7 @@ skip_init_ctx:
 
 	if (!prog->is_func || extra_pass) {
 		if (extra_pass && ctx.idx != jit_data->ctx.idx) {
-			pr_err_once("multi-func JIT bug %d != %d\n",
+			printf_once("multi-func JIT bug %d != %d\n",
 				    ctx.idx, jit_data->ctx.idx);
 			bpf_jit_binary_free(header);
 			prog->bpf_func = NULL;
@@ -1060,8 +1060,8 @@ skip_init_ctx:
 	if (!prog->is_func || extra_pass) {
 		bpf_prog_fill_jited_linfo(prog, ctx.offset + 1);
 out_off:
-		kfree(ctx.offset);
-		kfree(jit_data);
+		free(ctx.offset);
+		free(jit_data);
 		prog->aux->jit_data = NULL;
 	}
 out:

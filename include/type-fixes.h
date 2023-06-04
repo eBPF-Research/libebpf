@@ -145,4 +145,14 @@ typedef struct {
 #define SZ_1G				0x40000000
 #define SZ_2G				0x80000000
 
+/**
+ * round_up - round up to next specified power of 2
+ * @x: the value to round
+ * @y: multiple to round up to (must be a power of 2)
+ *
+ * Rounds @x up to next multiple of @y (which must be a power of 2).
+ * To perform arbitrary rounding up, use roundup() below.
+ */
+#define round_up(x, y) ((((x)-1) | __round_mask(x, y))+1)
+
 #endif // TYPE_FIXED_H

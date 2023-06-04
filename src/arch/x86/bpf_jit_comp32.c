@@ -14,7 +14,7 @@
 #include "linux-bpf.h"
 #include <string.h>
 #include <stdio.h>
-
+#include "bpf_jit_arch.h"
 /*
  * eBPF prog stack layout:
  *
@@ -1620,7 +1620,7 @@ static int do_jit(struct bpf_prog *bpf_prog, int *addrs, u8 *image,
 		/* dst = dst << imm */
 		case BPF_ALU | BPF_RSH | BPF_K:
 		case BPF_ALU | BPF_LSH | BPF_K:
-			if (unlikely(imm32 > 31))
+			if ( (imm32 > 31))
 				return -EINVAL;
 			/* mov ecx,imm32*/
 			EMIT2_off32(0xC7, add_1reg(0xC0, IA32_ECX), imm32);
@@ -1631,13 +1631,13 @@ static int do_jit(struct bpf_prog *bpf_prog, int *addrs, u8 *image,
 			break;
 		/* dst = dst << imm */
 		case BPF_ALU64 | BPF_LSH | BPF_K:
-			if (unlikely(imm32 > 63))
+			if ( (imm32 > 63))
 				return -EINVAL;
 			emit_ia32_lsh_i64(dst, imm32, dstk, &prog);
 			break;
 		/* dst = dst >> imm */
 		case BPF_ALU64 | BPF_RSH | BPF_K:
-			if (unlikely(imm32 > 63))
+			if ( (imm32 > 63))
 				return -EINVAL;
 			emit_ia32_rsh_i64(dst, imm32, dstk, &prog);
 			break;
@@ -1655,7 +1655,7 @@ static int do_jit(struct bpf_prog *bpf_prog, int *addrs, u8 *image,
 			break;
 		/* dst = dst >> imm (signed) */
 		case BPF_ALU64 | BPF_ARSH | BPF_K:
-			if (unlikely(imm32 > 63))
+			if ( (imm32 > 63))
 				return -EINVAL;
 			emit_ia32_arsh_i64(dst, imm32, dstk, &prog);
 			break;
@@ -1890,7 +1890,7 @@ static int do_jit(struct bpf_prog *bpf_prog, int *addrs, u8 *image,
 			jmp_offset = func - (image + addrs[i]);
 
 			if (!imm32 || !is_simm32(jmp_offset)) {
-				pr_err("unsupported BPF func %d addr %p image %p\n",
+				printf("unsupported BPF func %d addr %p image %p\n",
 				       imm32, func, image);
 				return -EINVAL;
 			}
@@ -2151,7 +2151,7 @@ emit_cond_jmp:		jmp_cond = get_cond_jmp_opcode(BPF_OP(code), false);
 			} else if (is_simm32(jmp_offset)) {
 				EMIT2_off32(0x0F, jmp_cond + 0x10, jmp_offset);
 			} else {
-				pr_err("cond_jmp gen bug %llx\n", jmp_offset);
+				printf("cond_jmp gen bug %llx\n", jmp_offset);
 				return -EFAULT;
 			}
 			break;
@@ -2198,7 +2198,7 @@ emit_cond_jmp_signed:	/* Check the condition for low 32-bit comparison */
 			if (is_simm32(jmp_offset)) {
 				EMIT2_off32(0x0F, jmp_cond + 0x10, jmp_offset);
 			} else {
-				pr_err("cond_jmp gen bug %llx\n", jmp_offset);
+				printf("cond_jmp gen bug %llx\n", jmp_offset);
 				return -EFAULT;
 			}
 			EMIT2(0xEB, 6);
@@ -2211,7 +2211,7 @@ emit_cond_jmp_signed:	/* Check the condition for low 32-bit comparison */
 			if (is_simm32(jmp_offset)) {
 				EMIT2_off32(0x0F, jmp_cond + 0x10, jmp_offset);
 			} else {
-				pr_err("cond_jmp gen bug %llx\n", jmp_offset);
+				printf("cond_jmp gen bug %llx\n", jmp_offset);
 				return -EFAULT;
 			}
 			break;
@@ -2237,7 +2237,7 @@ emit_jmp:
 			} else if (is_simm32(jmp_offset)) {
 				EMIT1_off32(0xE9, jmp_offset);
 			} else {
-				pr_err("jmp gen bug %llx\n", jmp_offset);
+				printf("jmp gen bug %llx\n", jmp_offset);
 				return -EFAULT;
 			}
 			break;
@@ -2265,19 +2265,19 @@ notyet:
 			 * to interpreter, but not to JIT or if there is junk in
 			 * bpf_prog
 			 */
-			pr_err("bpf_jit: unknown opcode %02x\n", code);
+			printf("bpf_jit: unknown opcode %02x\n", code);
 			return -EINVAL;
 		}
 
 		ilen = prog - temp;
 		if (ilen > BPF_MAX_INSN_SIZE) {
-			pr_err("bpf_jit: fatal insn size error\n");
+			printf("bpf_jit: fatal insn size error\n");
 			return -EFAULT;
 		}
 
 		if (image) {
-			if (unlikely(proglen + ilen > oldproglen)) {
-				pr_err("bpf_jit: fatal error\n");
+			if ( (proglen + ilen > oldproglen)) {
+				printf("bpf_jit: fatal error\n");
 				return -EFAULT;
 			}
 			memcpy(image + proglen, temp, ilen);
@@ -2355,7 +2355,7 @@ out_image:
 		}
 		if (image) {
 			if (proglen != oldproglen) {
-				pr_err("bpf_jit: proglen=%d != oldproglen=%d\n",
+				printf("bpf_jit: proglen=%d != oldproglen=%d\n",
 				       proglen, oldproglen);
 				goto out_image;
 			}
@@ -2385,7 +2385,7 @@ out_image:
 	}
 
 out_addrs:
-	kfree(addrs);
+	free(addrs);
 out:
 	if (tmp_blinded)
 		bpf_jit_prog_release_other(prog, prog == orig_prog ?

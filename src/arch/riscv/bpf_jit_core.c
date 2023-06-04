@@ -6,7 +6,7 @@
  *
  */
 
-#include "bpf_jit.h"
+#include "bpf_jit_arch.h"
 
 /* Number of iterations to try until offsets converge. */
 #define NR_JIT_ITERATIONS	16
@@ -122,7 +122,7 @@ struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog)
 	}
 
 	if (i == NR_JIT_ITERATIONS) {
-		pr_err("bpf-jit: image did not converge in <%d passes!\n", i);
+		printf("bpf-jit: image did not converge in <%d passes!\n", i);
 		bpf_jit_binary_free(jit_data->header);
 		prog = orig_prog;
 		goto out_offset;
@@ -151,8 +151,8 @@ skip_init_ctx:
 
 	if (!prog->is_func || extra_pass) {
 out_offset:
-		kfree(ctx->offset);
-		kfree(jit_data);
+		free(ctx->offset);
+		free(jit_data);
 		prog->aux->jit_data = NULL;
 	}
 out:

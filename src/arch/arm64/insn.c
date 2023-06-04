@@ -316,7 +316,7 @@ u64 aarch64_insn_decode_immediate(enum aarch64_insn_imm_type type, u32 insn)
 		break;
 	default:
 		if (aarch64_get_imm_shift_mask(type, &mask, &shift) < 0) {
-			pr_err("aarch64_insn_decode_immediate: unknown immediate encoding %d\n",
+			printf("aarch64_insn_decode_immediate: unknown immediate encoding %d\n",
 			       type);
 			return 0;
 		}
@@ -346,7 +346,7 @@ u32  aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
 		break;
 	default:
 		if (aarch64_get_imm_shift_mask(type, &mask, &shift) < 0) {
-			pr_err("aarch64_insn_encode_immediate: unknown immediate encoding %d\n",
+			printf("aarch64_insn_encode_immediate: unknown immediate encoding %d\n",
 			       type);
 			return AARCH64_BREAK_FAULT;
 		}
@@ -380,7 +380,7 @@ u32 aarch64_insn_decode_register(enum aarch64_insn_register_type type,
 		shift = 16;
 		break;
 	default:
-		pr_err("%s: unknown register type encoding %d\n", __func__,
+		printf("%s: unknown register type encoding %d\n", __func__,
 		       type);
 		return 0;
 	}
@@ -398,7 +398,7 @@ static u32 aarch64_insn_encode_register(enum aarch64_insn_register_type type,
 		return AARCH64_BREAK_FAULT;
 
 	if (reg < AARCH64_INSN_REG_0 || reg > AARCH64_INSN_REG_SP) {
-		pr_err("%s: unknown register encoding %d\n", __func__, reg);
+		printf("%s: unknown register encoding %d\n", __func__, reg);
 		return AARCH64_BREAK_FAULT;
 	}
 
@@ -419,7 +419,7 @@ static u32 aarch64_insn_encode_register(enum aarch64_insn_register_type type,
 		shift = 16;
 		break;
 	default:
-		pr_err("%s: unknown register type encoding %d\n", __func__,
+		printf("%s: unknown register type encoding %d\n", __func__,
 		       type);
 		return AARCH64_BREAK_FAULT;
 	}
@@ -449,7 +449,7 @@ static u32 aarch64_insn_encode_ldst_size(enum aarch64_insn_size_type type,
 		size = 3;
 		break;
 	default:
-		pr_err("%s: unknown size encoding %d\n", __func__, type);
+		printf("%s: unknown size encoding %d\n", __func__, type);
 		return AARCH64_BREAK_FAULT;
 	}
 
@@ -465,14 +465,14 @@ static inline long branch_imm_common(unsigned long pc, unsigned long addr,
 	long offset;
 
 	if ((pc & 0x3) || (addr & 0x3)) {
-		pr_err("%s: A64 instructions must be word aligned\n", __func__);
+		printf("%s: A64 instructions must be word aligned\n", __func__);
 		return range;
 	}
 
 	offset = ((long)addr - (long)pc);
 
 	if (offset < -range || offset >= range) {
-		pr_err("%s: offset out of range\n", __func__);
+		printf("%s: offset out of range\n", __func__);
 		return range;
 	}
 
@@ -502,7 +502,7 @@ u32  aarch64_insn_gen_branch_imm(unsigned long pc, unsigned long addr,
 		insn = aarch64_insn_get_b_value();
 		break;
 	default:
-		pr_err("%s: unknown branch encoding %d\n", __func__, type);
+		printf("%s: unknown branch encoding %d\n", __func__, type);
 		return AARCH64_BREAK_FAULT;
 	}
 
@@ -530,7 +530,7 @@ u32 aarch64_insn_gen_comp_branch_imm(unsigned long pc, unsigned long addr,
 		insn = aarch64_insn_get_cbnz_value();
 		break;
 	default:
-		pr_err("%s: unknown branch encoding %d\n", __func__, type);
+		printf("%s: unknown branch encoding %d\n", __func__, type);
 		return AARCH64_BREAK_FAULT;
 	}
 
@@ -541,7 +541,7 @@ u32 aarch64_insn_gen_comp_branch_imm(unsigned long pc, unsigned long addr,
 		insn |= AARCH64_INSN_SF_BIT;
 		break;
 	default:
-		pr_err("%s: unknown variant encoding %d\n", __func__, variant);
+		printf("%s: unknown variant encoding %d\n", __func__, variant);
 		return AARCH64_BREAK_FAULT;
 	}
 
@@ -562,7 +562,7 @@ u32 aarch64_insn_gen_cond_branch_imm(unsigned long pc, unsigned long addr,
 	insn = aarch64_insn_get_bcond_value();
 
 	if (cond < AARCH64_INSN_COND_EQ || cond > AARCH64_INSN_COND_AL) {
-		pr_err("%s: unknown condition encoding %d\n", __func__, cond);
+		printf("%s: unknown condition encoding %d\n", __func__, cond);
 		return AARCH64_BREAK_FAULT;
 	}
 	insn |= cond;
@@ -597,7 +597,7 @@ u32 aarch64_insn_gen_branch_reg(enum aarch64_insn_register reg,
 		insn = aarch64_insn_get_ret_value();
 		break;
 	default:
-		pr_err("%s: unknown branch encoding %d\n", __func__, type);
+		printf("%s: unknown branch encoding %d\n", __func__, type);
 		return AARCH64_BREAK_FAULT;
 	}
 
@@ -620,7 +620,7 @@ u32 aarch64_insn_gen_load_store_reg(enum aarch64_insn_register reg,
 		insn = aarch64_insn_get_str_reg_value();
 		break;
 	default:
-		pr_err("%s: unknown load/store encoding %d\n", __func__, type);
+		printf("%s: unknown load/store encoding %d\n", __func__, type);
 		return AARCH64_BREAK_FAULT;
 	}
 
@@ -659,14 +659,14 @@ u32 aarch64_insn_gen_load_store_pair(enum aarch64_insn_register reg1,
 		insn = aarch64_insn_get_stp_post_value();
 		break;
 	default:
-		pr_err("%s: unknown load/store encoding %d\n", __func__, type);
+		printf("%s: unknown load/store encoding %d\n", __func__, type);
 		return AARCH64_BREAK_FAULT;
 	}
 
 	switch (variant) {
 	case AARCH64_INSN_VARIANT_32BIT:
 		if ((offset & 0x3) || (offset < -256) || (offset > 252)) {
-			pr_err("%s: offset must be multiples of 4 in the range of [-256, 252] %d\n",
+			printf("%s: offset must be multiples of 4 in the range of [-256, 252] %d\n",
 			       __func__, offset);
 			return AARCH64_BREAK_FAULT;
 		}
@@ -674,7 +674,7 @@ u32 aarch64_insn_gen_load_store_pair(enum aarch64_insn_register reg1,
 		break;
 	case AARCH64_INSN_VARIANT_64BIT:
 		if ((offset & 0x7) || (offset < -512) || (offset > 504)) {
-			pr_err("%s: offset must be multiples of 8 in the range of [-512, 504] %d\n",
+			printf("%s: offset must be multiples of 8 in the range of [-512, 504] %d\n",
 			       __func__, offset);
 			return AARCH64_BREAK_FAULT;
 		}
@@ -682,7 +682,7 @@ u32 aarch64_insn_gen_load_store_pair(enum aarch64_insn_register reg1,
 		insn |= AARCH64_INSN_SF_BIT;
 		break;
 	default:
-		pr_err("%s: unknown variant encoding %d\n", __func__, variant);
+		printf("%s: unknown variant encoding %d\n", __func__, variant);
 		return AARCH64_BREAK_FAULT;
 	}
 
@@ -715,7 +715,7 @@ u32 aarch64_insn_gen_load_store_ex(enum aarch64_insn_register reg,
 		insn = aarch64_insn_get_store_ex_value();
 		break;
 	default:
-		pr_err("%s: unknown load/store exclusive encoding %d\n", __func__, type);
+		printf("%s: unknown load/store exclusive encoding %d\n", __func__, type);
 		return AARCH64_BREAK_FAULT;
 	}
 
@@ -746,7 +746,7 @@ u32 aarch64_insn_gen_ldadd(enum aarch64_insn_register result,
 	case AARCH64_INSN_SIZE_64:
 		break;
 	default:
-		pr_err("%s: unimplemented size encoding %d\n", __func__, size);
+		printf("%s: unimplemented size encoding %d\n", __func__, size);
 		return AARCH64_BREAK_FAULT;
 	}
 
@@ -791,7 +791,7 @@ static u32 aarch64_insn_encode_prfm_imm(enum aarch64_insn_prfm_type type,
 		imm_type = BIT(1);
 		break;
 	default:
-		pr_err("%s: unknown prfm type encoding %d\n", __func__, type);
+		printf("%s: unknown prfm type encoding %d\n", __func__, type);
 		return AARCH64_BREAK_FAULT;
 	}
 
@@ -805,7 +805,7 @@ static u32 aarch64_insn_encode_prfm_imm(enum aarch64_insn_prfm_type type,
 		imm_target = BIT(1);
 		break;
 	default:
-		pr_err("%s: unknown prfm target encoding %d\n", __func__, target);
+		printf("%s: unknown prfm target encoding %d\n", __func__, target);
 		return AARCH64_BREAK_FAULT;
 	}
 
@@ -816,7 +816,7 @@ static u32 aarch64_insn_encode_prfm_imm(enum aarch64_insn_prfm_type type,
 		imm_policy = BIT(0);
 		break;
 	default:
-		pr_err("%s: unknown prfm policy encoding %d\n", __func__, policy);
+		printf("%s: unknown prfm policy encoding %d\n", __func__, policy);
 		return AARCH64_BREAK_FAULT;
 	}
 
@@ -865,7 +865,7 @@ u32 aarch64_insn_gen_add_sub_imm(enum aarch64_insn_register dst,
 		insn = aarch64_insn_get_subs_imm_value();
 		break;
 	default:
-		pr_err("%s: unknown add/sub encoding %d\n", __func__, type);
+		printf("%s: unknown add/sub encoding %d\n", __func__, type);
 		return AARCH64_BREAK_FAULT;
 	}
 
@@ -876,7 +876,7 @@ u32 aarch64_insn_gen_add_sub_imm(enum aarch64_insn_register dst,
 		insn |= AARCH64_INSN_SF_BIT;
 		break;
 	default:
-		pr_err("%s: unknown variant encoding %d\n", __func__, variant);
+		printf("%s: unknown variant encoding %d\n", __func__, variant);
 		return AARCH64_BREAK_FAULT;
 	}
 
@@ -901,7 +901,7 @@ u32 aarch64_insn_gen_add_sub_imm(enum aarch64_insn_register dst,
 	return aarch64_insn_encode_immediate(AARCH64_INSN_IMM_12, insn, imm);
 
 out:
-	pr_err("%s: invalid immediate encoding %d\n", __func__, imm);
+	printf("%s: invalid immediate encoding %d\n", __func__, imm);
 	return AARCH64_BREAK_FAULT;
 }
 
@@ -925,7 +925,7 @@ u32 aarch64_insn_gen_bitfield(enum aarch64_insn_register dst,
 		insn = aarch64_insn_get_sbfm_value();
 		break;
 	default:
-		pr_err("%s: unknown bitfield encoding %d\n", __func__, type);
+		printf("%s: unknown bitfield encoding %d\n", __func__, type);
 		return AARCH64_BREAK_FAULT;
 	}
 
@@ -938,16 +938,16 @@ u32 aarch64_insn_gen_bitfield(enum aarch64_insn_register dst,
 		mask = GENMASK(5, 0);
 		break;
 	default:
-		pr_err("%s: unknown variant encoding %d\n", __func__, variant);
+		printf("%s: unknown variant encoding %d\n", __func__, variant);
 		return AARCH64_BREAK_FAULT;
 	}
 
 	if (immr & ~mask) {
-		pr_err("%s: invalid immr encoding %d\n", __func__, immr);
+		printf("%s: invalid immr encoding %d\n", __func__, immr);
 		return AARCH64_BREAK_FAULT;
 	}
 	if (imms & ~mask) {
-		pr_err("%s: invalid imms encoding %d\n", __func__, imms);
+		printf("%s: invalid imms encoding %d\n", __func__, imms);
 		return AARCH64_BREAK_FAULT;
 	}
 
@@ -978,19 +978,19 @@ u32 aarch64_insn_gen_movewide(enum aarch64_insn_register dst,
 		insn = aarch64_insn_get_movn_value();
 		break;
 	default:
-		pr_err("%s: unknown movewide encoding %d\n", __func__, type);
+		printf("%s: unknown movewide encoding %d\n", __func__, type);
 		return AARCH64_BREAK_FAULT;
 	}
 
 	if (imm & ~(SZ_64K - 1)) {
-		pr_err("%s: invalid immediate encoding %d\n", __func__, imm);
+		printf("%s: invalid immediate encoding %d\n", __func__, imm);
 		return AARCH64_BREAK_FAULT;
 	}
 
 	switch (variant) {
 	case AARCH64_INSN_VARIANT_32BIT:
 		if (shift != 0 && shift != 16) {
-			pr_err("%s: invalid shift encoding %d\n", __func__,
+			printf("%s: invalid shift encoding %d\n", __func__,
 			       shift);
 			return AARCH64_BREAK_FAULT;
 		}
@@ -998,13 +998,13 @@ u32 aarch64_insn_gen_movewide(enum aarch64_insn_register dst,
 	case AARCH64_INSN_VARIANT_64BIT:
 		insn |= AARCH64_INSN_SF_BIT;
 		if (shift != 0 && shift != 16 && shift != 32 && shift != 48) {
-			pr_err("%s: invalid shift encoding %d\n", __func__,
+			printf("%s: invalid shift encoding %d\n", __func__,
 			       shift);
 			return AARCH64_BREAK_FAULT;
 		}
 		break;
 	default:
-		pr_err("%s: unknown variant encoding %d\n", __func__, variant);
+		printf("%s: unknown variant encoding %d\n", __func__, variant);
 		return AARCH64_BREAK_FAULT;
 	}
 
@@ -1038,14 +1038,14 @@ u32 aarch64_insn_gen_add_sub_shifted_reg(enum aarch64_insn_register dst,
 		insn = aarch64_insn_get_subs_value();
 		break;
 	default:
-		pr_err("%s: unknown add/sub encoding %d\n", __func__, type);
+		printf("%s: unknown add/sub encoding %d\n", __func__, type);
 		return AARCH64_BREAK_FAULT;
 	}
 
 	switch (variant) {
 	case AARCH64_INSN_VARIANT_32BIT:
 		if (shift & ~(SZ_32 - 1)) {
-			pr_err("%s: invalid shift encoding %d\n", __func__,
+			printf("%s: invalid shift encoding %d\n", __func__,
 			       shift);
 			return AARCH64_BREAK_FAULT;
 		}
@@ -1053,13 +1053,13 @@ u32 aarch64_insn_gen_add_sub_shifted_reg(enum aarch64_insn_register dst,
 	case AARCH64_INSN_VARIANT_64BIT:
 		insn |= AARCH64_INSN_SF_BIT;
 		if (shift & ~(SZ_64 - 1)) {
-			pr_err("%s: invalid shift encoding %d\n", __func__,
+			printf("%s: invalid shift encoding %d\n", __func__,
 			       shift);
 			return AARCH64_BREAK_FAULT;
 		}
 		break;
 	default:
-		pr_err("%s: unknown variant encoding %d\n", __func__, variant);
+		printf("%s: unknown variant encoding %d\n", __func__, variant);
 		return AARCH64_BREAK_FAULT;
 	}
 
@@ -1089,14 +1089,14 @@ u32 aarch64_insn_gen_data1(enum aarch64_insn_register dst,
 		break;
 	case AARCH64_INSN_DATA1_REVERSE_64:
 		if (variant != AARCH64_INSN_VARIANT_64BIT) {
-			pr_err("%s: invalid variant for reverse64 %d\n",
+			printf("%s: invalid variant for reverse64 %d\n",
 			       __func__, variant);
 			return AARCH64_BREAK_FAULT;
 		}
 		insn = aarch64_insn_get_rev64_value();
 		break;
 	default:
-		pr_err("%s: unknown data1 encoding %d\n", __func__, type);
+		printf("%s: unknown data1 encoding %d\n", __func__, type);
 		return AARCH64_BREAK_FAULT;
 	}
 
@@ -1107,7 +1107,7 @@ u32 aarch64_insn_gen_data1(enum aarch64_insn_register dst,
 		insn |= AARCH64_INSN_SF_BIT;
 		break;
 	default:
-		pr_err("%s: unknown variant encoding %d\n", __func__, variant);
+		printf("%s: unknown variant encoding %d\n", __func__, variant);
 		return AARCH64_BREAK_FAULT;
 	}
 
@@ -1144,7 +1144,7 @@ u32 aarch64_insn_gen_data2(enum aarch64_insn_register dst,
 		insn = aarch64_insn_get_rorv_value();
 		break;
 	default:
-		pr_err("%s: unknown data2 encoding %d\n", __func__, type);
+		printf("%s: unknown data2 encoding %d\n", __func__, type);
 		return AARCH64_BREAK_FAULT;
 	}
 
@@ -1155,7 +1155,7 @@ u32 aarch64_insn_gen_data2(enum aarch64_insn_register dst,
 		insn |= AARCH64_INSN_SF_BIT;
 		break;
 	default:
-		pr_err("%s: unknown variant encoding %d\n", __func__, variant);
+		printf("%s: unknown variant encoding %d\n", __func__, variant);
 		return AARCH64_BREAK_FAULT;
 	}
 
@@ -1183,7 +1183,7 @@ u32 aarch64_insn_gen_data3(enum aarch64_insn_register dst,
 		insn = aarch64_insn_get_msub_value();
 		break;
 	default:
-		pr_err("%s: unknown data3 encoding %d\n", __func__, type);
+		printf("%s: unknown data3 encoding %d\n", __func__, type);
 		return AARCH64_BREAK_FAULT;
 	}
 
@@ -1194,7 +1194,7 @@ u32 aarch64_insn_gen_data3(enum aarch64_insn_register dst,
 		insn |= AARCH64_INSN_SF_BIT;
 		break;
 	default:
-		pr_err("%s: unknown variant encoding %d\n", __func__, variant);
+		printf("%s: unknown variant encoding %d\n", __func__, variant);
 		return AARCH64_BREAK_FAULT;
 	}
 
@@ -1244,14 +1244,14 @@ u32 aarch64_insn_gen_logical_shifted_reg(enum aarch64_insn_register dst,
 		insn = aarch64_insn_get_bics_value();
 		break;
 	default:
-		pr_err("%s: unknown logical encoding %d\n", __func__, type);
+		printf("%s: unknown logical encoding %d\n", __func__, type);
 		return AARCH64_BREAK_FAULT;
 	}
 
 	switch (variant) {
 	case AARCH64_INSN_VARIANT_32BIT:
 		if (shift & ~(SZ_32 - 1)) {
-			pr_err("%s: invalid shift encoding %d\n", __func__,
+			printf("%s: invalid shift encoding %d\n", __func__,
 			       shift);
 			return AARCH64_BREAK_FAULT;
 		}
@@ -1259,13 +1259,13 @@ u32 aarch64_insn_gen_logical_shifted_reg(enum aarch64_insn_register dst,
 	case AARCH64_INSN_VARIANT_64BIT:
 		insn |= AARCH64_INSN_SF_BIT;
 		if (shift & ~(SZ_64 - 1)) {
-			pr_err("%s: invalid shift encoding %d\n", __func__,
+			printf("%s: invalid shift encoding %d\n", __func__,
 			       shift);
 			return AARCH64_BREAK_FAULT;
 		}
 		break;
 	default:
-		pr_err("%s: unknown variant encoding %d\n", __func__, variant);
+		printf("%s: unknown variant encoding %d\n", __func__, variant);
 		return AARCH64_BREAK_FAULT;
 	}
 
@@ -1309,7 +1309,7 @@ u32 aarch64_insn_gen_adr(unsigned long pc, unsigned long addr,
 		offset = (addr - ALIGN_DOWN(pc, SZ_4K)) >> 12;
 		break;
 	default:
-		pr_err("%s: unknown adr encoding %d\n", __func__, type);
+		printf("%s: unknown adr encoding %d\n", __func__, type);
 		return AARCH64_BREAK_FAULT;
 	}
 
@@ -1543,7 +1543,7 @@ static u32 aarch64_encode_immediate(u64 imm,
 		esz = 64;
 		break;
 	default:
-		pr_err("%s: unknown variant encoding %d\n", __func__, variant);
+		printf("%s: unknown variant encoding %d\n", __func__, variant);
 		return AARCH64_BREAK_FAULT;
 	}
 
@@ -1645,7 +1645,7 @@ u32 aarch64_insn_gen_logical_immediate(enum aarch64_insn_logic_type type,
 		insn = aarch64_insn_get_ands_imm_value();
 		break;
 	default:
-		pr_err("%s: unknown logical encoding %d\n", __func__, type);
+		printf("%s: unknown logical encoding %d\n", __func__, type);
 		return AARCH64_BREAK_FAULT;
 	}
 
@@ -1676,7 +1676,7 @@ u32 aarch64_insn_gen_extr(enum aarch64_insn_variant variant,
 		insn = aarch64_insn_encode_immediate(AARCH64_INSN_IMM_N, insn, 1);
 		break;
 	default:
-		pr_err("%s: unknown variant encoding %d\n", __func__, variant);
+		printf("%s: unknown variant encoding %d\n", __func__, variant);
 		return AARCH64_BREAK_FAULT;
 	}
 

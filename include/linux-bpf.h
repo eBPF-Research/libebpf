@@ -6,6 +6,7 @@
 
 #include "linux-errno.h"
 #include "type-fixes.h"
+#include <stdio.h>
 
 struct sk_buff;
 struct sock;
@@ -16,6 +17,7 @@ struct xdp_buff;
 struct sock_reuseport;
 struct ctl_table;
 struct ctl_table_header;
+struct bpf_trampoline;
 
 /* ArgX, context and stack frame pointer register positions. Note,
  * Arg1, Arg2, Arg3, etc are used as argument mappings of function
@@ -1025,7 +1027,7 @@ static __always_inline unsigned int bpf_dispatcher_nop_func(
 {
 	return bpf_func(ctx, insnsi);
 }
-#ifdef CONFIG_BPF_JIT
+
 struct bpf_trampoline *bpf_trampoline_lookup(u64 key);
 int bpf_trampoline_link_prog(struct bpf_prog *prog);
 int bpf_trampoline_unlink_prog(struct bpf_prog *prog);
@@ -1064,21 +1066,7 @@ void bpf_trampoline_put(struct bpf_trampoline *tr);
 	extern struct bpf_dispatcher bpf_dispatcher_##name;
 #define BPF_DISPATCHER_FUNC(name) bpf_dispatcher_##name##_func
 #define BPF_DISPATCHER_PTR(name) (&bpf_dispatcher_##name)
-#else
 
-static inline void bpf_trampoline_put(struct bpf_trampoline *tr) {}
-#define DEFINE_BPF_DISPATCHER(name)
-#define DECLARE_BPF_DISPATCHER(name)
-#define BPF_DISPATCHER_FUNC(name) bpf_dispatcher_nop_func
-#define BPF_DISPATCHER_PTR(name) NULL
-static inline void bpf_dispatcher_change_prog(struct bpf_dispatcher *d,
-					      struct bpf_prog *from,
-					      struct bpf_prog *to) {}
-static inline bool is_bpf_image_address(unsigned long address)
-{
-	return false;
-}
-#endif
 
 struct bpf_func_info_aux {
 	u16 linkage;
@@ -1487,7 +1475,7 @@ void bpf_jit_prog_release_other(struct bpf_prog *fp, struct bpf_prog *fp_other);
 static inline void bpf_jit_dump(unsigned int flen, unsigned int proglen,
 				u32 pass, void *image)
 {
-	pr_err("flen=%u proglen=%u pass=%u image=%pK\n", flen,
+	printf("flen=%u proglen=%u pass=%u image=%pK\n", flen,
 	       proglen, pass, image);
 }
 

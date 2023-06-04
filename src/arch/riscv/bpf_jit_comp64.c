@@ -5,7 +5,7 @@
  *
  */
 
-#include "bpf_jit.h"
+#include "bpf_jit_arch.h"
 
 #define RV_REG_TCC RV_REG_A6
 #define RV_REG_TCC_SAVED RV_REG_S6 /* Store A6 in S6 if program do calls */
@@ -408,7 +408,7 @@ static int emit_jump_and_link(u8 rd, s64 rvoff, bool force_jalr,
 		return 0;
 	}
 
-	pr_err("bpf-jit: target offset 0x%llx is out of range\n", rvoff);
+	printf("bpf-jit: target offset 0x%llx is out of range\n", rvoff);
 	return -ERANGE;
 }
 
@@ -1045,7 +1045,7 @@ out_be:
 		     rv_amoadd_d(RV_REG_ZERO, rs, rd, 0, 0), ctx);
 		break;
 	default:
-		pr_err("bpf-jit: unknown opcode %02x\n", code);
+		printf("bpf-jit: unknown opcode %02x\n", code);
 		return -EINVAL;
 	}
 
@@ -1149,5 +1149,5 @@ void *bpf_jit_alloc_exec(unsigned long size)
 
 void bpf_jit_free_exec(void *addr)
 {
-	return vfree(addr);
+	return free(addr);
 }

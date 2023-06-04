@@ -8,7 +8,7 @@
 
 #include "linux-bpf.h"
 #include "linux-errno.h"
-#include "bpf_jit_32.h"
+#include "bpf_jit_arch.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -1209,7 +1209,7 @@ static inline void emit_ar_r(const u8 rd, const u8 rt, const u8 rm,
 // 	if (out_offset == -1)
 // 		out_offset = cur_offset;
 // 	if (cur_offset != out_offset) {
-// 		pr_err_once("tail_call out_offset = %d, expected %d!\n",
+// 		printf_once("tail_call out_offset = %d, expected %d!\n",
 // 			    cur_offset, out_offset);
 // 		return -1;
 // 	}
@@ -1465,7 +1465,7 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
 	case BPF_ALU | BPF_LSH | BPF_K:
 	case BPF_ALU | BPF_RSH | BPF_K:
 	case BPF_ALU | BPF_ARSH | BPF_K:
-		if (unlikely(imm > 31))
+		if ( (imm > 31))
 			return -EINVAL;
 		if (imm)
 			emit_a32_alu_i(dst_lo, imm, ctx, BPF_OP(code));
@@ -1474,13 +1474,13 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
 		break;
 	/* dst = dst << imm */
 	case BPF_ALU64 | BPF_LSH | BPF_K:
-		if (unlikely(imm > 63))
+		if ( (imm > 63))
 			return -EINVAL;
 		emit_a32_lsh_i64(dst, imm, ctx);
 		break;
 	/* dst = dst >> imm */
 	case BPF_ALU64 | BPF_RSH | BPF_K:
-		if (unlikely(imm > 63))
+		if ( (imm > 63))
 			return -EINVAL;
 		emit_a32_rsh_i64(dst, imm, ctx);
 		break;
@@ -1498,7 +1498,7 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
 		break;
 	/* dst = dst >> imm (signed) */
 	case BPF_ALU64 | BPF_ARSH | BPF_K:
-		if (unlikely(imm > 63))
+		if ( (imm > 63))
 			return -EINVAL;
 		emit_a32_arsh_i64(dst, imm, ctx);
 		break;
@@ -1798,7 +1798,7 @@ notyet:
 		pr_info_once("*** NOT YET: opcode %02x ***\n", code);
 		return -EFAULT;
 	default:
-		pr_err_once("unknown opcode %02x\n", code);
+		printf_once("unknown opcode %02x\n", code);
 		return -EINVAL;
 	}
 
@@ -2002,10 +2002,10 @@ struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog)
 out_imms:
 #if __LINUX_ARM_ARCH__ < 7
 	if (ctx.imm_count)
-		kfree(ctx.imms);
+		free(ctx.imms);
 #endif
 out_off:
-	kfree(ctx.offsets);
+	free(ctx.offsets);
 out:
 	if (tmp_blinded)
 		bpf_jit_prog_release_other(prog, prog == orig_prog ?

@@ -11,6 +11,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "bpf_jit_arch.h"
 
 #ifndef __ASSEMBLY__
 
@@ -330,7 +331,7 @@ static int emit_patch(u8 **pprog, void *func, void *ip, u8 opcode)
 
 	offset = func - (ip + X86_PATCH_SIZE);
 	if (!is_simm32(offset)) {
-		pr_err("Target call %p is out of range\n", func);
+		printf("Target call %p is out of range\n", func);
 		return -ERANGE;
 	}
 	EMIT1_off32(opcode, offset);
@@ -904,27 +905,27 @@ st:			if (is_imm8(insn->off))
 				// 	break;
 
 				// if (excnt >= bpf_prog->aux->num_exentries) {
-				// 	pr_err("ex gen bug\n");
+				// 	printf("ex gen bug\n");
 				// 	return -EFAULT;
 				// }
 				// ex = &bpf_prog->aux->extable[excnt++];
 
 				// delta = _insn - (u8 *)&ex->insn;
 				// if (!is_simm32(delta)) {
-				// 	pr_err("extable->insn doesn't fit into 32-bit\n");
+				// 	printf("extable->insn doesn't fit into 32-bit\n");
 				// 	return -EFAULT;
 				// }
 				// ex->insn = delta;
 
 				// delta = (u8 *)ex_handler_bpf - (u8 *)&ex->handler;
 				// if (!is_simm32(delta)) {
-				// 	pr_err("extable->handler doesn't fit into 32-bit\n");
+				// 	printf("extable->handler doesn't fit into 32-bit\n");
 				// 	return -EFAULT;
 				// }
 				// ex->handler = delta;
 
 				// if (dst_reg > BPF_REG_9) {
-				// 	pr_err("verifier error\n");
+				// 	printf("verifier error\n");
 				// 	return -EFAULT;
 				// }
 				// /*
@@ -1112,7 +1113,7 @@ emit_cond_jmp:		/* Convert BPF opcode to x86 */
 			} else if (is_simm32(jmp_offset)) {
 				EMIT2_off32(0x0F, jmp_cond + 0x10, jmp_offset);
 			} else {
-				pr_err("cond_jmp gen bug %llx\n", jmp_offset);
+				printf("cond_jmp gen bug %llx\n", jmp_offset);
 				return -EFAULT;
 			}
 
@@ -1139,7 +1140,7 @@ emit_jmp:
 			} else if (is_simm32(jmp_offset)) {
 				EMIT1_off32(0xE9, jmp_offset);
 			} else {
-				pr_err("jmp gen bug %llx\n", jmp_offset);
+				printf("jmp gen bug %llx\n", jmp_offset);
 				return -EFAULT;
 			}
 			break;
@@ -1169,19 +1170,19 @@ emit_jmp:
 			 * to the interpreter, but not to the JIT, or if there is
 			 * junk in bpf_prog.
 			 */
-			pr_err("bpf_jit: unknown opcode %02x\n", insn->code);
+			printf("bpf_jit: unknown opcode %02x\n", insn->code);
 			return -EINVAL;
 		}
 
 		ilen = prog - temp;
 		if (ilen > BPF_MAX_INSN_SIZE) {
-			pr_err("bpf_jit: fatal insn size error\n");
+			printf("bpf_jit: fatal insn size error\n");
 			return -EFAULT;
 		}
 
 		if (image) {
-			if (unlikely(proglen + ilen > oldproglen)) {
-				pr_err("bpf_jit: fatal error\n");
+			if (proglen + ilen > oldproglen) {
+				printf("bpf_jit: fatal error\n");
 				return -EFAULT;
 			}
 			memcpy(image + proglen, temp, ilen);
@@ -1311,7 +1312,7 @@ static int emit_cond_near_jump(u8 **pprog, void *func, void *ip, u8 jmp_cond)
 
 	offset = func - (ip + 2 + 4);
 	if (!is_simm32(offset)) {
-		pr_err("Target %p is out of range\n", func);
+		printf("Target %p is out of range\n", func);
 		return -EINVAL;
 	}
 	EMIT2_off32(0x0F, jmp_cond + 0x10, offset);
@@ -1559,7 +1560,7 @@ out_image:
 		}
 		if (image) {
 			if (proglen != oldproglen) {
-				pr_err("bpf_jit: proglen=%d != oldproglen=%d\n",
+				printf("bpf_jit: proglen=%d != oldproglen=%d\n",
 				       proglen, oldproglen);
 				goto out_image;
 			}
@@ -1613,8 +1614,8 @@ out_image:
 		if (image)
 			bpf_prog_fill_jited_linfo(prog, addrs + 1);
 out_addrs:
-		kfree(addrs);
-		kfree(jit_data);
+		free(addrs);
+		free(jit_data);
 		prog->aux->jit_data = NULL;
 	}
 out:
