@@ -48,13 +48,6 @@ if(PROJECT_SOURCE_DIR STREQUAL PROJECT_BINARY_DIR)
 endif()
 
 #
-# Enable package managers
-#
-
-include(cmake/Conan.cmake)
-include(cmake/Vcpkg.cmake)
-
-#
 # Create library, setup header and source files
 #
 
@@ -147,12 +140,6 @@ set_project_warnings(${PROJECT_NAME})
 verbose_message("Applied compiler warnings. Using standard ${CMAKE_CXX_STANDARD}.\n")
 
 #
-# Enable Doxygen
-#
-
-include(cmake/Doxygen.cmake)
-
-#
 # Model project dependencies
 #
 
@@ -192,6 +179,7 @@ if(${PROJECT_NAME}_BUILD_HEADERS_ONLY)
   target_include_directories(
     ${PROJECT_NAME}
     INTERFACE
+    ${headers}
     $<INSTALL_INTERFACE:include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   )
@@ -202,6 +190,7 @@ else()
     $<INSTALL_INTERFACE:include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     PRIVATE
+    ${headers}
     ${CMAKE_CURRENT_SOURCE_DIR}/src
   )
   if(${PROJECT_NAME}_BUILD_EXECUTABLE AND ${PROJECT_NAME}_ENABLE_UNIT_TESTING)
@@ -211,6 +200,7 @@ else()
       $<INSTALL_INTERFACE:include>
       $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
       PRIVATE
+      ${headers}
       ${CMAKE_CURRENT_SOURCE_DIR}/src
     )
   endif()
