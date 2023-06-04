@@ -5,23 +5,8 @@
  *
  * Copyright (C) 2014-2016 Zi Shen Lim <zlim.lnx@gmail.com>
  */
-#include <linux/bitops.h>
-#include <linux/bug.h>
-#include <linux/compiler.h>
-#include <linux/kernel.h>
-#include <linux/mm.h>
-#include <linux/smp.h>
-#include <linux/spinlock.h>
-#include <linux/stop_machine.h>
-#include <linux/types.h>
-#include <linux/uaccess.h>
-
-#include <asm/cacheflush.h>
-#include <asm/debug-monitors.h>
-#include <asm/fixmap.h>
-#include <asm/insn.h>
-#include <asm/kprobes.h>
-#include <asm/sections.h>
+#include "insn.h"
+#include "linux-errno.h"
 
 #define AARCH64_INSN_SF_BIT	BIT(31)
 #define AARCH64_INSN_N_BIT	BIT(22)
@@ -46,12 +31,12 @@ static const int aarch64_insn_encoding_class[] = {
 	AARCH64_INSN_CLS_DP_FPSIMD,
 };
 
-enum aarch64_insn_encoding_class __kprobes aarch64_get_insn_class(u32 insn)
+enum aarch64_insn_encoding_class  aarch64_get_insn_class(u32 insn)
 {
 	return aarch64_insn_encoding_class[(insn >> 25) & 0xf];
 }
 
-bool __kprobes aarch64_insn_is_steppable_hint(u32 insn)
+bool  aarch64_insn_is_steppable_hint(u32 insn)
 {
 	if (!aarch64_insn_is_hint(insn))
 		return false;
@@ -104,7 +89,7 @@ static bool is_image_text(unsigned long addr)
 	return core_kernel_text(addr) || is_exit_text(addr);
 }
 
-static void __kprobes *patch_map(void *addr, int fixmap)
+static void  *patch_map(void *addr, int fixmap)
 {
 	unsigned long uintaddr = (uintptr_t) addr;
 	bool image = is_image_text(uintaddr);
@@ -122,7 +107,7 @@ static void __kprobes *patch_map(void *addr, int fixmap)
 			(uintaddr & ~PAGE_MASK));
 }
 
-static void __kprobes patch_unmap(int fixmap)
+static void  patch_unmap(int fixmap)
 {
 	clear_fixmap(fixmap);
 }
@@ -130,7 +115,7 @@ static void __kprobes patch_unmap(int fixmap)
  * In ARMv8-A, A64 instructions have a fixed length of 32 bits and are always
  * little-endian.
  */
-int __kprobes aarch64_insn_read(void *addr, u32 *insnp)
+int  aarch64_insn_read(void *addr, u32 *insnp)
 {
 	int ret;
 	__le32 val;
@@ -142,7 +127,7 @@ int __kprobes aarch64_insn_read(void *addr, u32 *insnp)
 	return ret;
 }
 
-static int __kprobes __aarch64_insn_write(void *addr, __le32 insn)
+static int  __aarch64_insn_write(void *addr, __le32 insn)
 {
 	void *waddr = addr;
 	unsigned long flags = 0;
@@ -159,12 +144,12 @@ static int __kprobes __aarch64_insn_write(void *addr, __le32 insn)
 	return ret;
 }
 
-int __kprobes aarch64_insn_write(void *addr, u32 insn)
+int  aarch64_insn_write(void *addr, u32 insn)
 {
 	return __aarch64_insn_write(addr, cpu_to_le32(insn));
 }
 
-bool __kprobes aarch64_insn_uses_literal(u32 insn)
+bool  aarch64_insn_uses_literal(u32 insn)
 {
 	/* ldr/ldrsw (literal), prfm */
 
@@ -174,7 +159,7 @@ bool __kprobes aarch64_insn_uses_literal(u32 insn)
 		aarch64_insn_is_prfm_lit(insn);
 }
 
-bool __kprobes aarch64_insn_is_branch(u32 insn)
+bool  aarch64_insn_is_branch(u32 insn)
 {
 	/* b, bl, cb*, tb*, b.cond, br, blr */
 
@@ -190,7 +175,7 @@ bool __kprobes aarch64_insn_is_branch(u32 insn)
 		aarch64_insn_is_bcond(insn);
 }
 
-int __kprobes aarch64_insn_patch_text_nosync(void *addr, u32 insn)
+int  aarch64_insn_patch_text_nosync(void *addr, u32 insn)
 {
 	u32 *tp = addr;
 	int ret;
@@ -214,7 +199,7 @@ struct aarch64_insn_patch {
 	atomic_t	cpu_count;
 };
 
-static int __kprobes aarch64_insn_patch_text_cb(void *arg)
+static int  aarch64_insn_patch_text_cb(void *arg)
 {
 	int i, ret = 0;
 	struct aarch64_insn_patch *pp = arg;
@@ -235,7 +220,7 @@ static int __kprobes aarch64_insn_patch_text_cb(void *arg)
 	return ret;
 }
 
-int __kprobes aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt)
+int  aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt)
 {
 	struct aarch64_insn_patch patch = {
 		.text_addrs = addrs,
@@ -251,7 +236,7 @@ int __kprobes aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt)
 				       cpu_online_mask);
 }
 
-static int __kprobes aarch64_get_imm_shift_mask(enum aarch64_insn_imm_type type,
+static int  aarch64_get_imm_shift_mask(enum aarch64_insn_imm_type type,
 						u32 *maskp, int *shiftp)
 {
 	u32 mask;
@@ -340,7 +325,7 @@ u64 aarch64_insn_decode_immediate(enum aarch64_insn_imm_type type, u32 insn)
 	return (insn >> shift) & mask;
 }
 
-u32 __kprobes aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
+u32  aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
 				  u32 insn, u64 imm)
 {
 	u32 immlo, immhi, mask;
@@ -494,7 +479,7 @@ static inline long branch_imm_common(unsigned long pc, unsigned long addr,
 	return offset;
 }
 
-u32 __kprobes aarch64_insn_gen_branch_imm(unsigned long pc, unsigned long addr,
+u32  aarch64_insn_gen_branch_imm(unsigned long pc, unsigned long addr,
 					  enum aarch64_insn_branch_type type)
 {
 	u32 insn;
@@ -586,12 +571,12 @@ u32 aarch64_insn_gen_cond_branch_imm(unsigned long pc, unsigned long addr,
 					     offset >> 2);
 }
 
-u32 __kprobes aarch64_insn_gen_hint(enum aarch64_insn_hint_cr_op op)
+u32  aarch64_insn_gen_hint(enum aarch64_insn_hint_cr_op op)
 {
 	return aarch64_insn_get_hint_value() | op;
 }
 
-u32 __kprobes aarch64_insn_gen_nop(void)
+u32  aarch64_insn_gen_nop(void)
 {
 	return aarch64_insn_gen_hint(AARCH64_INSN_HINT_NOP);
 }
@@ -1435,71 +1420,71 @@ u32 aarch32_insn_mcr_extract_crm(u32 insn)
 	return insn & CRM_MASK;
 }
 
-static bool __kprobes __check_eq(unsigned long pstate)
+static bool  __check_eq(unsigned long pstate)
 {
 	return (pstate & PSR_Z_BIT) != 0;
 }
 
-static bool __kprobes __check_ne(unsigned long pstate)
+static bool  __check_ne(unsigned long pstate)
 {
 	return (pstate & PSR_Z_BIT) == 0;
 }
 
-static bool __kprobes __check_cs(unsigned long pstate)
+static bool  __check_cs(unsigned long pstate)
 {
 	return (pstate & PSR_C_BIT) != 0;
 }
 
-static bool __kprobes __check_cc(unsigned long pstate)
+static bool  __check_cc(unsigned long pstate)
 {
 	return (pstate & PSR_C_BIT) == 0;
 }
 
-static bool __kprobes __check_mi(unsigned long pstate)
+static bool  __check_mi(unsigned long pstate)
 {
 	return (pstate & PSR_N_BIT) != 0;
 }
 
-static bool __kprobes __check_pl(unsigned long pstate)
+static bool  __check_pl(unsigned long pstate)
 {
 	return (pstate & PSR_N_BIT) == 0;
 }
 
-static bool __kprobes __check_vs(unsigned long pstate)
+static bool  __check_vs(unsigned long pstate)
 {
 	return (pstate & PSR_V_BIT) != 0;
 }
 
-static bool __kprobes __check_vc(unsigned long pstate)
+static bool  __check_vc(unsigned long pstate)
 {
 	return (pstate & PSR_V_BIT) == 0;
 }
 
-static bool __kprobes __check_hi(unsigned long pstate)
+static bool  __check_hi(unsigned long pstate)
 {
 	pstate &= ~(pstate >> 1);	/* PSR_C_BIT &= ~PSR_Z_BIT */
 	return (pstate & PSR_C_BIT) != 0;
 }
 
-static bool __kprobes __check_ls(unsigned long pstate)
+static bool  __check_ls(unsigned long pstate)
 {
 	pstate &= ~(pstate >> 1);	/* PSR_C_BIT &= ~PSR_Z_BIT */
 	return (pstate & PSR_C_BIT) == 0;
 }
 
-static bool __kprobes __check_ge(unsigned long pstate)
+static bool  __check_ge(unsigned long pstate)
 {
 	pstate ^= (pstate << 3);	/* PSR_N_BIT ^= PSR_V_BIT */
 	return (pstate & PSR_N_BIT) == 0;
 }
 
-static bool __kprobes __check_lt(unsigned long pstate)
+static bool  __check_lt(unsigned long pstate)
 {
 	pstate ^= (pstate << 3);	/* PSR_N_BIT ^= PSR_V_BIT */
 	return (pstate & PSR_N_BIT) != 0;
 }
 
-static bool __kprobes __check_gt(unsigned long pstate)
+static bool  __check_gt(unsigned long pstate)
 {
 	/*PSR_N_BIT ^= PSR_V_BIT */
 	unsigned long temp = pstate ^ (pstate << 3);
@@ -1508,7 +1493,7 @@ static bool __kprobes __check_gt(unsigned long pstate)
 	return (temp & PSR_N_BIT) == 0;
 }
 
-static bool __kprobes __check_le(unsigned long pstate)
+static bool  __check_le(unsigned long pstate)
 {
 	/*PSR_N_BIT ^= PSR_V_BIT */
 	unsigned long temp = pstate ^ (pstate << 3);
@@ -1517,7 +1502,7 @@ static bool __kprobes __check_le(unsigned long pstate)
 	return (temp & PSR_N_BIT) != 0;
 }
 
-static bool __kprobes __check_al(unsigned long pstate)
+static bool  __check_al(unsigned long pstate)
 {
 	return true;
 }

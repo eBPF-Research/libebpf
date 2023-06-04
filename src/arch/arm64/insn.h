@@ -7,9 +7,9 @@
  */
 #ifndef	__ASM_INSN_H
 #define	__ASM_INSN_H
-#include <linux/types.h>
 
-#include <asm/insn-def.h>
+#include "type-fixes.h"
+#include "insn-def.h"
 
 #ifndef __ASSEMBLY__
 

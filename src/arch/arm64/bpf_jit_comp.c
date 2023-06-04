@@ -219,8 +219,8 @@ static int build_prologue(struct jit_ctx *ctx, bool ebpf_from_cbpf)
 	 */
 
 	/* BTI landing pad */
-	if ((CONFIG_ARM64_BTI_KERNEL))
-		emit(A64_BTI_C, ctx);
+	// if ((CONFIG_ARM64_BTI_KERNEL))
+	// 	emit(A64_BTI_C, ctx);
 
 	/* Save FP and LR registers to stay align with ARM64 AAPCS */
 	emit(A64_PUSH(A64_FP, A64_LR, A64_SP), ctx);
