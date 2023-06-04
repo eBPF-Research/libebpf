@@ -5,6 +5,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+int bpf_jit_enable = true;
+// const int bpf_jit_harden;
+// const int bpf_jit_kallsyms;
+// const long bpf_jit_limit;
+
 struct bpf_binary_header *
 bpf_jit_binary_alloc(unsigned int proglen, u8 **image_ptr,
 		     unsigned int alignment,
@@ -13,8 +18,10 @@ bpf_jit_binary_alloc(unsigned int proglen, u8 **image_ptr,
 	struct bpf_binary_header *hdr;
 	u32 size, hole, start;
 
-	WARN_ON_ONCE(!is_power_of_2(alignment) ||
-		     alignment > BPF_IMAGE_ALIGNMENT);
+	if(!is_power_of_2(alignment) ||
+		     alignment > BPF_IMAGE_ALIGNMENT) {
+				printf("!is_power_of_2(alignment) || alignment > BPF_IMAGE_ALIGNMENT");
+	}
 
 	/* Most of BPF filters are really small, but if some of them
 	 * fill a page, allow at least 128 extra bytes to insert a
@@ -36,7 +43,8 @@ bpf_jit_binary_alloc(unsigned int proglen, u8 **image_ptr,
 	hdr->size = size;
 	hole = min(size - (proglen + sizeof(*hdr)),
 		     PAGE_SIZE - sizeof(*hdr));
-	start = get_random_u32_below(hole) & ~(alignment - 1);
+	// get_random_u32_below(hole)
+	start = (hole - 1) & ~(alignment - 1);
 
 	/* Leave a random number of instructions before BPF code. */
 	*image_ptr = &hdr->image[start];
@@ -102,7 +110,6 @@ struct bpf_prog *bpf_prog_alloc(unsigned int size)
 
 	return prog;
 }
-EXPORT_SYMBOL_GPL(bpf_prog_alloc);
 
 int bpf_prog_alloc_jited_linfo(struct bpf_prog *prog)
 {

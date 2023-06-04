@@ -292,7 +292,7 @@ enum aarch64_insn_mb_type {
 #define	__AARCH64_INSN_FUNCS(abbr, mask, val)				\
 static __always_inline bool aarch64_insn_is_##abbr(u32 code)		\
 {									\
-	BUILD_BUG_ON(~(mask) & (val));					\
+	/* BUILD_BUG_ON(~(mask) & (val)); */					\
 	return (code & (mask)) == (val);				\
 }									\
 static __always_inline u32 aarch64_insn_get_##abbr##_value(void)	\

@@ -1,10 +1,15 @@
 file(GLOB srcfiles
     "${PROJECT_SOURCE_DIR}/src/*.c")
-file(GLOB headerfiles
-		"${PROJECT_SOURCE_DIR}/src/*.h")
+
+# Allow user to specify the architecture
+if(NOT DEFINED ARCH)
+  set(ARCH ${CMAKE_SYSTEM_PROCESSOR})
+endif()
+
+message(STATUS "Building for architecture: ${ARCH}")
 
 # Detect the architecture
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm")
+if(ARCH MATCHES "arm")
   message(STATUS "arm architecture detected")
   set(ARCH_SOURCES
     src/arch/arm/bpf_jit_32.c
@@ -12,7 +17,7 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm")
   set(ARCH_HEADERS
     src/arch/arm/
   )
-elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+elseif(ARCH MATCHES "aarch64")
   message(STATUS "arm64 architecture detected")
   set(ARCH_SOURCES
     src/arch/arm64/bpf_jit_comp.c
@@ -21,7 +26,7 @@ elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
   set(ARCH_HEADERS
     src/arch/arm64/
   )
-elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "riscv")
+elseif(ARCH MATCHES "riscv")
   message(STATUS "riscv architecture detected")
   set(ARCH_SOURCES
     src/arch/riscv/bpf_jit_comp64.c
@@ -30,7 +35,7 @@ elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "riscv")
   set(ARCH_HEADERS
     src/arch/riscv/
   )
-elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64" OR CMAKE_SYSTEM_PROCESSOR MATCHES "i686" OR CMAKE_SYSTEM_PROCESSOR MATCHES "i386")
+elseif(ARCH MATCHES "x86_64" OR ARCH MATCHES "i686" OR ARCH MATCHES "i386")
   message(STATUS "x86 architecture detected")
   set(ARCH_SOURCES
     src/arch/x86/bpf_jit_comp.c
@@ -49,11 +54,12 @@ set(sources
 
 set(exe_sources
     example/main.c
-		${sources}
+    ${sources}
 )
 
 set(headers
     include/
+    src/
     ${ARCH_HEADERS}
     ${headerfiles}
 )

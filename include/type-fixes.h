@@ -14,11 +14,9 @@ typedef int32_t s32;
 typedef uint64_t u64;
 typedef int64_t s64;
 
-
 #ifndef __ASSEMBLY__
 
 #include <linux/posix_types.h>
-
 
 /*
  * Below are truly Linux-specific types that should never collide with
@@ -36,7 +34,6 @@ typedef int64_t s64;
  * __xx is ok: it doesn't pollute the POSIX namespace. Use these in the
  * header files exported to user space
  */
-
 typedef __signed__ char __s8;
 typedef unsigned char __u8;
 
@@ -87,6 +84,8 @@ typedef unsigned __bitwise __poll_t;
 #define BPF_COMPLEXITY_LIMIT_INSNS      1000000 /* yes. 1M insns */
 #define MAX_TAIL_CALL_CNT 32
 
+#define __ALIGN_KERNEL_MASK(x, mask)	(((x) + (mask)) & ~(mask))
+#define __ALIGN_KERNEL(x, a)		__ALIGN_KERNEL_MASK(x, (__typeof__(x))(a) - 1)
 /* @a is a power of 2 value */
 #define ALIGN(x, a)		__ALIGN_KERNEL((x), (a))
 #define ALIGN_DOWN(x, a)	__ALIGN_KERNEL((x) - ((a) - 1), (a))
@@ -145,6 +144,14 @@ typedef struct {
 #define SZ_1G				0x40000000
 #define SZ_2G				0x80000000
 
+/*
+ * This looks more complex than it should be. But we need to
+ * get the type for the ~ right in round_down (it needs to be
+ * as wide as the result!), and we want to evaluate the macro
+ * arguments just once each.
+ */
+#define __round_mask(x, y) ((__typeof__(x))((y)-1))
+
 /**
  * round_up - round up to next specified power of 2
  * @x: the value to round
@@ -154,5 +161,37 @@ typedef struct {
  * To perform arbitrary rounding up, use roundup() below.
  */
 #define round_up(x, y) ((((x)-1) | __round_mask(x, y))+1)
+
+/*
+ * Compiler (optimization) barrier.
+ */
+#ifndef barrier
+#define barrier() asm volatile("" ::: "memory")
+#endif
+
+#define BIT(nr)			(1UL << (nr))
+#define BIT_ULL(nr)		(1ULL << (nr))
+
+#ifndef min
+#define min(x, y) ({                \
+   typeof(x) _min1 = (x);          \
+   typeof(y) _min2 = (y);          \
+   (void) (&_min1 == &_min2);      \
+   _min1 < _min2 ? _min1 : _min2; })
+#endif
+
+#ifndef max
+#define max(x, y) ({                \
+   typeof(x) _max1 = (x);          \
+   typeof(y) _max2 = (y);          \
+   (void) (&_max1 == &_max2);      \
+   _max1 > _max2 ? _max1 : _max2; })
+#endif
+
+static inline __attribute__((const))
+bool is_power_of_2(unsigned long n)
+{
+	return (n != 0 && ((n & (n - 1)) == 0));
+}
 
 #endif // TYPE_FIXED_H

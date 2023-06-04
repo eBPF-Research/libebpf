@@ -1567,4 +1567,15 @@ static inline bool bpf_prog_was_classic(const struct bpf_prog *prog)
 	return prog->type == BPF_PROG_TYPE_UNSPEC;
 }
 
+void bpf_prog_free_linfo(struct bpf_prog *prog);
+void bpf_prog_fill_jited_linfo(struct bpf_prog *prog,
+			       const u32 *insn_to_jit_off);
+int bpf_prog_alloc_jited_linfo(struct bpf_prog *prog);
+void bpf_prog_jit_attempt_done(struct bpf_prog *prog);
+
+struct bpf_prog *bpf_prog_alloc(unsigned int size);
+struct bpf_prog *bpf_prog_alloc_no_stats(unsigned int size);
+struct bpf_prog *bpf_prog_realloc(struct bpf_prog *fp_old, unsigned int size);
+void __bpf_prog_free(struct bpf_prog *fp);
+
 #endif /* _LINUX_BPF_H */

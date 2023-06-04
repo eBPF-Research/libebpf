@@ -1578,13 +1578,13 @@ out_image:
 				sizeof(struct exception_table_entry);
 
 			/* allocate module memory for x86 insns and extable */
-			header = bpf_jit_binary_alloc(roundup(proglen, align) + extable_size,
+			header = bpf_jit_binary_alloc(round_up(proglen, align) + extable_size,
 						      &image, align, jit_fill_hole);
 			if (!header) {
 				prog = orig_prog;
 				goto out_addrs;
 			}
-			prog->aux->extable = (void *) image + roundup(proglen, align);
+			prog->aux->extable = (void *) image + round_up(proglen, align);
 		}
 		oldproglen = proglen;
 		cond_resched();
