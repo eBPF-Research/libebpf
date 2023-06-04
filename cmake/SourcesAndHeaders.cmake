@@ -1,6 +1,3 @@
-file(GLOB srcfiles
-    "${PROJECT_SOURCE_DIR}/src/*.c")
-
 # Allow user to specify the architecture
 if(NOT DEFINED ARCH)
   set(ARCH ${CMAKE_SYSTEM_PROCESSOR})
@@ -48,8 +45,11 @@ else()
 endif()
 
 set(sources
-  ${ARCH_SOURCES}
-  ${srcfiles}
+  # ${ARCH_SOURCES}
+  src/ebpf_jit_arm64.c
+  src/ebpf_jit_x86_64.c
+  src/ebpf_jit.c
+  src/ebpf_vm.c
 )
 
 set(exe_sources

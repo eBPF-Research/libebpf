@@ -1,4 +1,4 @@
-.PHONY: install coverage test docs help build clean
+.PHONY: install coverage test docs help build clean build-arm run-arm
 .DEFAULT_GOAL := help
 
 define BROWSER_PYSCRIPT
@@ -54,6 +54,13 @@ docs: ## generate Doxygen HTML documentation, including API docs
 build: ## build the package
 	cmake -Bbuild
 	cmake --build build --config Debug
+
+build-arm: ## build the package on arm32
+	cmake -Bbuild -DCMAKE_TOOLCHAIN_FILE=cmake/arm-toolchain.cmake
+	cmake --build build --config Debug
+
+run-arm: build-arm ## run the package on arm32
+	qemu-arm build/bin/Debug/libebpf
 
 install: ## install the package to the `INSTALL_LOCATION`
 	rm -rf build/

@@ -102,6 +102,8 @@ else()
   endif()
 endif()
 
+# set the -static flag for static linking
+set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "-static")
 set_target_properties(
   ${PROJECT_NAME}
   PROPERTIES
