@@ -12,3 +12,17 @@ https://github.com/eBPF-Research/libebpf/blob/master/src/ebpf_jit_x86_64.h
 
 3. 单元测试
 qemu-user
+
+## install arm32 arm64 build and qemu
+
+arm32:
+
+```bash
+sudo apt-get install gcc-arm-linux-gnueabi qemu-user
+```
+
+arm64:
+
+```bash
+sudo apt-get install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+```

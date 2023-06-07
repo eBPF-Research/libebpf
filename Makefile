@@ -1,4 +1,4 @@
-.PHONY: install coverage test docs help build clean build-arm run-arm
+.PHONY: install coverage test docs help build clean build-arm run-arm run-arm64 build-arm64 build-arm32
 .DEFAULT_GOAL := help
 
 define BROWSER_PYSCRIPT
@@ -55,12 +55,19 @@ build: ## build the package
 	cmake -Bbuild
 	cmake --build build --config Debug
 
-build-arm: ## build the package on arm32
+build-arm32: ## build the package on arm32
 	cmake -Bbuild -DCMAKE_TOOLCHAIN_FILE=cmake/arm-toolchain.cmake
 	cmake --build build --config Debug
 
-run-arm: build-arm ## run the package on arm32
-	qemu-arm build/bin/Debug/libebpf
+run-arm32: build-arm32 ## run the binary on arm32 qemu
+	qemu-arm -L /usr/arm-linux-gnueabihf/ /home/yunwei/libebpf/build/bin/Debug/libebpf
+
+build-arm64: ## build the package on arm64
+	cmake -Bbuild -DCMAKE_TOOLCHAIN_FILE=cmake/aarch64-toolchain.cmake
+	cmake --build build --config Debug
+
+run-arm64: build-arm64 ## run the binary on arm32 qemu
+	qemu-aarch64 -L /usr/aarch64-linux-gnu/  /home/yunwei/libebpf/build/bin/Debug/libebpf
 
 install: ## install the package to the `INSTALL_LOCATION`
 	rm -rf build/

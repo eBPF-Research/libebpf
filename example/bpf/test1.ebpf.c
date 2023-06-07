@@ -4,5 +4,5 @@ struct data {
 };
 
 int add_test(struct data *d, int sz) {
-	return d->a + d->b;
+ 	return d->a + d->b;
 }
