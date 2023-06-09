@@ -5,6 +5,9 @@
 #include "libebpf/linux-jit-bpf.h"
 #include <stdlib.h>
 #include <string.h>
+#ifdef __linux__
+#include <time.h>
+#endif
 
 int bpf_jit_enable = true;
 // const int bpf_jit_harden;
@@ -89,10 +92,7 @@ bpf_jit_binary_alloc(unsigned int proglen, u8 **image_ptr,
 
 void bpf_jit_binary_free(struct bpf_binary_header *hdr)
 {
-	u32 size = hdr->size;
-
 	bpf_jit_free_exec(hdr);
-	// bpf_jit_uncharge_modmem(size);
 }
 
 typedef unsigned int (*bpf_dispatcher_fn)(const void *ctx,
@@ -178,7 +178,7 @@ void bpf_prog_jit_attempt_done(struct bpf_prog *prog)
  * here is relative to the prog itself instead of the main prog.
  * This array has one entry for each xlated bpf insn.
  *
- * jited_off is the byte off to the end of the jited insn.
+ * jited_off is the byte off to the last byte of the jited insn.
  *
  * Hence, with
  * insn_start:
@@ -240,12 +240,9 @@ static inline u32 bpf_prog_insn_size(const struct bpf_prog *prog)
 
 static int bpf_prog_load(union bpf_attr *attr, const void* uattr)
 {
-	enum bpf_prog_type type = attr->prog_type;
 	struct bpf_prog *prog, *dst_prog = NULL;
 	struct btf *attach_btf = NULL;
-	int err;
-	char license[128];
-	bool is_gpl;
+	bool is_gpl = false;
 
 	/* remove kernel checkers here */
 
@@ -264,11 +261,9 @@ static int bpf_prog_load(union bpf_attr *attr, const void* uattr)
 	prog->aux->user = NULL; // get_current_user();
 	prog->len = attr->insn_cnt;
 
-	err = -EFAULT;
-	if (memcpy(prog->insns,
+	memcpy(prog->insns,
 			     attr->insns,
-			     bpf_prog_insn_size(prog)) != 0)
-		goto free_prog;
+			     bpf_prog_insn_size(prog));
 
 	prog->orig_prog = NULL;
 	prog->jited = 0;
@@ -276,21 +271,12 @@ static int bpf_prog_load(union bpf_attr *attr, const void* uattr)
 	prog->gpl_compatible = is_gpl ? 1 : 0;
 
 	prog->aux->load_time = 0;
-	err = strncpy(prog->aux->name, attr->prog_name,
+	strncpy(prog->aux->name, attr->prog_name,
 			       sizeof(attr->prog_name));
-	if (err < 0)
-		goto free_prog;
 
 	/* run eBPF verifier */
 	// err = bpf_check(&prog, attr, uattr);
-	// if (err < 0)
-	// 	goto free_used_maps;
-
-free_prog:
-	// if (prog->aux->attach_btf)
-	// 	btf_put(prog->aux->attach_btf);
-	bpf_prog_free(prog);
-	return err;
+	return 0;
 }
 
 /* Free internal BPF program */
@@ -327,4 +313,39 @@ void bpf_jit_prog_release_other(struct bpf_prog *fp, struct bpf_prog *fp_other)
 	 */
 	fp->aux->prog = fp;
 	bpf_prog_clone_free(fp_other);
+}
+
+/* Base function for offset calculation. Needs to go into .text section,
+ * therefore keeping it non-static as well; will also be used by JITs
+ * anyway later on, so do not let the compiler omit it. This also needs
+ * to go into kallsyms for correlation from e.g. bpftool, so naming
+ * must not change.
+ */
+noinline u64 __bpf_call_base(u64 r1, u64 r2, u64 r3, u64 r4, u64 r5)
+{
+	return 0;
+}
+
+/* The logic is similar to BPF_PROG_RUN, but with an explicit
+ * rcu_read_lock() and migrate_disable() which are required
+ * for the trampoline. The macro is split into
+ * call _bpf_prog_enter
+ * call prog->bpf_func
+ * call __bpf_prog_exit
+ */
+u64 __bpf_prog_enter(void)
+{
+#ifdef __linux__
+	u64 start = clock();
+#elif
+	u64 start = 0;
+#endif
+	printf("__bpf_prog_enter %lu\n", start);
+	return start;
+}
+
+void __bpf_prog_exit(struct bpf_prog *prog, u64 start)
+{
+	// do nothing
+	printf("__bpf_prog_exit %lu\n", start);
 }

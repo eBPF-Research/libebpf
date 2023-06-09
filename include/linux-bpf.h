@@ -6,6 +6,7 @@
 
 #include "linux-errno.h"
 #include "type-fixes.h"
+#include "libebpf/linux-jit-bpf.h"
 #include <stdio.h>
 
 struct sk_buff;
@@ -18,6 +19,8 @@ struct sock_reuseport;
 struct ctl_table;
 struct ctl_table_header;
 struct bpf_trampoline;
+struct file;
+struct vm_area_struct;
 
 /* ArgX, context and stack frame pointer register positions. Note,
  * Arg1, Arg2, Arg3, etc are used as argument mappings of function
@@ -1140,7 +1143,6 @@ void __bpf_prog_exit(struct bpf_prog *prog, u64 start);
 
 
 /* Helper macros for filter block array initializers. */
-
 /* Internal classic blocks for direct assignment */
 
 #define __BPF_STMT(CODE, K)					\
@@ -1577,8 +1579,6 @@ struct bpf_map_ops {
 	int (*map_direct_value_meta)(const struct bpf_map *map,
 				     u64 imm, u32 *off);
 	int (*map_mmap)(struct bpf_map *map, struct vm_area_struct *vma);
-	__poll_t (*map_poll)(struct bpf_map *map, struct file *filp,
-			     struct poll_table_struct *pts);
 
 	/* BTF name and id of struct allocated by map_alloc */
 	const char * const map_btf_name;

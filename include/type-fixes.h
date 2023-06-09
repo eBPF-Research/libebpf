@@ -253,4 +253,12 @@ do { \
 
 #define BUG_ON(condition) assert(!(condition))
 
+/*
+ * Note the missing underscores.
+ *
+ *   gcc: https://gcc.gnu.org/onlinedocs/gcc/Common-Function-Attributes.html#index-noinline-function-attribute
+ * clang: mentioned
+ */
+#define   noinline                      __attribute__((__noinline__))
+
 #endif // TYPE_FIXED_H

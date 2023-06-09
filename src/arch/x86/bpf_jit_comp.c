@@ -1416,7 +1416,7 @@ emit_cond_jmp:		/* Convert BPF opcode to x86 */
 			} else if (is_simm32(jmp_offset)) {
 				EMIT2_off32(0x0F, jmp_cond + 0x10, jmp_offset);
 			} else {
-				printf("cond_jmp gen bug %llx\n", jmp_offset);
+				printf("cond_jmp gen bug %lx\n", jmp_offset);
 				return -EFAULT;
 			}
 
@@ -1443,7 +1443,7 @@ emit_jmp:
 			} else if (is_simm32(jmp_offset)) {
 				EMIT1_off32(0xE9, jmp_offset);
 			} else {
-				printf("jmp gen bug %llx\n", jmp_offset);
+				printf("jmp gen bug %lx\n", jmp_offset);
 				return -EFAULT;
 			}
 			break;
@@ -2094,7 +2094,7 @@ out_image:
 
 	if (!image || !prog->is_func || extra_pass) {
 		if (image)
-			bpf_prog_fill_jited_linfo(prog, addrs + 1);
+			bpf_prog_fill_jited_linfo(prog, (const u32 *)(addrs + 1));
 out_addrs:
 		free(addrs);
 		free(jit_data);
