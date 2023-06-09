@@ -26,6 +26,16 @@ if (UNIX)
     add_compile_options("$<$<CONFIG:DEBUG>:-D_DEBUG>")    #this will allow to use same _DEBUG macro available in both Linux as well as Windows - MSCV environment. Easy to put Debug specific code.
 endif (UNIX)
 
+#
+# Print a message only if the `VERBOSE_OUTPUT` option is on
+#
+
+function(verbose_message content)
+    if(${PROJECT_NAME}_VERBOSE_OUTPUT)
+			message(STATUS ${content})
+    endif()
+endfunction()
+
 
 #
 # Setup alternative names
@@ -221,12 +231,6 @@ else()
 endif()
 
 verbose_message("Project is now aliased as ${PROJECT_NAME}::${PROJECT_NAME}.\n")
-
-#
-# Format the project using the `clang-format` target (i.e: cmake --build build --target clang-format)
-#
-
-add_clang_format_target()
 
 #
 # Install library for easy downstream inclusion

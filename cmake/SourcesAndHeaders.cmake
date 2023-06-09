@@ -45,7 +45,7 @@ else()
 endif()
 
 set(sources
-  # ${ARCH_SOURCES}
+  ${ARCH_SOURCES}
   src/ebpf_jit_arm64.c
   src/ebpf_jit_x86_64.c
   src/ebpf_jit.c

@@ -15,3 +15,4 @@ CMakeFiles/*
 # Ignore all local history of files
 .history
 *.o
+*.pyc

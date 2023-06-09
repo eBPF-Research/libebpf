@@ -41,7 +41,7 @@ extern "C" {
 #endif
 
 /**
- * @brief Opaque type for a the ebpf VM.
+ * @brief Opaque type for the ebpf VM.
  */
 struct ebpf_vm;
 

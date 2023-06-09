@@ -41,7 +41,6 @@ example: libebpf ## make test program
 	$(Q)$(CC) example/test_vm.c -static $(CFLAGS) $(LDLIBS)  -I include/libebpf/ -L bin/ -l:libebpf.a -o bin/vm
 	$(Q)$(CC) example/test_code.c -static $(CFLAGS) $(LDLIBS)  -I include/libebpf/ -L bin/ -l:libebpf.a -o bin/code
 
-
 # 单元测试
 # 测试libebpf基本功能
 # %.ebpf: %.ebpf.c
