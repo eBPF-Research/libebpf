@@ -261,4 +261,8 @@ do { \
  */
 #define   noinline                      __attribute__((__noinline__))
 
+#define FIELD_GET(_mask, _reg)						\
+	({								\
+		(typeof(_mask))(((_reg) & (_mask)) >> __bf_shf(_mask));	\
+	}) 
 #endif // TYPE_FIXED_H

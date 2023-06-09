@@ -13,6 +13,31 @@
 
 #ifndef __ASSEMBLY__
 
+/*
+ * ARM Architecture Reference Manual for ARMv8 Profile-A, Issue A.a
+ * Section C3.1 "A64 instruction index by encoding":
+ * AArch64 main encoding table
+ *  Bit position
+ *   28 27 26 25	Encoding Group
+ *   0  0  -  -		Unallocated
+ *   1  0  0  -		Data processing, immediate
+ *   1  0  1  -		Branch, exception generation and system instructions
+ *   -  1  -  0		Loads and stores
+ *   -  1  0  1		Data processing - register
+ *   0  1  1  1		Data processing - SIMD and floating point
+ *   1  1  1  1		Data processing - SIMD and floating point
+ * "-" means "don't care"
+ */
+enum aarch64_insn_encoding_class {
+	AARCH64_INSN_CLS_UNKNOWN,	/* UNALLOCATED */
+	AARCH64_INSN_CLS_DP_IMM,	/* Data processing - immediate */
+	AARCH64_INSN_CLS_DP_REG,	/* Data processing - register */
+	AARCH64_INSN_CLS_DP_FPSIMD,	/* Data processing - SIMD and FP */
+	AARCH64_INSN_CLS_LDST,		/* Loads and stores */
+	AARCH64_INSN_CLS_BR_SYS,	/* Branch, exception generation and
+					 * system instructions */
+};
+
 enum aarch64_insn_hint_cr_op {
 	AARCH64_INSN_HINT_NOP	= 0x0 << 5,
 	AARCH64_INSN_HINT_YIELD	= 0x1 << 5,

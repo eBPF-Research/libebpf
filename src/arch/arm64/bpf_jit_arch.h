@@ -9,6 +9,24 @@
 
 #include "insn.h"
 
+// config ARM64_PAGE_SHIFT
+// 	int
+// 	default 16 if ARM64_64K_PAGES
+// 	default 14 if ARM64_16K_PAGES
+// 	default 12
+// config ARM64_CONT_SHIFT
+// 	int
+// 	default 5 if ARM64_64K_PAGES
+// 	default 7 if ARM64_16K_PAGES
+// 	default 4
+
+/* PAGE_SHIFT determines the page size */
+/* CONT_SHIFT determines the number of pages which can be tracked together  */
+#define PAGE_SHIFT		12 //CONFIG_ARM64_PAGE_SHIFT
+#define CONT_SHIFT		4  //CONFIG_ARM64_CONT_SHIFT
+#define PAGE_SIZE		((1UL) << PAGE_SHIFT)
+#define PAGE_MASK		(~(PAGE_SIZE-1))
+
 /* 5-bit Register Operand */
 #define A64_R(x)	AARCH64_INSN_REG_##x
 #define A64_FP		AARCH64_INSN_REG_FP

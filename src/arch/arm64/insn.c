@@ -7,6 +7,86 @@
  */
 #include "insn.h"
 #include "linux-errno.h"
+#include "bpf_jit_arch.h"
+#include <stdio.h>
+#include <stdlib.h>
+
+/*
+ * arm64 requires the DTB to be 8 byte aligned and
+ * not exceed 2MB in size.
+ */
+#define MIN_FDT_ALIGN		8
+#define MAX_FDT_SIZE		SZ_2M
+
+/*
+ * Here we define all the compile-time 'special' virtual
+ * addresses. The point is to have a constant address at
+ * compile time, but to set the physical address only
+ * in the boot process.
+ *
+ * These 'compile-time allocated' memory buffers are
+ * page-sized. Use set_fixmap(idx,phys) to associate
+ * physical memory with fixmap indices.
+ *
+ */
+enum fixed_addresses {
+	FIX_HOLE,
+
+	/*
+	 * Reserve a virtual window for the FDT that is 2 MB larger than the
+	 * maximum supported size, and put it at the top of the fixmap region.
+	 * The additional space ensures that any FDT that does not exceed
+	 * MAX_FDT_SIZE can be mapped regardless of whether it crosses any
+	 * 2 MB alignment boundaries.
+	 *
+	 * Keep this at the top so it remains 2 MB aligned.
+	 */
+#define FIX_FDT_SIZE		(MAX_FDT_SIZE + SZ_2M)
+	FIX_FDT_END,
+	FIX_FDT = FIX_FDT_END + FIX_FDT_SIZE / PAGE_SIZE - 1,
+
+	FIX_EARLYCON_MEM_BASE,
+	FIX_TEXT_POKE0,
+
+#ifdef CONFIG_ACPI_APEI_GHES
+	/* Used for GHES mapping from assorted contexts */
+	FIX_APEI_GHES_IRQ,
+	FIX_APEI_GHES_SEA,
+#ifdef CONFIG_ARM_SDE_INTERFACE
+	FIX_APEI_GHES_SDEI_NORMAL,
+	FIX_APEI_GHES_SDEI_CRITICAL,
+#endif
+#endif /* CONFIG_ACPI_APEI_GHES */
+
+#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+	FIX_ENTRY_TRAMP_DATA,
+	FIX_ENTRY_TRAMP_TEXT,
+#define TRAMP_VALIAS		(__fix_to_virt(FIX_ENTRY_TRAMP_TEXT))
+#endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
+	__end_of_permanent_fixed_addresses,
+
+	/*
+	 * Temporary boot-time mappings, used by early_ioremap(),
+	 * before ioremap() is functional.
+	 */
+#define NR_FIX_BTMAPS		(SZ_256K / PAGE_SIZE)
+#define FIX_BTMAPS_SLOTS	7
+#define TOTAL_FIX_BTMAPS	(NR_FIX_BTMAPS * FIX_BTMAPS_SLOTS)
+
+	FIX_BTMAP_END = __end_of_permanent_fixed_addresses,
+	FIX_BTMAP_BEGIN = FIX_BTMAP_END + TOTAL_FIX_BTMAPS - 1,
+
+	/*
+	 * Used for kernel page table creation, so unmapped memory may be used
+	 * for tables.
+	 */
+	FIX_PTE,
+	FIX_PMD,
+	FIX_PUD,
+	FIX_PGD,
+
+	__end_of_fixed_addresses
+};
 
 #define AARCH64_INSN_SF_BIT	BIT(31)
 #define AARCH64_INSN_N_BIT	BIT(22)
@@ -36,75 +116,37 @@ enum aarch64_insn_encoding_class  aarch64_get_insn_class(u32 insn)
 	return aarch64_insn_encoding_class[(insn >> 25) & 0xf];
 }
 
-bool  aarch64_insn_is_steppable_hint(u32 insn)
-{
-	if (!aarch64_insn_is_hint(insn))
-		return false;
+// static DEFINE_RAW_SPINLOCK(patch_lock);
+// static bool is_exit_text(unsigned long addr)
+// {
+// 	/* discarded with init text/data */
+	// return system_state < SYSTEM_RUNNING &&
+	// 	addr >= (unsigned long)__exittext_begin &&
+	// 	addr < (unsigned long)__exittext_end;
+// 	return false;
+// }
 
-	switch (insn & 0xFE0) {
-	case AARCH64_INSN_HINT_XPACLRI:
-	case AARCH64_INSN_HINT_PACIA_1716:
-	case AARCH64_INSN_HINT_PACIB_1716:
-	case AARCH64_INSN_HINT_AUTIA_1716:
-	case AARCH64_INSN_HINT_AUTIB_1716:
-	case AARCH64_INSN_HINT_PACIAZ:
-	case AARCH64_INSN_HINT_PACIASP:
-	case AARCH64_INSN_HINT_PACIBZ:
-	case AARCH64_INSN_HINT_PACIBSP:
-	case AARCH64_INSN_HINT_AUTIAZ:
-	case AARCH64_INSN_HINT_AUTIASP:
-	case AARCH64_INSN_HINT_AUTIBZ:
-	case AARCH64_INSN_HINT_AUTIBSP:
-	case AARCH64_INSN_HINT_BTI:
-	case AARCH64_INSN_HINT_BTIC:
-	case AARCH64_INSN_HINT_BTIJ:
-	case AARCH64_INSN_HINT_BTIJC:
-	case AARCH64_INSN_HINT_NOP:
-		return true;
-	default:
-		return false;
-	}
-}
-
-bool aarch64_insn_is_branch_imm(u32 insn)
-{
-	return (aarch64_insn_is_b(insn) || aarch64_insn_is_bl(insn) ||
-		aarch64_insn_is_tbz(insn) || aarch64_insn_is_tbnz(insn) ||
-		aarch64_insn_is_cbz(insn) || aarch64_insn_is_cbnz(insn) ||
-		aarch64_insn_is_bcond(insn));
-}
-
-static DEFINE_RAW_SPINLOCK(patch_lock);
-
-static bool is_exit_text(unsigned long addr)
-{
-	/* discarded with init text/data */
-	return system_state < SYSTEM_RUNNING &&
-		addr >= (unsigned long)__exittext_begin &&
-		addr < (unsigned long)__exittext_end;
-}
-
-static bool is_image_text(unsigned long addr)
-{
-	return core_kernel_text(addr) || is_exit_text(addr);
-}
+// static bool is_image_text(unsigned long addr)
+// {
+// 	return core_kernel_text(addr) || is_exit_text(addr);
+// }
 
 static void  *patch_map(void *addr, int fixmap)
 {
 	unsigned long uintaddr = (uintptr_t) addr;
-	bool image = is_image_text(uintaddr);
+	// bool image = is_image_text(uintaddr);
 	struct page *page;
 
-	if (image)
-		page = phys_to_page(__pa_symbol(addr));
-	else if (IS_ENABLED(CONFIG_STRICT_MODULE_RWX))
-		page = vmalloc_to_page(addr);
-	else
+	// if (image)
+	// 	page = phys_to_page(__pa_symbol(addr));
+	// else if (IS_ENABLED(CONFIG_STRICT_MODULE_RWX))
+	// 	page = vmalloc_to_page(addr);
+	// else
 		return addr;
 
-	BUG_ON(!page);
-	return (void *)set_fixmap_offset(fixmap, page_to_phys(page) +
-			(uintaddr & ~PAGE_MASK));
+	// BUG_ON(!page);
+	// return (void *)set_fixmap_offset(fixmap, page_to_phys(page) +
+	// 		(uintaddr & ~PAGE_MASK));
 }
 
 static void  patch_unmap(int fixmap)
@@ -117,10 +159,10 @@ static void  patch_unmap(int fixmap)
  */
 int  aarch64_insn_read(void *addr, u32 *insnp)
 {
-	int ret;
+	void * ret;
 	__le32 val;
 
-	ret = copy_from_kernel_nofault(&val, addr, AARCH64_INSN_SIZE);
+	ret = memcpy(&val, addr, AARCH64_INSN_SIZE);
 	if (!ret)
 		*insnp = le32_to_cpu(val);
 
@@ -130,49 +172,23 @@ int  aarch64_insn_read(void *addr, u32 *insnp)
 static int  __aarch64_insn_write(void *addr, __le32 insn)
 {
 	void *waddr = addr;
-	unsigned long flags = 0;
-	int ret;
+	// unsigned long flags = 0;
+	// int ret;
 
-	raw_spin_lock_irqsave(&patch_lock, flags);
+	// raw_spin_lock_irqsave(&patch_lock, flags);
 	waddr = patch_map(addr, FIX_TEXT_POKE0);
 
-	ret = copy_to_kernel_nofault(waddr, &insn, AARCH64_INSN_SIZE);
+	memcpy(waddr, &insn, AARCH64_INSN_SIZE);
 
 	patch_unmap(FIX_TEXT_POKE0);
-	raw_spin_unlock_irqrestore(&patch_lock, flags);
+	// raw_spin_unlock_irqrestore(&patch_lock, flags);
 
-	return ret;
+	return 0;
 }
 
 int  aarch64_insn_write(void *addr, u32 insn)
 {
 	return __aarch64_insn_write(addr, cpu_to_le32(insn));
-}
-
-bool  aarch64_insn_uses_literal(u32 insn)
-{
-	/* ldr/ldrsw (literal), prfm */
-
-	return aarch64_insn_is_ldr_lit(insn) ||
-		aarch64_insn_is_ldrsw_lit(insn) ||
-		aarch64_insn_is_adr_adrp(insn) ||
-		aarch64_insn_is_prfm_lit(insn);
-}
-
-bool  aarch64_insn_is_branch(u32 insn)
-{
-	/* b, bl, cb*, tb*, b.cond, br, blr */
-
-	return aarch64_insn_is_b(insn) ||
-		aarch64_insn_is_bl(insn) ||
-		aarch64_insn_is_cbz(insn) ||
-		aarch64_insn_is_cbnz(insn) ||
-		aarch64_insn_is_tbz(insn) ||
-		aarch64_insn_is_tbnz(insn) ||
-		aarch64_insn_is_ret(insn) ||
-		aarch64_insn_is_br(insn) ||
-		aarch64_insn_is_blr(insn) ||
-		aarch64_insn_is_bcond(insn);
 }
 
 int  aarch64_insn_patch_text_nosync(void *addr, u32 insn)
@@ -232,8 +248,9 @@ int  aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt)
 	if (cnt <= 0)
 		return -EINVAL;
 
-	return stop_machine_cpuslocked(aarch64_insn_patch_text_cb, &patch,
-				       cpu_online_mask);
+	return 0;
+	// stop_machine_cpuslocked(aarch64_insn_patch_text_cb, &patch,
+	// 			       cpu_online_mask);
 }
 
 static int  aarch64_get_imm_shift_mask(enum aarch64_insn_imm_type type,
@@ -569,16 +586,6 @@ u32 aarch64_insn_gen_cond_branch_imm(unsigned long pc, unsigned long addr,
 
 	return aarch64_insn_encode_immediate(AARCH64_INSN_IMM_19, insn,
 					     offset >> 2);
-}
-
-u32  aarch64_insn_gen_hint(enum aarch64_insn_hint_cr_op op)
-{
-	return aarch64_insn_get_hint_value() | op;
-}
-
-u32  aarch64_insn_gen_nop(void)
-{
-	return aarch64_insn_gen_hint(AARCH64_INSN_HINT_NOP);
 }
 
 u32 aarch64_insn_gen_branch_reg(enum aarch64_insn_register reg,
@@ -1347,7 +1354,8 @@ s32 aarch64_get_branch_offset(u32 insn)
 	}
 
 	/* Unhandled instruction */
-	BUG();
+	assert(false && "Unhandled instruction");
+	return 0;
 }
 
 /*
@@ -1370,7 +1378,7 @@ u32 aarch64_set_branch_offset(u32 insn, s32 offset)
 						     offset >> 2);
 
 	/* Unhandled instruction */
-	BUG();
+	assert(false && "Unhandled instruction");
 }
 
 s32 aarch64_insn_adrp_get_offset(u32 insn)

@@ -8,6 +8,11 @@
 #ifndef PFILTER_OPCODES_ARM_H
 #define PFILTER_OPCODES_ARM_H
 
+/* PAGE_SHIFT determines the page size */
+#define PAGE_SHIFT		12
+#define PAGE_SIZE		((1UL) << PAGE_SHIFT)
+#define PAGE_MASK		(~((1 << PAGE_SHIFT) - 1))
+
 /* ARM 32bit Registers */
 #define ARM_R0	0
 #define ARM_R1	1

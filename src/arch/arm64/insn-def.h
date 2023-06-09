@@ -54,4 +54,48 @@
 
 #define PSR_BTYPE_SHIFT		10
 
+#define cpu_to_le64(x) (( __le64)(__u64)(x))
+#define le64_to_cpu(x) (( __u64)(__le64)(x))
+#define cpu_to_le32(x) (( __le32)(__u32)(x))
+#define le32_to_cpu(x) (( __u32)(__le32)(x))
+#define cpu_to_le16(x) (( __le16)(__u16)(x))
+#define le16_to_cpu(x) (( __u16)(__le16)(x))
+
+static __always_inline __le64 __cpu_to_le64p(const __u64 *p)
+{
+	return ( __le64)*p;
+}
+static __always_inline __u64 __le64_to_cpup(const __le64 *p)
+{
+	return ( __u64)*p;
+}
+static __always_inline __le32 __cpu_to_le32p(const __u32 *p)
+{
+	return ( __le32)*p;
+}
+static __always_inline __u32 __le32_to_cpup(const __le32 *p)
+{
+	return ( __u32)*p;
+}
+static __always_inline __le16 __cpu_to_le16p(const __u16 *p)
+{
+	return ( __le16)*p;
+}
+static __always_inline __u16 __le16_to_cpup(const __le16 *p)
+{
+	return ( __u16)*p;
+}
+
+/*
+ * BUILD_BUG_ON_ZERO is not available in h files included from asm files,
+ * disable the input check if that is the case.
+ */
+#define GENMASK_INPUT_CHECK(h, l) 0
+#define BITS_PER_LONG 64
+#define __GENMASK(h, l) \
+	(((~(0UL)) - ((1UL) << (l)) + 1) & \
+	 (~(0UL) >> (BITS_PER_LONG - 1 - (h))))
+#define GENMASK(h, l) \
+	(GENMASK_INPUT_CHECK(h, l) + __GENMASK(h, l))
+
 #endif /* __ASM_INSN_DEF_H */

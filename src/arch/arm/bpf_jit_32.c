@@ -4,6 +4,9 @@
  *
  * Copyright (c) 2017 Shubham Bansal <illusionist.neo@gmail.com>
  * Copyright (c) 2011 Mircea Gherzan <mgherzan@gmail.com>
+ * 
+ * Supports (__LINUX_ARM_ARCH__ >= 6
+ *  || ctx->cpu_architecture >= CPU_ARCH_ARMv5TE)
  */
 
 #include "linux-bpf.h"
@@ -335,8 +338,7 @@ static void jit_fill_hole(void *area, unsigned int size)
 #endif
 
 /* total stack size used in JITed code */
-// #define _STACK_SIZE	(ctx->prog->aux->stack_depth + SCRATCH_SIZE)
-#define _STACK_SIZE	(512 + SCRATCH_SIZE)
+#define _STACK_SIZE	(ctx->prog->aux->stack_depth + SCRATCH_SIZE)
 #define STACK_SIZE	ALIGN(_STACK_SIZE, STACK_ALIGNMENT)
 
 #if __LINUX_ARM_ARCH__ < 7
@@ -525,7 +527,7 @@ static const s8 *arm_bpf_get_reg64(const s8 *reg, const s8 *tmp,
 {
 	if (is_stacked(reg[1])) {
 		// if (__LINUX_ARM_ARCH__ >= 6 ||
-		    // ctx->cpu_architecture >= CPU_ARCH_ARMv5TE) {
+		//     ctx->cpu_architecture >= CPU_ARCH_ARMv5TE) {
 			emit(ARM_LDRD_I(tmp[1], ARM_FP,
 					EBPF_SCRATCH_TO_ARM_FP(reg[1])), ctx);
 		// } else {
@@ -556,7 +558,7 @@ static void arm_bpf_put_reg64(const s8 *reg, const s8 *src,
 {
 	if (is_stacked(reg[1])) {
 		// if (__LINUX_ARM_ARCH__ >= 6 ||
-		    // ctx->cpu_architecture >= CPU_ARCH_ARMv5TE) {
+		//     ctx->cpu_architecture >= CPU_ARCH_ARMv5TE) {
 			emit(ARM_STRD_I(src[1], ARM_FP,
 				       EBPF_SCRATCH_TO_ARM_FP(reg[1])), ctx);
 		// } else {
@@ -723,8 +725,8 @@ static inline void emit_a32_alu_r64(const bool is64, const s8 dst[],
 
 		/* ALU operation */
 		emit_alu_r(rd[1], rs, true, false, op, ctx);
-		// if (!ctx->prog->aux->verifier_zext)
-		// 	emit_a32_mov_i(rd[0], 0, ctx);
+		if (!ctx->prog->aux->verifier_zext)
+			emit_a32_mov_i(rd[0], 0, ctx);
 	}
 
 	arm_bpf_put_reg64(dst, rd, ctx);
@@ -746,9 +748,9 @@ static inline void emit_a32_mov_r64(const bool is64, const s8 dst[],
 				  struct jit_ctx *ctx) {
 	if (!is64) {
 		emit_a32_mov_r(dst_lo, src_lo, ctx);
-		// if (!ctx->prog->aux->verifier_zext)
-		// 	/* Zero out high 4 bytes */
-		// 	emit_a32_mov_i(dst_hi, 0, ctx);
+		if (!ctx->prog->aux->verifier_zext)
+			/* Zero out high 4 bytes */
+			emit_a32_mov_i(dst_hi, 0, ctx);
 	} 
 	// else if (__LINUX_ARM_ARCH__ < 6 &&
 	// 	   ctx->cpu_architecture < CPU_ARCH_ARMv5TE) {
@@ -1070,20 +1072,20 @@ static inline void emit_ldx_r(const s8 dst[], const s8 src,
 	case BPF_B:
 		/* Load a Byte */
 		emit(ARM_LDRB_I(rd[1], rm, off), ctx);
-		// if (!ctx->prog->aux->verifier_zext)
-		// 	emit_a32_mov_i(rd[0], 0, ctx);
+		if (!ctx->prog->aux->verifier_zext)
+			emit_a32_mov_i(rd[0], 0, ctx);
 		break;
 	case BPF_H:
 		/* Load a HalfWord */
 		emit(ARM_LDRH_I(rd[1], rm, off), ctx);
-		// if (!ctx->prog->aux->verifier_zext)
-		// 	emit_a32_mov_i(rd[0], 0, ctx);
+		if (!ctx->prog->aux->verifier_zext)
+			emit_a32_mov_i(rd[0], 0, ctx);
 		break;
 	case BPF_W:
 		/* Load a Word */
 		emit(ARM_LDR_I(rd[1], rm, off), ctx);
-		// if (!ctx->prog->aux->verifier_zext)
-		// 	emit_a32_mov_i(rd[0], 0, ctx);
+		if (!ctx->prog->aux->verifier_zext)
+			emit_a32_mov_i(rd[0], 0, ctx);
 		break;
 	case BPF_DW:
 		/* Load a Double Word */
@@ -1137,86 +1139,86 @@ static inline void emit_ar_r(const u8 rd, const u8 rt, const u8 rm,
 	}
 }
 
-// static int out_offset = -1; /* initialized on the first pass of build_body() */
-// static int emit_bpf_tail_call(struct jit_ctx *ctx)
-// {
+static int out_offset = -1; /* initialized on the first pass of build_body() */
+static int emit_bpf_tail_call(struct jit_ctx *ctx)
+{
 
-// 	/* bpf_tail_call(void *prog_ctx, struct bpf_array *array, u64 index) */
-// 	const s8 *r2 = bpf2a32[BPF_REG_2];
-// 	const s8 *r3 = bpf2a32[BPF_REG_3];
-// 	const s8 *tmp = bpf2a32[TMP_REG_1];
-// 	const s8 *tmp2 = bpf2a32[TMP_REG_2];
-// 	const s8 *tcc = bpf2a32[TCALL_CNT];
-// 	const s8 *tc;
-// 	const int idx0 = ctx->idx;
-// #define cur_offset (ctx->idx - idx0)
-// #define jmp_offset (out_offset - (cur_offset) - 2)
-// 	u32 lo, hi;
-// 	s8 r_array, r_index;
-// 	int off;
+	/* bpf_tail_call(void *prog_ctx, struct bpf_array *array, u64 index) */
+	const s8 *r2 = bpf2a32[BPF_REG_2];
+	const s8 *r3 = bpf2a32[BPF_REG_3];
+	const s8 *tmp = bpf2a32[TMP_REG_1];
+	const s8 *tmp2 = bpf2a32[TMP_REG_2];
+	const s8 *tcc = bpf2a32[TCALL_CNT];
+	const s8 *tc;
+	const int idx0 = ctx->idx;
+#define cur_offset (ctx->idx - idx0)
+#define jmp_offset (out_offset - (cur_offset) - 2)
+	u32 lo, hi;
+	s8 r_array, r_index;
+	int off;
 
-// 	/* if (index >= array->map.max_entries)
-// 	 *	goto out;
-// 	 */
-// 	BUILD_BUG_ON(offsetof(struct bpf_array, map.max_entries) >
-// 		     ARM_INST_LDST__IMM12);
-// 	off = offsetof(struct bpf_array, map.max_entries);
-// 	r_array = arm_bpf_get_reg32(r2[1], tmp2[0], ctx);
-// 	/* index is 32-bit for arrays */
-// 	r_index = arm_bpf_get_reg32(r3[1], tmp2[1], ctx);
-// 	/* array->map.max_entries */
-// 	emit(ARM_LDR_I(tmp[1], r_array, off), ctx);
-// 	/* index >= array->map.max_entries */
-// 	emit(ARM_CMP_R(r_index, tmp[1]), ctx);
-// 	_emit(ARM_COND_CS, ARM_B(jmp_offset), ctx);
+	/* if (index >= array->map.max_entries)
+	 *	goto out;
+	 */
+	BUILD_BUG_ON(offsetof(struct bpf_array, map.max_entries) >
+		     ARM_INST_LDST__IMM12);
+	off = offsetof(struct bpf_array, map.max_entries);
+	r_array = arm_bpf_get_reg32(r2[1], tmp2[0], ctx);
+	/* index is 32-bit for arrays */
+	r_index = arm_bpf_get_reg32(r3[1], tmp2[1], ctx);
+	/* array->map.max_entries */
+	emit(ARM_LDR_I(tmp[1], r_array, off), ctx);
+	/* index >= array->map.max_entries */
+	emit(ARM_CMP_R(r_index, tmp[1]), ctx);
+	_emit(ARM_COND_CS, ARM_B(jmp_offset), ctx);
 
-// 	/* tmp2[0] = array, tmp2[1] = index */
+	/* tmp2[0] = array, tmp2[1] = index */
 
-// 	/* if (tail_call_cnt > MAX_TAIL_CALL_CNT)
-// 	 *	goto out;
-// 	 * tail_call_cnt++;
-// 	 */
-// 	lo = (u32)MAX_TAIL_CALL_CNT;
-// 	hi = (u32)((u64)MAX_TAIL_CALL_CNT >> 32);
-// 	tc = arm_bpf_get_reg64(tcc, tmp, ctx);
-// 	emit(ARM_CMP_I(tc[0], hi), ctx);
-// 	_emit(ARM_COND_EQ, ARM_CMP_I(tc[1], lo), ctx);
-// 	_emit(ARM_COND_HI, ARM_B(jmp_offset), ctx);
-// 	emit(ARM_ADDS_I(tc[1], tc[1], 1), ctx);
-// 	emit(ARM_ADC_I(tc[0], tc[0], 0), ctx);
-// 	arm_bpf_put_reg64(tcc, tmp, ctx);
+	/* if (tail_call_cnt > MAX_TAIL_CALL_CNT)
+	 *	goto out;
+	 * tail_call_cnt++;
+	 */
+	lo = (u32)MAX_TAIL_CALL_CNT;
+	hi = (u32)((u64)MAX_TAIL_CALL_CNT >> 32);
+	tc = arm_bpf_get_reg64(tcc, tmp, ctx);
+	emit(ARM_CMP_I(tc[0], hi), ctx);
+	_emit(ARM_COND_EQ, ARM_CMP_I(tc[1], lo), ctx);
+	_emit(ARM_COND_HI, ARM_B(jmp_offset), ctx);
+	emit(ARM_ADDS_I(tc[1], tc[1], 1), ctx);
+	emit(ARM_ADC_I(tc[0], tc[0], 0), ctx);
+	arm_bpf_put_reg64(tcc, tmp, ctx);
 
-// 	/* prog = array->ptrs[index]
-// 	 * if (prog == NULL)
-// 	 *	goto out;
-// 	 */
-// 	BUILD_BUG_ON(imm8m(offsetof(struct bpf_array, ptrs)) < 0);
-// 	off = imm8m(offsetof(struct bpf_array, ptrs));
-// 	emit(ARM_ADD_I(tmp[1], r_array, off), ctx);
-// 	emit(ARM_LDR_R_SI(tmp[1], tmp[1], r_index, SRTYPE_ASL, 2), ctx);
-// 	emit(ARM_CMP_I(tmp[1], 0), ctx);
-// 	_emit(ARM_COND_EQ, ARM_B(jmp_offset), ctx);
+	/* prog = array->ptrs[index]
+	 * if (prog == NULL)
+	 *	goto out;
+	 */
+	BUILD_BUG_ON(imm8m(offsetof(struct bpf_array, ptrs)) < 0);
+	off = imm8m(offsetof(struct bpf_array, ptrs));
+	emit(ARM_ADD_I(tmp[1], r_array, off), ctx);
+	emit(ARM_LDR_R_SI(tmp[1], tmp[1], r_index, SRTYPE_ASL, 2), ctx);
+	emit(ARM_CMP_I(tmp[1], 0), ctx);
+	_emit(ARM_COND_EQ, ARM_B(jmp_offset), ctx);
 
-// 	/* goto *(prog->bpf_func + prologue_size); */
-// 	BUILD_BUG_ON(offsetof(struct bpf_prog, bpf_func) >
-// 		     ARM_INST_LDST__IMM12);
-// 	off = offsetof(struct bpf_prog, bpf_func);
-// 	emit(ARM_LDR_I(tmp[1], tmp[1], off), ctx);
-// 	emit(ARM_ADD_I(tmp[1], tmp[1], ctx->prologue_bytes), ctx);
-// 	emit_bx_r(tmp[1], ctx);
+	/* goto *(prog->bpf_func + prologue_size); */
+	BUILD_BUG_ON(offsetof(struct bpf_prog, bpf_func) >
+		     ARM_INST_LDST__IMM12);
+	off = offsetof(struct bpf_prog, bpf_func);
+	emit(ARM_LDR_I(tmp[1], tmp[1], off), ctx);
+	emit(ARM_ADD_I(tmp[1], tmp[1], ctx->prologue_bytes), ctx);
+	emit_bx_r(tmp[1], ctx);
 
-// 	/* out: */
-// 	if (out_offset == -1)
-// 		out_offset = cur_offset;
-// 	if (cur_offset != out_offset) {
-// 		printf_once("tail_call out_offset = %d, expected %d!\n",
-// 			    cur_offset, out_offset);
-// 		return -1;
-// 	}
-// 	return 0;
-// #undef cur_offset
-// #undef jmp_offset
-// }
+	/* out: */
+	if (out_offset == -1)
+		out_offset = cur_offset;
+	if (cur_offset != out_offset) {
+		printf("tail_call out_offset = %d, expected %d!\n",
+			    cur_offset, out_offset);
+		return -1;
+	}
+	return 0;
+#undef cur_offset
+#undef jmp_offset
+}
 
 /* 0xabcd => 0xcdab */
 static inline void emit_rev16(const u8 rd, const u8 rn, struct jit_ctx *ctx)
@@ -1451,8 +1453,8 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
 		}
 		emit_udivmod(rd_lo, rd_lo, rt, ctx, BPF_OP(code));
 		arm_bpf_put_reg32(dst_lo, rd_lo, ctx);
-		// if (!ctx->prog->aux->verifier_zext)
-		// 	emit_a32_mov_i(dst_hi, 0, ctx);
+		if (!ctx->prog->aux->verifier_zext)
+			emit_a32_mov_i(dst_hi, 0, ctx);
 		break;
 	case BPF_ALU64 | BPF_DIV | BPF_K:
 	case BPF_ALU64 | BPF_DIV | BPF_X:
@@ -1465,22 +1467,22 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
 	case BPF_ALU | BPF_LSH | BPF_K:
 	case BPF_ALU | BPF_RSH | BPF_K:
 	case BPF_ALU | BPF_ARSH | BPF_K:
-		if ( (imm > 31))
+		if (unlikely(imm > 31))
 			return -EINVAL;
 		if (imm)
 			emit_a32_alu_i(dst_lo, imm, ctx, BPF_OP(code));
-		// if (!ctx->prog->aux->verifier_zext)
-		// 	emit_a32_mov_i(dst_hi, 0, ctx);
+		if (!ctx->prog->aux->verifier_zext)
+			emit_a32_mov_i(dst_hi, 0, ctx);
 		break;
 	/* dst = dst << imm */
 	case BPF_ALU64 | BPF_LSH | BPF_K:
-		if ( (imm > 63))
+		if (unlikely(imm > 63))
 			return -EINVAL;
 		emit_a32_lsh_i64(dst, imm, ctx);
 		break;
 	/* dst = dst >> imm */
 	case BPF_ALU64 | BPF_RSH | BPF_K:
-		if ( (imm > 63))
+		if (unlikely(imm > 63))
 			return -EINVAL;
 		emit_a32_rsh_i64(dst, imm, ctx);
 		break;
@@ -1498,15 +1500,15 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
 		break;
 	/* dst = dst >> imm (signed) */
 	case BPF_ALU64 | BPF_ARSH | BPF_K:
-		if ( (imm > 63))
+		if (unlikely(imm > 63))
 			return -EINVAL;
 		emit_a32_arsh_i64(dst, imm, ctx);
 		break;
 	/* dst = ~dst */
 	case BPF_ALU | BPF_NEG:
 		emit_a32_alu_i(dst_lo, 0, ctx, BPF_OP(code));
-		// if (!ctx->prog->aux->verifier_zext)
-		// 	emit_a32_mov_i(dst_hi, 0, ctx);
+		if (!ctx->prog->aux->verifier_zext)
+			emit_a32_mov_i(dst_hi, 0, ctx);
 		break;
 	/* dst = ~dst (64 bit) */
 	case BPF_ALU64 | BPF_NEG:
@@ -1562,13 +1564,13 @@ emit_bswap_uxt:
 #else /* ARMv6+ */
 			emit(ARM_UXTH(rd[1], rd[1]), ctx);
 #endif
-			// if (!ctx->prog->aux->verifier_zext)
-			// 	emit(ARM_EOR_R(rd[0], rd[0], rd[0]), ctx);
+			if (!ctx->prog->aux->verifier_zext)
+				emit(ARM_EOR_R(rd[0], rd[0], rd[0]), ctx);
 			break;
 		case 32:
 			/* zero-extend 32 bits into 64 bits */
-			// if (!ctx->prog->aux->verifier_zext)
-			// 	emit(ARM_EOR_R(rd[0], rd[0], rd[0]), ctx);
+			if (!ctx->prog->aux->verifier_zext)
+				emit(ARM_EOR_R(rd[0], rd[0], rd[0]), ctx);
 			break;
 		case 64:
 			/* nop */
@@ -1798,7 +1800,7 @@ notyet:
 		pr_info_once("*** NOT YET: opcode %02x ***\n", code);
 		return -EFAULT;
 	default:
-		printf_once("unknown opcode %02x\n", code);
+		printf("unknown opcode %02x\n", code);
 		return -EINVAL;
 	}
 
@@ -2002,10 +2004,10 @@ struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog)
 out_imms:
 #if __LINUX_ARM_ARCH__ < 7
 	if (ctx.imm_count)
-		free(ctx.imms);
+		kfree(ctx.imms);
 #endif
 out_off:
-	free(ctx.offsets);
+	kfree(ctx.offsets);
 out:
 	if (tmp_blinded)
 		bpf_jit_prog_release_other(prog, prog == orig_prog ?

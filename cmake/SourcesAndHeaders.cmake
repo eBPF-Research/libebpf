@@ -19,6 +19,7 @@ elseif(ARCH MATCHES "aarch64")
   set(ARCH_SOURCES
     src/arch/arm64/bpf_jit_comp.c
     src/arch/arm64/insn.c
+    src/ebpf_jit_arm64.c
   )
   set(ARCH_HEADERS
     src/arch/arm64/
@@ -36,6 +37,7 @@ elseif(ARCH MATCHES "x86_64" OR ARCH MATCHES "i686" OR ARCH MATCHES "i386")
   message(STATUS "x86 architecture detected")
   set(ARCH_SOURCES
     src/arch/x86/bpf_jit_comp.c
+    src/ebpf_jit_x86_64.c
   )
   set(ARCH_HEADERS
     src/arch/x86/
@@ -46,8 +48,6 @@ endif()
 
 set(sources
   ${ARCH_SOURCES}
-  src/ebpf_jit_arm64.c
-  src/ebpf_jit_x86_64.c
   src/ebpf_jit.c
   src/ebpf_vm.c
   src/linux_bpf_core.c

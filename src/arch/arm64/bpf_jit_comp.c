@@ -16,6 +16,45 @@
 #include <unistd.h>
 #include "bpf_jit_arch.h"
 
+/*
+ * User structures for general purpose, floating point and debug registers.
+ */
+struct user_pt_regs {
+	__u64		regs[31];
+	__u64		sp;
+	__u64		pc;
+	__u64		pstate;
+};
+/*
+ * This struct defines the way the registers are stored on the stack during an
+ * exception. Note that sizeof(struct pt_regs) has to be a multiple of 16 (for
+ * stack alignment). struct user_pt_regs must form a prefix of struct pt_regs.
+ */
+struct pt_regs {
+	union {
+		struct user_pt_regs user_regs;
+		struct {
+			u64 regs[31];
+			u64 sp;
+			u64 pc;
+			u64 pstate;
+		};
+	};
+	u64 orig_x0;
+#ifdef __AARCH64EB__
+	u32 unused2;
+	s32 syscallno;
+#else
+	s32 syscallno;
+	u32 unused2;
+#endif
+
+	u64 orig_addr_limit;
+	/* Only valid when ARM64_HAS_IRQ_PRIO_MASKING is enabled. */
+	u64 pmr_save;
+	u64 stackframe[2];
+};
+
 #define TMP_REG_1 (MAX_BPF_JIT_REG + 0)
 #define TMP_REG_2 (MAX_BPF_JIT_REG + 1)
 #define TCALL_CNT (MAX_BPF_JIT_REG + 2)
@@ -196,7 +235,7 @@ static bool is_addsub_imm(u32 imm)
 #define STACK_ALIGN(sz) (((sz) + 15) & ~15)
 
 /* Tail call offset to jump into */
-#if (CONFIG_ARM64_BTI_KERNEL)
+#if 0 // IS_ENABLED(CONFIG_ARM64_BTI_KERNEL)
 #define PROLOGUE_OFFSET 8
 #else
 #define PROLOGUE_OFFSET 7
@@ -238,7 +277,7 @@ static int build_prologue(struct jit_ctx *ctx, bool ebpf_from_cbpf)
 	 */
 
 	/* BTI landing pad */
-	// if ((CONFIG_ARM64_BTI_KERNEL))
+	// if (IS_ENABLED(CONFIG_ARM64_BTI_KERNEL))
 	// 	emit(A64_BTI_C, ctx);
 
 	/* Save FP and LR registers to stay align with ARM64 AAPCS */
@@ -269,14 +308,78 @@ static int build_prologue(struct jit_ctx *ctx, bool ebpf_from_cbpf)
 		// 	emit(A64_BTI_J, ctx);
 	}
 
-	// ctx->stack_size = STACK_ALIGN(prog->aux->stack_depth);
-	ctx->stack_size = STACK_ALIGN(512);
+	ctx->stack_size = STACK_ALIGN(prog->aux->stack_depth);
+
 	/* Set up function call stack */
 	emit(A64_SUB_I(1, A64_SP, A64_SP, ctx->stack_size), ctx);
 	return 0;
 }
 
 static int out_offset = -1; /* initialized on the first pass of build_body() */
+static int emit_bpf_tail_call(struct jit_ctx *ctx)
+{
+	/* bpf_tail_call(void *prog_ctx, struct bpf_array *array, u64 index) */
+	const u8 r2 = bpf2a64[BPF_REG_2];
+	const u8 r3 = bpf2a64[BPF_REG_3];
+
+	const u8 tmp = bpf2a64[TMP_REG_1];
+	const u8 prg = bpf2a64[TMP_REG_2];
+	const u8 tcc = bpf2a64[TCALL_CNT];
+	const int idx0 = ctx->idx;
+#define cur_offset (ctx->idx - idx0)
+#define jmp_offset (out_offset - (cur_offset))
+	size_t off;
+
+	/* if (index >= array->map.max_entries)
+	 *     goto out;
+	 */
+	off = offsetof(struct bpf_array, map.max_entries);
+	emit_a64_mov_i64(tmp, off, ctx);
+	emit(A64_LDR32(tmp, r2, tmp), ctx);
+	emit(A64_MOV(0, r3, r3), ctx);
+	emit(A64_CMP(0, r3, tmp), ctx);
+	emit(A64_B_(A64_COND_CS, jmp_offset), ctx);
+
+	/* if (tail_call_cnt > MAX_TAIL_CALL_CNT)
+	 *     goto out;
+	 * tail_call_cnt++;
+	 */
+	emit_a64_mov_i64(tmp, MAX_TAIL_CALL_CNT, ctx);
+	emit(A64_CMP(1, tcc, tmp), ctx);
+	emit(A64_B_(A64_COND_HI, jmp_offset), ctx);
+	emit(A64_ADD_I(1, tcc, tcc, 1), ctx);
+
+	/* prog = array->ptrs[index];
+	 * if (prog == NULL)
+	 *     goto out;
+	 */
+	off = offsetof(struct bpf_array, ptrs);
+	emit_a64_mov_i64(tmp, off, ctx);
+	emit(A64_ADD(1, tmp, r2, tmp), ctx);
+	emit(A64_LSL(1, prg, r3, 3), ctx);
+	emit(A64_LDR64(prg, tmp, prg), ctx);
+	emit(A64_CBZ(1, prg, jmp_offset), ctx);
+
+	/* goto *(prog->bpf_func + prologue_offset); */
+	off = offsetof(struct bpf_prog, bpf_func);
+	emit_a64_mov_i64(tmp, off, ctx);
+	emit(A64_LDR64(tmp, prg, tmp), ctx);
+	emit(A64_ADD_I(1, tmp, tmp, sizeof(u32) * PROLOGUE_OFFSET), ctx);
+	emit(A64_ADD_I(1, A64_SP, A64_SP, ctx->stack_size), ctx);
+	emit(A64_BR(tmp), ctx);
+
+	/* out: */
+	if (out_offset == -1)
+		out_offset = cur_offset;
+	if (cur_offset != out_offset) {
+		pr_err_once("tail_call out_offset = %d, expected %d!\n",
+			    cur_offset, out_offset);
+		return -1;
+	}
+	return 0;
+#undef cur_offset
+#undef jmp_offset
+}
 
 static void build_epilogue(struct jit_ctx *ctx)
 {
@@ -309,63 +412,63 @@ static void build_epilogue(struct jit_ctx *ctx)
 #define BPF_FIXUP_OFFSET_MASK	GENMASK(26, 0)
 #define BPF_FIXUP_REG_MASK	GENMASK(31, 27)
 
-// int arm64_bpf_fixup_exception(const struct exception_table_entry *ex,
-// 			      struct pt_regs *regs)
-// {
-// 	off_t offset = FIELD_GET(BPF_FIXUP_OFFSET_MASK, ex->fixup);
-// 	int dst_reg = FIELD_GET(BPF_FIXUP_REG_MASK, ex->fixup);
+int arm64_bpf_fixup_exception(const struct exception_table_entry *ex,
+			      struct pt_regs *regs)
+{
+	size_t offset = FIELD_GET(BPF_FIXUP_OFFSET_MASK, ex->fixup);
+	int dst_reg = FIELD_GET(BPF_FIXUP_REG_MASK, ex->fixup);
 
-// 	regs->regs[dst_reg] = 0;
-// 	regs->pc = (unsigned long)&ex->fixup - offset;
-// 	return 1;
-// }
+	regs->regs[dst_reg] = 0;
+	regs->pc = (unsigned long)&ex->fixup - offset;
+	return 1;
+}
 
 /* For accesses to BTF pointers, add an entry to the exception table */
-// static int add_exception_handler(const struct bpf_insn *insn,
-// 				 struct jit_ctx *ctx,
-// 				 int dst_reg)
-// {
-// 	off_t offset;
-// 	unsigned long pc;
-// 	struct exception_table_entry *ex;
+static int add_exception_handler(const struct bpf_insn *insn,
+				 struct jit_ctx *ctx,
+				 int dst_reg)
+{
+	size_t offset;
+	unsigned long pc;
+	struct exception_table_entry *ex;
 
-// 	if (!ctx->image)
-// 		/* First pass */
-// 		return 0;
+	if (!ctx->image)
+		/* First pass */
+		return 0;
 
-// 	if (BPF_MODE(insn->code) != BPF_PROBE_MEM)
-// 		return 0;
+	if (BPF_MODE(insn->code) != BPF_PROBE_MEM)
+		return 0;
 
-// 	// if (!ctx->prog->aux->extable ||
-// 	//     WARN_ON_ONCE(ctx->exentry_idx >= ctx->prog->aux->num_exentries))
-// 	// 	return -EINVAL;
+	if (!ctx->prog->aux->extable ||
+	    WARN_ON_ONCE(ctx->exentry_idx >= ctx->prog->aux->num_exentries))
+		return -EINVAL;
 
-// 	ex = &ctx->prog->aux->extable[ctx->exentry_idx];
-// 	pc = (unsigned long)&ctx->image[ctx->idx - 1];
+	ex = &ctx->prog->aux->extable[ctx->exentry_idx];
+	pc = (unsigned long)&ctx->image[ctx->idx - 1];
 
-// 	offset = pc - (long)&ex->insn;
-// 	if (WARN_ON_ONCE(offset >= 0 || offset < INT_MIN))
-// 		return -ERANGE;
-// 	ex->insn = offset;
+	offset = pc - (long)&ex->insn;
+	if (WARN_ON_ONCE(offset >= 0 || offset < INT_MIN))
+		return -ERANGE;
+	ex->insn = offset;
 
-// 	/*
-// 	 * Since the extable follows the program, the fixup offset is always
-// 	 * negative and limited to BPF_JIT_REGION_SIZE. Store a positive value
-// 	 * to keep things simple, and put the destination register in the upper
-// 	 * bits. We don't need to worry about buildtime or runtime sort
-// 	 * modifying the upper bits because the table is already sorted, and
-// 	 * isn't part of the main exception table.
-// 	 */
-// 	offset = (long)&ex->fixup - (pc + AARCH64_INSN_SIZE);
-// 	if (!FIELD_FIT(BPF_FIXUP_OFFSET_MASK, offset))
-// 		return -ERANGE;
+	/*
+	 * Since the extable follows the program, the fixup offset is always
+	 * negative and limited to BPF_JIT_REGION_SIZE. Store a positive value
+	 * to keep things simple, and put the destination register in the upper
+	 * bits. We don't need to worry about buildtime or runtime sort
+	 * modifying the upper bits because the table is already sorted, and
+	 * isn't part of the main exception table.
+	 */
+	offset = (long)&ex->fixup - (pc + AARCH64_INSN_SIZE);
+	if (!FIELD_FIT(BPF_FIXUP_OFFSET_MASK, offset))
+		return -ERANGE;
 
-// 	ex->fixup = FIELD_PREP(BPF_FIXUP_OFFSET_MASK, offset) |
-// 		    FIELD_PREP(BPF_FIXUP_REG_MASK, dst_reg);
+	ex->fixup = FIELD_PREP(BPF_FIXUP_OFFSET_MASK, offset) |
+		    FIELD_PREP(BPF_FIXUP_REG_MASK, dst_reg);
 
-// 	ctx->exentry_idx++;
-// 	return 0;
-// }
+	ctx->exentry_idx++;
+	return 0;
+}
 
 /* JITs an eBPF instruction.
  * Returns:
@@ -396,7 +499,7 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx,
 #define check_imm(bits, imm) do {				\
 	if ((((imm) > 0) && ((imm) >> (bits))) ||		\
 	    (((imm) < 0) && (~(imm) >> (bits)))) {		\
-		pr_info("[%2d] imm=%d(0x%x) out of range\n",	\
+		printf("[%2d] imm=%d(0x%x) out of range\n",	\
 			i, imm, imm);				\
 		return -EINVAL;					\
 	}							\
@@ -832,7 +935,7 @@ emit_cond_jmp:
 		if (!off) {
 			reg = dst;
 		} else {
-			emit_a64_mov_i4s(1, tmp, off, ctx);
+			emit_a64_mov_i(1, tmp, off, ctx);
 			emit(A64_ADD(1, tmp, tmp, dst), ctx);
 			reg = tmp;
 		}
@@ -849,7 +952,7 @@ emit_cond_jmp:
 		break;
 
 	default:
-		printf_once("unknown opcode %02x\n", code);
+		printf("unknown opcode %02x\n", code);
 		return -EINVAL;
 	}
 
@@ -908,8 +1011,8 @@ static int validate_code(struct jit_ctx *ctx)
 			return -1;
 	}
 
-	// if (WARN_ON_ONCE(ctx->exentry_idx != ctx->prog->aux->num_exentries))
-	// 	return -1;
+	if (WARN_ON_ONCE(ctx->exentry_idx != ctx->prog->aux->num_exentries))
+		return -1;
 
 	return 0;
 }
@@ -1040,14 +1143,14 @@ skip_init_ctx:
 
 	if (!prog->is_func || extra_pass) {
 		if (extra_pass && ctx.idx != jit_data->ctx.idx) {
-			printf_once("multi-func JIT bug %d != %d\n",
+			printf("multi-func JIT bug %d != %d\n",
 				    ctx.idx, jit_data->ctx.idx);
 			bpf_jit_binary_free(header);
 			prog->bpf_func = NULL;
 			prog->jited = 0;
 			goto out_off;
 		}
-		bpf_jit_binary_lock_ro(header);
+		// bpf_jit_binary_lock_ro(header);
 	} else {
 		jit_data->ctx = ctx;
 		jit_data->image = image_ptr;
@@ -1068,14 +1171,5 @@ out:
 	if (tmp_blinded)
 		bpf_jit_prog_release_other(prog, prog == orig_prog ?
 					   tmp : orig_prog);
-}
-
-void *bpf_jit_alloc_exec(unsigned long size)
-{
-	return malloc(size);
-}
-
-void bpf_jit_free_exec(void *addr)
-{
-	return free(addr);
+	return prog;
 }
