@@ -2,6 +2,7 @@
 #include "linux-errno.h"
 #include "linux-bpf.h"
 #include "bpf_jit_arch.h"
+#include "libebpf/linux-jit-bpf.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -9,6 +10,40 @@ int bpf_jit_enable = true;
 // const int bpf_jit_harden;
 // const int bpf_jit_kallsyms;
 // const long bpf_jit_limit;
+
+static inline struct bpf_binary_header *
+bpf_jit_binary_hdr(const struct bpf_prog *fp)
+{
+	unsigned long real_start = (unsigned long)fp->bpf_func;
+	unsigned long addr = real_start & PAGE_MASK;
+
+	return (void *)addr;
+}
+
+/* This symbol is only overridden by archs that have different
+ * requirements than the usual eBPF JITs, f.e. when they only
+ * implement cBPF JIT, do not set images read-only, etc.
+ */
+void bpf_jit_free(struct bpf_prog *fp)
+{
+	if (fp->jited) {
+		struct bpf_binary_header *hdr = bpf_jit_binary_hdr(fp);
+
+		bpf_jit_binary_free(hdr);
+	}
+
+	__bpf_prog_free(fp);
+}
+
+void *bpf_jit_alloc_exec(unsigned long size)
+{
+	return malloc(size);
+}
+
+void bpf_jit_free_exec(void *addr)
+{
+	free(addr);
+}
 
 struct bpf_binary_header *
 bpf_jit_binary_alloc(unsigned int proglen, u8 **image_ptr,
@@ -29,11 +64,11 @@ bpf_jit_binary_alloc(unsigned int proglen, u8 **image_ptr,
 	 */
 	size = round_up(proglen + sizeof(*hdr) + 128, PAGE_SIZE);
 
-	if (bpf_jit_charge_modmem(size))
-		return NULL;
+	// if (bpf_jit_charge_modmem(size))
+	// 	return NULL;
 	hdr = bpf_jit_alloc_exec(size);
 	if (!hdr) {
-		bpf_jit_uncharge_modmem(size);
+		// bpf_jit_uncharge_modmem(size);
 		return NULL;
 	}
 
@@ -57,7 +92,7 @@ void bpf_jit_binary_free(struct bpf_binary_header *hdr)
 	u32 size = hdr->size;
 
 	bpf_jit_free_exec(hdr);
-	bpf_jit_uncharge_modmem(size);
+	// bpf_jit_uncharge_modmem(size);
 }
 
 typedef unsigned int (*bpf_dispatcher_fn)(const void *ctx,
@@ -198,8 +233,98 @@ void __bpf_prog_free(struct bpf_prog *fp)
 	free(fp);
 }
 
-struct bpf_prog *bpf_prog_get(const void* code, unsigned int code_len) {
-	struct bpf_prog *prog = bpf_prog_alloc(code_len);
-	memcpy(prog->insnsi, code, code_len);
-	return prog;
+static inline u32 bpf_prog_insn_size(const struct bpf_prog *prog)
+{
+	return prog->len * sizeof(struct bpf_insn);
+}
+
+static int bpf_prog_load(union bpf_attr *attr, const void* uattr)
+{
+	enum bpf_prog_type type = attr->prog_type;
+	struct bpf_prog *prog, *dst_prog = NULL;
+	struct btf *attach_btf = NULL;
+	int err;
+	char license[128];
+	bool is_gpl;
+
+	/* remove kernel checkers here */
+
+	/* plain bpf_prog allocation */
+	prog = bpf_prog_alloc(bpf_prog_size(attr->insn_cnt));
+	if (!prog) {
+		return -ENOMEM;
+	}
+
+	prog->expected_attach_type = attr->expected_attach_type;
+	prog->aux->attach_btf = attach_btf;
+	prog->aux->attach_btf_id = attr->attach_btf_id;
+	prog->aux->dst_prog = dst_prog;
+	prog->aux->offload_requested = !!attr->prog_ifindex;
+
+	prog->aux->user = NULL; // get_current_user();
+	prog->len = attr->insn_cnt;
+
+	err = -EFAULT;
+	if (memcpy(prog->insns,
+			     attr->insns,
+			     bpf_prog_insn_size(prog)) != 0)
+		goto free_prog;
+
+	prog->orig_prog = NULL;
+	prog->jited = 0;
+
+	prog->gpl_compatible = is_gpl ? 1 : 0;
+
+	prog->aux->load_time = 0;
+	err = strncpy(prog->aux->name, attr->prog_name,
+			       sizeof(attr->prog_name));
+	if (err < 0)
+		goto free_prog;
+
+	/* run eBPF verifier */
+	// err = bpf_check(&prog, attr, uattr);
+	// if (err < 0)
+	// 	goto free_used_maps;
+
+free_prog:
+	// if (prog->aux->attach_btf)
+	// 	btf_put(prog->aux->attach_btf);
+	bpf_prog_free(prog);
+	return err;
+}
+
+/* Free internal BPF program */
+void bpf_prog_free(struct bpf_prog *fp)
+{
+	struct bpf_prog_aux *aux = fp->aux;
+
+	for (int i = 0; i < aux->func_cnt; i++)
+		bpf_jit_free(aux->func[i]);
+	if (aux->func_cnt) {
+		free(aux->func);
+	} else {
+		bpf_jit_free(aux->prog);
+	}
+}
+
+static void bpf_prog_clone_free(struct bpf_prog *fp)
+{
+	/* aux was stolen by the other clone, so we cannot free
+	 * it from this path! It will be freed eventually by the
+	 * other program on release.
+	 *
+	 * At this point, we don't need a deferred release since
+	 * clone is guaranteed to not be locked.
+	 */
+	fp->aux = NULL;
+	__bpf_prog_free(fp);
+}
+
+void bpf_jit_prog_release_other(struct bpf_prog *fp, struct bpf_prog *fp_other)
+{
+	/* We have to repoint aux->prog to self, as we don't
+	 * know whether fp here is the clone or the original.
+	 */
+	fp->aux->prog = fp;
+	bpf_prog_clone_free(fp_other);
 }

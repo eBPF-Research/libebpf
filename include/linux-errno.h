@@ -50,4 +50,6 @@
  */
 #define	ENOSYS		38	/* Invalid system call number */
 
+#define ENOTSUPP	524	/* Operation is not supported */
+
 #endif

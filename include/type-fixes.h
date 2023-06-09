@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <assert.h>
 
 typedef uint8_t u8;
 typedef int8_t s8;
@@ -16,7 +17,13 @@ typedef int64_t s64;
 
 #ifndef __ASSEMBLY__
 
-#include <linux/posix_types.h>
+/*
+ *   gcc: https://gcc.gnu.org/onlinedocs/gcc/Common-Function-Attributes.html#index-aligned-function-attribute
+ *   gcc: https://gcc.gnu.org/onlinedocs/gcc/Common-Type-Attributes.html#index-aligned-type-attribute
+ *   gcc: https://gcc.gnu.org/onlinedocs/gcc/Common-Variable-Attributes.html#index-aligned-variable-attribute
+ */
+#define __aligned(x)                    __attribute__((__aligned__(x)))
+#define __aligned_largest               __attribute__((__aligned__))
 
 /*
  * Below are truly Linux-specific types that should never collide with
@@ -193,5 +200,57 @@ bool is_power_of_2(unsigned long n)
 {
 	return (n != 0 && ((n & (n - 1)) == 0));
 }
+
+/**
+ * container_of - cast a member of a structure out to the containing structure
+ * @ptr:	the pointer to the member.
+ * @type:	the type of the container struct this is embedded in.
+ * @member:	the name of the member within the struct.
+ *
+ */
+#define container_of(ptr, type, member) ({                  \
+    const typeof( ((type *)0)->member ) *__mptr = (ptr);    \
+    (type *)( (char *)__mptr - offsetof(type,member) );})
+
+#define WARN_ON_ONCE(condition) ({ \
+   int __ret_warn_on = !!(condition); \
+   unlikely(__ret_warn_on); })
+
+/**
+ * BUILD_BUG_ON - break compile if a condition is true.
+ * @condition: the condition which the compiler should know is false.
+ *
+ * If you have some code which relies on certain constants being equal, or
+ * some other compile-time-evaluated condition, you should use BUILD_BUG_ON to
+ * detect if someone changes it.
+ */
+#define BUILD_BUG_ON(condition) \
+   ((void)sizeof(char[1 - 2*!!(condition)]))
+
+/*
+ * Using __builtin_constant_p(x) to ignore cases where the return
+ * value is always the same.  This idea is taken from a similar patch
+ * written by Daniel Walker.
+ */
+# ifndef likely
+#  define likely(x) (x)
+# endif
+# ifndef unlikely
+#  define unlikely(x) (x)
+# endif
+
+#define WRITE_ONCE(x, val) \
+do { \
+    volatile typeof(x) *__ptr = &(x); \
+    *__ptr = (val); \
+} while (0)
+
+#define READ_ONCE(x) \
+({ \
+    volatile typeof(x) *__ptr = &(x); \
+    *__ptr; \
+})
+
+#define BUG_ON(condition) assert(!(condition))
 
 #endif // TYPE_FIXED_H

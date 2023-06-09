@@ -50,6 +50,7 @@ set(sources
   src/ebpf_jit_x86_64.c
   src/ebpf_jit.c
   src/ebpf_vm.c
+  src/linux_bpf_core.c
 )
 
 set(exe_sources

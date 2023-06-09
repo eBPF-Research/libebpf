@@ -249,17 +249,6 @@ struct bpf_insn {
 	__s32	imm;		/* signed immediate constant */
 };
 
-/* Key of an a BPF_MAP_TYPE_LPM_TRIE entry */
-struct bpf_lpm_trie_key {
-	__u32	prefixlen;	/* up to 32 for AF_INET, 128 for AF_INET6 */
-	__u8	data[0];	/* Arbitrary size */
-};
-
-struct bpf_cgroup_storage_key {
-	__u64	cgroup_inode_id;	/* cgroup inode id */
-	__u32	attach_type;		/* program attach type */
-};
-
 enum bpf_map_type {
 	BPF_MAP_TYPE_UNSPEC,
 	BPF_MAP_TYPE_HASH,
@@ -386,54 +375,6 @@ enum bpf_link_type {
 
 	MAX_BPF_LINK_TYPE,
 };
-
-/* cgroup-bpf attach flags used in BPF_PROG_ATTACH command
- *
- * NONE(default): No further bpf programs allowed in the subtree.
- *
- * BPF_F_ALLOW_OVERRIDE: If a sub-cgroup installs some bpf program,
- * the program in this cgroup yields to sub-cgroup program.
- *
- * BPF_F_ALLOW_MULTI: If a sub-cgroup installs some bpf program,
- * that cgroup program gets run in addition to the program in this cgroup.
- *
- * Only one program is allowed to be attached to a cgroup with
- * NONE or BPF_F_ALLOW_OVERRIDE flag.
- * Attaching another program on top of NONE or BPF_F_ALLOW_OVERRIDE will
- * release old program and attach the new one. Attach flags has to match.
- *
- * Multiple programs are allowed to be attached to a cgroup with
- * BPF_F_ALLOW_MULTI flag. They are executed in FIFO order
- * (those that were attached first, run first)
- * The programs of sub-cgroup are executed first, then programs of
- * this cgroup and then programs of parent cgroup.
- * When children program makes decision (like picking TCP CA or sock bind)
- * parent program has a chance to override it.
- *
- * With BPF_F_ALLOW_MULTI a new program is added to the end of the list of
- * programs for a cgroup. Though it's possible to replace an old program at
- * any position by also specifying BPF_F_REPLACE flag and position itself in
- * replace_bpf_fd attribute. Old program at this position will be released.
- *
- * A cgroup with MULTI or OVERRIDE flag allows any attach flags in sub-cgroups.
- * A cgroup with NONE doesn't allow any programs in sub-cgroups.
- * Ex1:
- * cgrp1 (MULTI progs A, B) ->
- *    cgrp2 (OVERRIDE prog C) ->
- *      cgrp3 (MULTI prog D) ->
- *        cgrp4 (OVERRIDE prog E) ->
- *          cgrp5 (NONE prog F)
- * the event in cgrp5 triggers execution of F,D,A,B in that order.
- * if prog F is detached, the execution is E,D,A,B
- * if prog F and D are detached, the execution is E,A,B
- * if prog F, E and D are detached, the execution is C,A,B
- *
- * All eligible programs are executed regardless of return code from
- * earlier programs.
- */
-#define BPF_F_ALLOW_OVERRIDE	(1U << 0)
-#define BPF_F_ALLOW_MULTI	(1U << 1)
-#define BPF_F_REPLACE		(1U << 2)
 
 /* If BPF_F_STRICT_ALIGNMENT is used in BPF_PROG_LOAD command, the
  * verifier will perform strict alignment checking as if the kernel
@@ -1012,6 +953,14 @@ struct btf_func_model {
  */
 #define BPF_MAX_TRAMP_PROGS 40
 
+enum bpf_tramp_prog_type {
+	BPF_TRAMP_FENTRY,
+	BPF_TRAMP_FEXIT,
+	BPF_TRAMP_MODIFY_RETURN,
+	BPF_TRAMP_MAX,
+	BPF_TRAMP_REPLACE, /* more than MAX */
+};
+
 struct bpf_tramp_progs {
 	struct bpf_prog *progs[BPF_MAX_TRAMP_PROGS];
 	int nr_progs;
@@ -1348,9 +1297,7 @@ struct bpf_prog_aux {
 	bool offload_requested; /* Program is bound and offloaded to the netdev. */
 	bool attach_btf_trace; /* true if attaching to BTF-enabled raw tp */
 	bool func_proto_unreliable;
-	bool sleepable;
 	bool tail_call_reachable;
-	bool xdp_has_frags;
 	/* BTF_KIND_FUNC_PROTO for valid attach_btf_id */
 	const struct btf_type *attach_func_proto;
 	/* function name for valid attach_btf_id */
@@ -1575,7 +1522,118 @@ void bpf_prog_jit_attempt_done(struct bpf_prog *prog);
 
 struct bpf_prog *bpf_prog_alloc(unsigned int size);
 struct bpf_prog *bpf_prog_alloc_no_stats(unsigned int size);
-struct bpf_prog *bpf_prog_realloc(struct bpf_prog *fp_old, unsigned int size);
 void __bpf_prog_free(struct bpf_prog *fp);
+
+enum bpf_text_poke_type {
+	BPF_MOD_CALL,
+	BPF_MOD_JUMP,
+};
+
+int bpf_arch_text_poke(void *ip, enum bpf_text_poke_type t,
+		       void *addr1, void *addr2);
+
+
+/* map is generic key/value storage optionally accesible by eBPF programs */
+struct bpf_map_ops {
+	/* funcs callable from userspace (via syscall) */
+	int (*map_alloc_check)(union bpf_attr *attr);
+	struct bpf_map *(*map_alloc)(union bpf_attr *attr);
+	void (*map_release)(struct bpf_map *map, struct file *map_file);
+	void (*map_free)(struct bpf_map *map);
+	int (*map_get_next_key)(struct bpf_map *map, void *key, void *next_key);
+	void (*map_release_uref)(struct bpf_map *map);
+	void *(*map_lookup_elem_sys_only)(struct bpf_map *map, void *key);
+
+	/* funcs callable from userspace and from eBPF programs */
+	void *(*map_lookup_elem)(struct bpf_map *map, void *key);
+	int (*map_update_elem)(struct bpf_map *map, void *key, void *value, u64 flags);
+	int (*map_delete_elem)(struct bpf_map *map, void *key);
+	int (*map_push_elem)(struct bpf_map *map, void *value, u64 flags);
+	int (*map_pop_elem)(struct bpf_map *map, void *value);
+	int (*map_peek_elem)(struct bpf_map *map, void *value);
+
+	/* funcs called by prog_array and perf_event_array map */
+	void *(*map_fd_get_ptr)(struct bpf_map *map, struct file *map_file,
+				int fd);
+	void (*map_fd_put_ptr)(void *ptr);
+	u32 (*map_gen_lookup)(struct bpf_map *map, struct bpf_insn *insn_buf);
+	u32 (*map_fd_sys_lookup_elem)(void *ptr);
+	void (*map_seq_show_elem)(struct bpf_map *map, void *key,
+				  struct seq_file *m);
+	int (*map_check_btf)(const struct bpf_map *map,
+			     const struct btf *btf,
+			     const struct btf_type *key_type,
+			     const struct btf_type *value_type);
+
+	/* Prog poke tracking helpers. */
+	int (*map_poke_track)(struct bpf_map *map, struct bpf_prog_aux *aux);
+	void (*map_poke_untrack)(struct bpf_map *map, struct bpf_prog_aux *aux);
+	void (*map_poke_run)(struct bpf_map *map, u32 key, struct bpf_prog *old,
+			     struct bpf_prog *new);
+
+	/* Direct value access helpers. */
+	int (*map_direct_value_addr)(const struct bpf_map *map,
+				     u64 *imm, u32 off);
+	int (*map_direct_value_meta)(const struct bpf_map *map,
+				     u64 imm, u32 *off);
+	int (*map_mmap)(struct bpf_map *map, struct vm_area_struct *vma);
+	__poll_t (*map_poll)(struct bpf_map *map, struct file *filp,
+			     struct poll_table_struct *pts);
+
+	/* BTF name and id of struct allocated by map_alloc */
+	const char * const map_btf_name;
+	int *map_btf_id;
+};
+
+struct bpf_map_memory {
+	u32 pages;
+	struct user_struct *user;
+};
+
+struct bpf_map {
+	/* The first two cachelines with read-mostly members of which some
+	 * are also accessed in fast-path (e.g. ops, max_entries).
+	 */
+	const struct bpf_map_ops *ops;
+	struct bpf_map *inner_map_meta;
+#ifdef CONFIG_SECURITY
+	void *security;
+#endif
+	enum bpf_map_type map_type;
+	u32 key_size;
+	u32 value_size;
+	u32 max_entries;
+	u32 map_flags;
+	int spin_lock_off; /* >=0 valid offset, <0 error */
+	u32 id;
+	int numa_node;
+	u32 btf_key_type_id;
+	u32 btf_value_type_id;
+	struct btf *btf;
+	struct bpf_map_memory memory;
+	char name[BPF_OBJ_NAME_LEN];
+	u32 btf_vmlinux_value_type_id;
+	bool bypass_spec_v1;
+	bool frozen; /* write-once; write-protected by freeze_mutex */
+	/* 22 bytes hole */
+
+	/* The 3rd and 4th cacheline with misc members to avoid false sharing
+	 * particularly with refcounting.
+	 */
+	// struct work_struct work;
+	u64 writecnt; /* writable mmap cnt; protected by freeze_mutex */
+};
+
+struct bpf_array {
+	struct bpf_map map;
+	u32 elem_size;
+	u32 index_mask;
+	struct bpf_array_aux *aux;
+	union {
+		char value[0] __aligned(8);
+		void *ptrs[0] __aligned(8);
+		void *pptrs[0] __aligned(8);
+	};
+};
 
 #endif /* _LINUX_BPF_H */
