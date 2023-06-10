@@ -238,7 +238,7 @@ static inline u32 bpf_prog_insn_size(const struct bpf_prog *prog)
 	return prog->len * sizeof(struct bpf_insn);
 }
 
-static int bpf_prog_load(union bpf_attr *attr, const void* uattr)
+struct bpf_prog *bpf_prog_load(union bpf_attr *attr)
 {
 	struct bpf_prog *prog, *dst_prog = NULL;
 	struct btf *attach_btf = NULL;
@@ -249,14 +249,14 @@ static int bpf_prog_load(union bpf_attr *attr, const void* uattr)
 	/* plain bpf_prog allocation */
 	prog = bpf_prog_alloc(bpf_prog_size(attr->insn_cnt));
 	if (!prog) {
-		return -ENOMEM;
+		return NULL;
 	}
 
 	prog->expected_attach_type = attr->expected_attach_type;
 	prog->aux->attach_btf = attach_btf;
 	prog->aux->attach_btf_id = attr->attach_btf_id;
 	prog->aux->dst_prog = dst_prog;
-	prog->aux->offload_requested = !!attr->prog_ifindex;
+	prog->aux->offload_requested = false; // origin is: !!attr->prog_ifindex;
 
 	prog->aux->user = NULL; // get_current_user();
 	prog->len = attr->insn_cnt;
@@ -276,7 +276,7 @@ static int bpf_prog_load(union bpf_attr *attr, const void* uattr)
 
 	/* run eBPF verifier */
 	// err = bpf_check(&prog, attr, uattr);
-	return 0;
+	return prog;
 }
 
 /* Free internal BPF program */
