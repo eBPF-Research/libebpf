@@ -111,7 +111,9 @@ else()
 endif()
 
 # set the -static flag for static linking
-set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "-static")
+if(NOT ${PROJECT_NAME}_ENABLE_ASAN)
+  set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "-static")
+endif()
 set_target_properties(
   ${PROJECT_NAME}
   PROPERTIES

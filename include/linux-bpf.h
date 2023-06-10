@@ -1299,13 +1299,6 @@ int bpf_jit_get_func_addr(const struct bpf_prog *prog,
 struct bpf_prog *bpf_jit_blind_constants(struct bpf_prog *fp);
 void bpf_jit_prog_release_other(struct bpf_prog *fp, struct bpf_prog *fp_other);
 
-static inline void bpf_jit_dump(unsigned int flen, unsigned int proglen,
-				u32 pass, void *image)
-{
-	printf("flen=%u proglen=%u pass=%u image=%pK\n", flen,
-	       proglen, pass, image);
-}
-
 static inline bool bpf_jit_is_ebpf(void)
 {
 	return true;
@@ -1458,6 +1451,13 @@ struct bpf_map_ops {
 	const char * const map_btf_name;
 	int *map_btf_id;
 };
+
+static inline void bpf_jit_dump(unsigned int flen, unsigned int proglen,
+				u32 pass, void *image)
+{
+	printf("flen=%u proglen=%u pass=%u image=%pK\n", flen,
+	       proglen, pass, image);
+}
 
 struct bpf_map_memory {
 	u32 pages;

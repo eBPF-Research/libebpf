@@ -32,7 +32,7 @@ void bpf_jit_free(struct bpf_prog *fp)
 	if (fp->jited) {
 		struct bpf_binary_header *hdr = bpf_jit_binary_hdr(fp);
 
-		bpf_jit_binary_free(hdr);
+		// bpf_jit_binary_free(hdr);
 	}
 
 	__bpf_prog_free(fp);
@@ -262,7 +262,7 @@ struct bpf_prog *bpf_prog_load(union bpf_attr *attr)
 	prog->len = attr->insn_cnt;
 
 	memcpy(prog->insnsi,
-			     attr->insns,
+			     (void*)attr->insns,
 			     bpf_prog_insn_size(prog));
 
 	prog->orig_prog = NULL;

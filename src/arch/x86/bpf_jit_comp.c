@@ -2072,7 +2072,7 @@ out_image:
 		// cond_resched();
 	}
 
-	// bpf_jit_dump(prog->len, proglen, pass + 1, image);
+	bpf_jit_dump(prog->len, proglen, pass + 1, image);
 
 	if (image) {
 		if (!prog->is_func || extra_pass) {
