@@ -2257,7 +2257,7 @@ emit_jmp:
 			emit_epilogue(&prog, bpf_prog->aux->stack_depth);
 			break;
 notyet:
-			pr_info_once("*** NOT YET: opcode %02x ***\n", code);
+			printf("*** NOT YET: opcode %02x ***\n", code);
 			return -EFAULT;
 		default:
 			/*

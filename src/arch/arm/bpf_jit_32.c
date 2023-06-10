@@ -15,6 +15,135 @@
 #include <string.h>
 #include <stdlib.h>
 
+#define ARM_OPCODE_CONDTEST_FAIL   0
+#define ARM_OPCODE_CONDTEST_PASS   1
+#define ARM_OPCODE_CONDTEST_UNCOND 2
+
+/*
+ * Assembler opcode byteswap helpers.
+ * These are only intended for use by this header: don't use them directly,
+ * because they will be suboptimal in most cases.
+ */
+#define ___asm_opcode_swab32(x) (	\
+	  (((x) << 24) & 0xFF000000)	\
+	| (((x) <<  8) & 0x00FF0000)	\
+	| (((x) >>  8) & 0x0000FF00)	\
+	| (((x) >> 24) & 0x000000FF)	\
+)
+#define ___asm_opcode_swab16(x) (	\
+	  (((x) << 8) & 0xFF00)		\
+	| (((x) >> 8) & 0x00FF)		\
+)
+#define ___asm_opcode_swahb32(x) (	\
+	  (((x) << 8) & 0xFF00FF00)	\
+	| (((x) >> 8) & 0x00FF00FF)	\
+)
+#define ___asm_opcode_swahw32(x) (	\
+	  (((x) << 16) & 0xFFFF0000)	\
+	| (((x) >> 16) & 0x0000FFFF)	\
+)
+#define ___asm_opcode_identity32(x) ((x) & 0xFFFFFFFF)
+#define ___asm_opcode_identity16(x) ((x) & 0xFFFF)
+
+/*
+ * Opcode byteswap helpers
+ *
+ * These macros help with converting instructions between a canonical integer
+ * format and in-memory representation, in an endianness-agnostic manner.
+ *
+ * __mem_to_opcode_*() convert from in-memory representation to canonical form.
+ * __opcode_to_mem_*() convert from canonical form to in-memory representation.
+ *
+ *
+ * Canonical instruction representation:
+ *
+ *	ARM:		0xKKLLMMNN
+ *	Thumb 16-bit:	0x0000KKLL, where KK < 0xE8
+ *	Thumb 32-bit:	0xKKLLMMNN, where KK >= 0xE8
+ *
+ * There is no way to distinguish an ARM instruction in canonical representation
+ * from a Thumb instruction (just as these cannot be distinguished in memory).
+ * Where this distinction is important, it needs to be tracked separately.
+ *
+ * Note that values in the range 0x0000E800..0xE7FFFFFF intentionally do not
+ * represent any valid Thumb-2 instruction.  For this range,
+ * __opcode_is_thumb32() and __opcode_is_thumb16() will both be false.
+ *
+ * The ___asm variants are intended only for use by this header, in situations
+ * involving inline assembler.  For .S files, the normal __opcode_*() macros
+ * should do the right thing.
+ */
+#define ___opcode_swab32(x) ___asm_opcode_swab32(x)
+#define ___opcode_swab16(x) ___asm_opcode_swab16(x)
+#define ___opcode_swahb32(x) ___asm_opcode_swahb32(x)
+#define ___opcode_swahw32(x) ___asm_opcode_swahw32(x)
+#define ___opcode_identity32(x) ___asm_opcode_identity32(x)
+#define ___opcode_identity16(x) ___asm_opcode_identity16(x)
+
+#ifdef CONFIG_CPU_ENDIAN_BE8
+
+#define __opcode_to_mem_arm(x) ___opcode_swab32(x)
+#define __opcode_to_mem_thumb16(x) ___opcode_swab16(x)
+#define __opcode_to_mem_thumb32(x) ___opcode_swahb32(x)
+#define ___asm_opcode_to_mem_arm(x) ___asm_opcode_swab32(x)
+#define ___asm_opcode_to_mem_thumb16(x) ___asm_opcode_swab16(x)
+#define ___asm_opcode_to_mem_thumb32(x) ___asm_opcode_swahb32(x)
+
+#else /* ! CONFIG_CPU_ENDIAN_BE8 */
+
+#define __opcode_to_mem_arm(x) ___opcode_identity32(x)
+#define __opcode_to_mem_thumb16(x) ___opcode_identity16(x)
+#define ___asm_opcode_to_mem_arm(x) ___asm_opcode_identity32(x)
+#define ___asm_opcode_to_mem_thumb16(x) ___asm_opcode_identity16(x)
+#ifdef CONFIG_CPU_ENDIAN_BE32
+#ifndef __ASSEMBLY__
+/*
+ * On BE32 systems, using 32-bit accesses to store Thumb instructions will not
+ * work in all cases, due to alignment constraints.  For now, a correct
+ * version is not provided for BE32, but the prototype needs to be there
+ * to compile patch.c.
+ */
+extern __u32 __opcode_to_mem_thumb32(__u32);
+#endif
+#else
+#define __opcode_to_mem_thumb32(x) ___opcode_swahw32(x)
+#define ___asm_opcode_to_mem_thumb32(x) ___asm_opcode_swahw32(x)
+#endif
+
+#endif /* ! CONFIG_CPU_ENDIAN_BE8 */
+
+#define __mem_to_opcode_arm(x) __opcode_to_mem_arm(x)
+#define __mem_to_opcode_thumb16(x) __opcode_to_mem_thumb16(x)
+#ifndef CONFIG_CPU_ENDIAN_BE32
+#define __mem_to_opcode_thumb32(x) __opcode_to_mem_thumb32(x)
+#endif
+
+/* Operations specific to Thumb opcodes */
+
+/* Instruction size checks: */
+#define __opcode_is_thumb32(x) (		\
+	   ((x) & 0xF8000000) == 0xE8000000	\
+	|| ((x) & 0xF0000000) == 0xF0000000	\
+)
+#define __opcode_is_thumb16(x) (					\
+	   ((x) & 0xFFFF0000) == 0					\
+	&& !(((x) & 0xF800) == 0xE800 || ((x) & 0xF000) == 0xF000)	\
+)
+
+/* Operations to construct or split 32-bit Thumb instructions: */
+#define __opcode_thumb32_first(x) (___opcode_identity16((x) >> 16))
+#define __opcode_thumb32_second(x) (___opcode_identity16(x))
+#define __opcode_thumb32_compose(first, second) (			\
+	  (___opcode_identity32(___opcode_identity16(first)) << 16)	\
+	| ___opcode_identity32(___opcode_identity16(second))		\
+)
+#define ___asm_opcode_thumb32_first(x) (___asm_opcode_identity16((x) >> 16))
+#define ___asm_opcode_thumb32_second(x) (___asm_opcode_identity16(x))
+#define ___asm_opcode_thumb32_compose(first, second) (			    \
+	  (___asm_opcode_identity32(___asm_opcode_identity16(first)) << 16) \
+	| ___asm_opcode_identity32(___asm_opcode_identity16(second))	    \
+)
+
 /*
  * eBPF prog stack layout:
  *
@@ -227,6 +356,26 @@ static inline void emit(u32 inst, struct jit_ctx *ctx)
 	_emit(ARM_COND_AL, inst, ctx);
 }
 
+/**
+ * rol32 - rotate a 32-bit value left
+ * @word: value to rotate
+ * @shift: bits to roll
+ */
+static inline __u32 rol32(__u32 word, unsigned int shift)
+{
+	return (word << (shift & 31)) | (word >> ((-shift) & 31));
+}
+
+/**
+ * ror32 - rotate a 32-bit value right
+ * @word: value to rotate
+ * @shift: bits to roll
+ */
+static inline __u32 ror32(__u32 word, unsigned int shift)
+{
+	return (word >> (shift & 31)) | (word << ((-shift) & 31));
+}
+
 /*
  * This is rather horrid, but necessary to convert an integer constant
  * to an immediate operand for the opcodes, and be able to detect at
@@ -429,7 +578,7 @@ static void emit_bx_r(u8 tgt_reg, struct jit_ctx *ctx)
 	// if (elf_hwcap & HWCAP_THUMB)
 	// 	emit(ARM_BX(tgt_reg), ctx);
 	// else
-		emit(ARM_MOV_R(ARM_PC, tgt_reg), ctx);
+	emit(ARM_MOV_R(ARM_PC, tgt_reg), ctx);
 }
 
 static inline void emit_blx_r(u8 tgt_reg, struct jit_ctx *ctx)
@@ -1353,7 +1502,7 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
 #define check_imm(bits, imm) do {				\
 	if ((imm) >= (1 << ((bits) - 1)) ||			\
 	    (imm) < -(1 << ((bits) - 1))) {			\
-		pr_info("[%2d] imm=%d(0x%x) out of range\n",	\
+		printf("[%2d] imm=%d(0x%x) out of range\n",	\
 			i, imm, imm);				\
 		return -EINVAL;					\
 	}							\
@@ -1797,7 +1946,7 @@ go_jmp:
 		emit(ARM_B(jmp_offset), ctx);
 		break;
 notyet:
-		pr_info_once("*** NOT YET: opcode %02x ***\n", code);
+		printf("*** NOT YET: opcode %02x ***\n", code);
 		return -EFAULT;
 	default:
 		printf("unknown opcode %02x\n", code);
@@ -1885,18 +2034,19 @@ struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog)
 	 * then we must fall back to the interpreter. Otherwise, we save
 	 * the new JITed code.
 	 */
-	tmp = bpf_jit_blind_constants(prog);
-
-	if (IS_ERR(tmp))
-		return orig_prog;
-	if (tmp != prog) {
-		tmp_blinded = true;
-		prog = tmp;
-	}
+	// tmp = bpf_jit_blind_constants(prog);
+	// disable bpf jit blind
+	// if (IS_ERR(tmp))
+	// 	return orig_prog;
+	// if (tmp != prog) {
+	// 	tmp_blinded = true;
+	// 	prog = tmp;
+	// }
 
 	memset(&ctx, 0, sizeof(ctx));
 	ctx.prog = prog;
-	ctx.cpu_architecture = cpu_architecture();
+	// In kernel: #define CPU_ARCH_UNKNOWN	0
+	ctx.cpu_architecture = 0;
 
 	/* Not able to allocate memory for offsets[] , then
 	 * we must fall back to the interpreter
@@ -1990,13 +2140,13 @@ struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog)
 		prog = orig_prog;
 		goto out_imms;
 	}
-	flush_icache_range((u32)header, (u32)(ctx.target + ctx.idx));
+	// flush_icache_range((u32)header, (u32)(ctx.target + ctx.idx));
 
 	if (bpf_jit_enable > 1)
 		/* there are 2 passes here */
 		bpf_jit_dump(prog->len, image_size, 2, ctx.target);
 
-	bpf_jit_binary_lock_ro(header);
+	// bpf_jit_binary_lock_ro(header);
 	prog->bpf_func = (void *)ctx.target;
 	prog->jited = 1;
 	prog->jited_len = image_size;
@@ -2004,10 +2154,10 @@ struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog)
 out_imms:
 #if __LINUX_ARM_ARCH__ < 7
 	if (ctx.imm_count)
-		kfree(ctx.imms);
+		 free(ctx.imms);
 #endif
 out_off:
-	kfree(ctx.offsets);
+	 free(ctx.offsets);
 out:
 	if (tmp_blinded)
 		bpf_jit_prog_release_other(prog, prog == orig_prog ?

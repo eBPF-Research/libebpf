@@ -1274,7 +1274,7 @@ int bpf_jit_emit_insn(const struct bpf_insn *insn, struct rv_jit_context *ctx,
 		/* Fallthrough. */
 
 notsupported:
-		pr_info_once("bpf-jit: not supported: opcode %02x ***\n", code);
+		printf("bpf-jit: not supported: opcode %02x ***\n", code);
 		return -EFAULT;
 
 	default:

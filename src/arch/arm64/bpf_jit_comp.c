@@ -298,7 +298,7 @@ static int build_prologue(struct jit_ctx *ctx, bool ebpf_from_cbpf)
 
 		cur_offset = ctx->idx - idx0;
 		if (cur_offset != PROLOGUE_OFFSET) {
-			printf_once("PROLOGUE_OFFSET = %d, expected %d!\n",
+			printf("PROLOGUE_OFFSET = %d, expected %d!\n",
 				    cur_offset, PROLOGUE_OFFSET);
 			return -1;
 		}
