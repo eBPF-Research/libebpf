@@ -5,7 +5,10 @@
 #include "libebpf/linux-jit-bpf.h"
 #include <stdlib.h>
 #include <string.h>
+
 #ifdef __linux__
+// for mmap and munmap, to let jit code be executable
+#include <sys/mman.h>
 #include <time.h>
 #endif
 
@@ -40,12 +43,26 @@ void bpf_jit_free(struct bpf_prog *fp)
 
 void *bpf_jit_alloc_exec(unsigned long size)
 {
+	printf("bpf_jit_alloc_exec for size: %ld\n", size);
+#ifdef __linux__
+	void *mem = mmap(NULL, size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS ,-1, 0);
+    if(mem == MAP_FAILED) {
+        return false;
+    }
+	return mem;
+#else
 	return malloc(size);
+#endif
 }
 
 void bpf_jit_free_exec(void *addr)
 {
+	printf("bpf_jit_free_exec for addr: %p\n", addr);
+#ifdef __linux__
+	munmap(addr, 0);
+#else
 	free(addr);
+#endif
 }
 
 struct bpf_binary_header *

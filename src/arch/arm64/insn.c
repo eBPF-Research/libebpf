@@ -49,15 +49,6 @@ atomic_inc_return(atomic_t *v)
 #define atomic_inc_return atomic_inc_return
 #endif
 
-#ifndef atomic_inc_return_release
-static inline int
-atomic_inc_return_release(atomic_t *v)
-{
-	return atomic_add_return_release(1, v);
-}
-#define atomic_inc_return_release atomic_inc_return_release
-#endif
-
 #ifndef atomic_inc_return_relaxed
 static inline int
 atomic_inc_return_relaxed(atomic_t *v)
