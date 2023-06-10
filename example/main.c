@@ -10,8 +10,9 @@
 		fprintf(stderr, "Failed to load code: %s\n", errmsg);          \
 	}
 
-char *errmsg;
+#define TEST_BPF_CODE bpf_mul_64_bit
 
+char *errmsg;
 struct mem {
 	int a;
 	int b;
@@ -26,7 +27,7 @@ int main()
 	struct ebpf_vm *vm = ebpf_create();
 	// remove 0, in the end
 	CHECK_EXIT(
-		ebpf_load(vm, bpf_add_mem_64_bit, sizeof(bpf_add_mem_64_bit), &errmsg));
+		ebpf_load(vm, TEST_BPF_CODE, sizeof(TEST_BPF_CODE), &errmsg));
 	ebpf_jit_fn fn = ebpf_compile(vm, &errmsg);
 	int mem_len = 1024 * 1024;
 	char* mem = malloc(mem_len);
@@ -40,8 +41,8 @@ int main()
 	printf("%d + %d = %ld\n", m.a, m.b, res);
 #elif JIT_TEST_KERNEL
 	union bpf_attr attr;
-	attr.insn_cnt = sizeof(bpf_mul_64_bit) / sizeof(struct bpf_insn);
-	attr.insns = (uint64_t)bpf_mul_64_bit;
+	attr.insn_cnt = sizeof(TEST_BPF_CODE) / sizeof(struct bpf_insn);
+	attr.insns = (uint64_t)TEST_BPF_CODE;
 	strcpy(attr.prog_name, "add_one");
 	attr.prog_type = BPF_PROG_TYPE_UNSPEC;
 	attr.log_buf = (uint64_t)errmsg;
@@ -66,7 +67,7 @@ int main()
 	struct ebpf_vm *vm = ebpf_create();
 	// remove 0, in the end
 	CHECK_EXIT(
-		ebpf_load(vm, bpf_add_mem_64_bit, sizeof(bpf_add_mem_64_bit), &errmsg));
+		ebpf_load(vm, TEST_BPF_CODE, sizeof(TEST_BPF_CODE), &errmsg));
 	CHECK_EXIT(ebpf_exec(vm, &m, sizeof(m), &res));
 	printf("%d + %d = %ld\n", m.a, m.b, res);
 #endif

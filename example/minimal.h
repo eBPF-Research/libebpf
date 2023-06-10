@@ -2,6 +2,7 @@
 #ifndef EBPF_CODE_H_
 #define EBPF_CODE_H_
 
+// original code from libebpf repo
 const unsigned char bpf_add_mem_64_bit_minimal[] = ""
 "\x61\x12\x00\x00\x00\x00\x00\x00"
 "\x61\x10\x04\x00\x00\x00\x00\x00"
@@ -47,6 +48,10 @@ const unsigned char bpf_mul_64_bit[] = {
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
+/*
+a * b / 2 for 32 bit
+clang -O2 -target bpf -m32 -c example/bpf/mul.bpf.c -o prog.o
+*/
 const unsigned char bpf_mul_32_bit[] = {
   0xb7, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00,
   0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
