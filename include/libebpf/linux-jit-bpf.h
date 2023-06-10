@@ -191,7 +191,7 @@ union bpf_attr {
 	struct { /* anonymous struct used by BPF_PROG_LOAD command */
 		uint32_t		prog_type;	/* one of enum bpf_prog_type */
 		uint32_t		insn_cnt;
-		__aligned_u64	insns[0];
+		__aligned_u64	insns;
 		__aligned_u64	license;
 		uint32_t		log_level;	/* verbosity level of verifier */
 		uint32_t		log_size;	/* size of user buffer */

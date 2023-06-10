@@ -40,11 +40,12 @@ int main()
 	printf("%d + %d = %ld\n", m.a, m.b, res);
 #elif JIT_TEST_KERNEL
 	union bpf_attr attr;
-	attr.insn_cnt = sizeof(bpf_code_64_bit) / sizeof(struct bpf_insn);
+	attr.insn_cnt = sizeof(ebpf_code) / sizeof(struct bpf_insn);
+	attr.insns = (uint64_t)ebpf_code;
+	strcpy(attr.prog_name, "add_one");
 	attr.prog_type = BPF_PROG_TYPE_UNSPEC;
 	attr.log_buf = (uint64_t)errmsg;
-	strcpy(attr.license, "GPL");
-	strcpy(attr.prog_name, "add_one");
+	attr.license = "GPL";
 	struct bpf_prog* prog = bpf_prog_load(&attr);
 	if (!prog) {
 		printf("Failed to load bpf program\n");
@@ -57,7 +58,7 @@ int main()
 	}
 	res = bpf_prog_run_jit(prog, NULL);
 	printf("%d + %d = %ld\n", m.a, m.b, res);
-
+	bpf_prog_free(prog);
 #else
 	// using ubpf vm for other arch
 	struct ebpf_vm *vm = ebpf_create();

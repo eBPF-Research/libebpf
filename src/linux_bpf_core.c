@@ -118,11 +118,11 @@ struct bpf_prog *bpf_prog_alloc_no_stats(unsigned int size)
 	struct bpf_prog *fp;
 
 	size = round_up(size, PAGE_SIZE);
-	fp = malloc(size);
+	fp = calloc(size, 1);
 	if (fp == NULL)
 		return NULL;
 
-	aux = malloc(sizeof(*aux));
+	aux = calloc(1, sizeof(*aux));
 	if (aux == NULL) {
 		free(fp);
 		return NULL;
@@ -261,7 +261,7 @@ struct bpf_prog *bpf_prog_load(union bpf_attr *attr)
 	prog->aux->user = NULL; // get_current_user();
 	prog->len = attr->insn_cnt;
 
-	memcpy(prog->insns,
+	memcpy(prog->insnsi,
 			     attr->insns,
 			     bpf_prog_insn_size(prog));
 

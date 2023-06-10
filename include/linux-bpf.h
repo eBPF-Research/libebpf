@@ -1308,11 +1308,7 @@ static inline void bpf_jit_dump(unsigned int flen, unsigned int proglen,
 
 static inline bool bpf_jit_is_ebpf(void)
 {
-# ifdef CONFIG_HAVE_EBPF_JIT
 	return true;
-# else
-	return false;
-# endif
 }
 
 static inline bool ebpf_jit_enabled(void)
