@@ -16,6 +16,73 @@
 #include <unistd.h>
 #include "bpf_jit_arch.h"
 
+/**
+ * __fls - find last (most-significant) set bit in a long word
+ * @word: the word to search
+ *
+ * Undefined if no set bit exists, so code should check against 0 first.
+ */
+static __always_inline unsigned long __fls(unsigned long word)
+{
+	int num = BITS_PER_LONG - 1;
+
+#if BITS_PER_LONG == 64
+	if (!(word & (~0ul << 32))) {
+		num -= 32;
+		word <<= 32;
+	}
+#endif
+	if (!(word & (~0ul << (BITS_PER_LONG-16)))) {
+		num -= 16;
+		word <<= 16;
+	}
+	if (!(word & (~0ul << (BITS_PER_LONG-8)))) {
+		num -= 8;
+		word <<= 8;
+	}
+	if (!(word & (~0ul << (BITS_PER_LONG-4)))) {
+		num -= 4;
+		word <<= 4;
+	}
+	if (!(word & (~0ul << (BITS_PER_LONG-2)))) {
+		num -= 2;
+		word <<= 2;
+	}
+	if (!(word & (~0ul << (BITS_PER_LONG-1))))
+		num -= 1;
+	return num;
+}
+
+/**
+ * fls64 - find last set bit in a 64-bit word
+ * @x: the word to search
+ *
+ * This is defined in a similar way as the libc and compiler builtin
+ * ffsll, but returns the position of the most significant set bit.
+ *
+ * fls64(value) returns 0 if value is 0 or the position of the last
+ * set bit if value is nonzero. The last (most significant) bit is
+ * at position 64.
+ */
+#if BITS_PER_LONG == 32
+static __always_inline int fls64(__u64 x)
+{
+	__u32 h = x >> 32;
+	if (h)
+		return fls(h) + 32;
+	return fls(x);
+}
+#elif BITS_PER_LONG == 64
+static __always_inline int fls64(__u64 x)
+{
+	if (x == 0)
+		return 0;
+	return __fls(x) + 1;
+}
+#else
+#error BITS_PER_LONG not 32 or 64
+#endif
+
 /*
  * User structures for general purpose, floating point and debug registers.
  */
@@ -372,7 +439,7 @@ static int emit_bpf_tail_call(struct jit_ctx *ctx)
 	if (out_offset == -1)
 		out_offset = cur_offset;
 	if (cur_offset != out_offset) {
-		pr_err_once("tail_call out_offset = %d, expected %d!\n",
+		printf("tail_call out_offset = %d, expected %d!\n",
 			    cur_offset, out_offset);
 		return -1;
 	}
@@ -1019,7 +1086,8 @@ static int validate_code(struct jit_ctx *ctx)
 
 static inline void bpf_flush_icache(void *start, void *end)
 {
-	flush_icache_range((unsigned long)start, (unsigned long)end);
+	// flush_icache_range((unsigned long)start, (unsigned long)end);
+	printf("warning: bpf_flush_icache not implemented\n");
 }
 
 struct arm64_jit_data {
@@ -1043,16 +1111,16 @@ struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog)
 	if (!prog->jit_requested)
 		return orig_prog;
 
-	tmp = bpf_jit_blind_constants(prog);
+	// tmp = bpf_jit_blind_constants(prog);
 	/* If blinding was requested and we failed during blinding,
 	 * we must fall back to the interpreter.
 	 */
-	if (IS_ERR(tmp))
-		return orig_prog;
-	if (tmp != prog) {
-		tmp_blinded = true;
-		prog = tmp;
-	}
+	// if (IS_ERR(tmp))
+	// 	return orig_prog;
+	// if (tmp != prog) {
+	// 	tmp_blinded = true;
+	// 	prog = tmp;
+	// }
 
 	jit_data = prog->aux->jit_data;
 	if (!jit_data) {
@@ -1161,7 +1229,7 @@ skip_init_ctx:
 	prog->jited_len = prog_size;
 
 	if (!prog->is_func || extra_pass) {
-		bpf_prog_fill_jited_linfo(prog, ctx.offset + 1);
+		bpf_prog_fill_jited_linfo(prog, (const u32 *)ctx.offset + 1);
 out_off:
 		free(ctx.offset);
 		free(jit_data);

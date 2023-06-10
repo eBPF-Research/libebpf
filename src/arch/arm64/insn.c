@@ -10,6 +10,63 @@
 #include "bpf_jit_arch.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+
+void atomic_add(int i, atomic_t *v) {
+    __sync_add_and_fetch(&v->counter, i);
+}
+
+int atomic_add_return(int i, atomic_t *v) {
+    return __sync_add_and_fetch(&v->counter, i);
+}
+
+static inline int atomic_read(const atomic_t *v)
+{
+    return (*(volatile int *)&(v)->counter);
+}
+
+#ifndef atomic_inc
+static inline void
+atomic_inc(atomic_t *v)
+{
+	atomic_add(1, v);
+}
+#define atomic_inc atomic_inc
+#endif
+
+#ifdef atomic_inc_return
+#define atomic_inc_return_acquire atomic_inc_return
+#define atomic_inc_return_release atomic_inc_return
+#define atomic_inc_return_relaxed atomic_inc_return
+#endif /* atomic_inc_return */
+
+#ifndef atomic_inc_return
+static inline int
+atomic_inc_return(atomic_t *v)
+{
+	return atomic_add_return(1, v);
+}
+#define atomic_inc_return atomic_inc_return
+#endif
+
+#ifndef atomic_inc_return_release
+static inline int
+atomic_inc_return_release(atomic_t *v)
+{
+	return atomic_add_return_release(1, v);
+}
+#define atomic_inc_return_release atomic_inc_return_release
+#endif
+
+#ifndef atomic_inc_return_relaxed
+static inline int
+atomic_inc_return_relaxed(atomic_t *v)
+{
+	return atomic_add_return_relaxed(1, v);
+}
+#define atomic_inc_return_relaxed atomic_inc_return_relaxed
+#endif
+
 
 /*
  * arm64 requires the DTB to be 8 byte aligned and
@@ -137,6 +194,7 @@ static void  *patch_map(void *addr, int fixmap)
 	// bool image = is_image_text(uintaddr);
 	struct page *page;
 
+	printf("patch_map addr %p fixmap %d\n", addr, fixmap);
 	// if (image)
 	// 	page = phys_to_page(__pa_symbol(addr));
 	// else if (IS_ENABLED(CONFIG_STRICT_MODULE_RWX))
@@ -151,22 +209,24 @@ static void  *patch_map(void *addr, int fixmap)
 
 static void  patch_unmap(int fixmap)
 {
-	clear_fixmap(fixmap);
+	printf("patch_unmap fixmap %d\n", fixmap);
+	// clear_fixmap(fixmap);
 }
+
 /*
  * In ARMv8-A, A64 instructions have a fixed length of 32 bits and are always
  * little-endian.
  */
 int  aarch64_insn_read(void *addr, u32 *insnp)
 {
-	void * ret;
+	// void * ret;
 	__le32 val;
 
-	ret = memcpy(&val, addr, AARCH64_INSN_SIZE);
-	if (!ret)
-		*insnp = le32_to_cpu(val);
+	memcpy(&val, addr, AARCH64_INSN_SIZE);
+	// if (!ret)
+	*insnp = le32_to_cpu(val);
 
-	return ret;
+	return 0;
 }
 
 static int  __aarch64_insn_write(void *addr, __le32 insn)
@@ -201,9 +261,11 @@ int  aarch64_insn_patch_text_nosync(void *addr, u32 insn)
 		return -EINVAL;
 
 	ret = aarch64_insn_write(tp, insn);
-	if (ret == 0)
-		__flush_icache_range((uintptr_t)tp,
-				     (uintptr_t)tp + AARCH64_INSN_SIZE);
+	if (ret == 0) {
+		printf("warn: __flush_icache_range not supportd");
+		// __flush_icache_range((uintptr_t)tp,
+		// 		     (uintptr_t)tp + AARCH64_INSN_SIZE);
+	}
 
 	return ret;
 }
@@ -228,9 +290,11 @@ static int  aarch64_insn_patch_text_cb(void *arg)
 		/* Notify other processors with an additional increment. */
 		atomic_inc(&pp->cpu_count);
 	} else {
-		while (atomic_read(&pp->cpu_count) <= num_online_cpus())
-			cpu_relax();
-		isb();
+		printf("warn: __flush_icache_range not supportd\
+		in aarch64_insn_patch_text_cb");
+		// while (atomic_read(&pp->cpu_count) <= num_online_cpus())
+		// 	cpu_relax();
+		// isb();
 	}
 
 	return ret;
@@ -1692,4 +1756,26 @@ u32 aarch64_insn_gen_extr(enum aarch64_insn_variant variant,
 	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RD, insn, Rd);
 	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RN, insn, Rn);
 	return aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RM, insn, Rm);
+}
+
+unsigned long __sw_hweight64(__u64 w)
+{
+#if BITS_PER_LONG == 32
+	return __sw_hweight32((unsigned int)(w >> 32)) +
+	       __sw_hweight32((unsigned int)w);
+#elif BITS_PER_LONG == 64
+#ifdef CONFIG_ARCH_HAS_FAST_MULTIPLIER
+	w -= (w >> 1) & 0x5555555555555555ul;
+	w =  (w & 0x3333333333333333ul) + ((w >> 2) & 0x3333333333333333ul);
+	w =  (w + (w >> 4)) & 0x0f0f0f0f0f0f0f0ful;
+	return (w * 0x0101010101010101ul) >> 56;
+#else
+	__u64 res = w - ((w >> 1) & 0x5555555555555555ul);
+	res = (res & 0x3333333333333333ul) + ((res >> 2) & 0x3333333333333333ul);
+	res = (res + (res >> 4)) & 0x0F0F0F0F0F0F0F0Ful;
+	res = res + (res >> 8);
+	res = res + (res >> 16);
+	return (res + (res >> 32)) & 0x00000000000000FFul;
+#endif
+#endif
 }

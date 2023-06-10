@@ -349,3 +349,37 @@ void __bpf_prog_exit(struct bpf_prog *prog, u64 start)
 	// do nothing
 	printf("__bpf_prog_exit %lu\n", start);
 }
+
+int bpf_jit_get_func_addr(const struct bpf_prog *prog,
+			  const struct bpf_insn *insn, bool extra_pass,
+			  u64 *func_addr, bool *func_addr_fixed)
+{
+	s16 off = insn->off;
+	s32 imm = insn->imm;
+	u8 *addr;
+
+	*func_addr_fixed = insn->src_reg != BPF_PSEUDO_CALL;
+	if (!*func_addr_fixed) {
+		/* Place-holder address till the last pass has collected
+		 * all addresses for JITed subprograms in which case we
+		 * can pick them up from prog->aux.
+		 */
+		if (!extra_pass)
+			addr = NULL;
+		else if (prog->aux->func &&
+			 off >= 0 && off < prog->aux->func_cnt)
+			addr = (u8 *)prog->aux->func[off]->bpf_func;
+		else
+			return -EINVAL;
+	} else {
+		/* Address of a BPF helper call. Since part of the core
+		 * kernel, it's always at a fixed location. __bpf_call_base
+		 * and the helper with imm relative to it are both in core
+		 * kernel.
+		 */
+		addr = (u8 *)__bpf_call_base + imm;
+	}
+
+	*func_addr = (unsigned long)addr;
+	return 0;
+}
