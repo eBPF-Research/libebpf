@@ -3,12 +3,12 @@
 CMakeCache.*
 CMakeFiles/*
 [Tt]esting/*
+ebpf_code.h
+
 
 ### VisualStudioCode ###
 .vscode/*
 .vscode/settings.json
-.vscode/tasks.json
-.vscode/launch.json
 .vscode/extensions.json
 
 ### VisualStudioCode Patch ###
@@ -16,3 +16,6 @@ CMakeFiles/*
 .history
 *.o
 *.pyc
+*.core
+core.*
+*.cache

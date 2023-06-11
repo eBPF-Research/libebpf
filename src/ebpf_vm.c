@@ -111,7 +111,7 @@ ebpf_register(struct ebpf_vm* vm, unsigned int idx, const char* name, void* fn)
 
     vm->ext_funcs[idx] = (ext_func)fn;
     vm->ext_func_names[idx] = name;
-
+    printf("ebpf_register: %s idx: %d func: %ld\n", name, idx, (long)fn);
     return 0;
 }
 
@@ -285,6 +285,8 @@ ebpf_exec(const struct ebpf_vm* vm, void* mem, size_t mem_len, uint64_t* bpf_ret
     while (1) {
         const uint16_t cur_pc = pc;
         struct ebpf_inst inst = ebpf_fetch_instruction(vm, pc++);
+
+        printf("op: %d %d\n", EBPF_OP_CALL, inst.opcode);
 
         switch (inst.opcode) {
         case EBPF_OP_ADD_IMM:
@@ -782,6 +784,7 @@ ebpf_exec(const struct ebpf_vm* vm, void* mem, size_t mem_len, uint64_t* bpf_ret
             *bpf_return_value = reg[0];
             return 0;
         case EBPF_OP_CALL:
+            printf("call: %ld", vm->ext_funcs[inst.imm]);
             reg[0] = vm->ext_funcs[inst.imm](reg[1], reg[2], reg[3], reg[4], reg[5]);
             // Unwind the stack if unwind extension returns success.
             if (inst.imm == vm->unwind_stack_extension_index && reg[0] == 0) {
@@ -805,6 +808,8 @@ validate(const struct ebpf_vm* vm, const struct ebpf_inst* insts, uint32_t num_i
     for (i = 0; i < num_insts; i++) {
         struct ebpf_inst inst = insts[i];
         bool store = false;
+
+        printf("op: %d %d imm: %d\n", EBPF_OP_CALL, inst.opcode, inst.imm);
 
         switch (inst.opcode) {
         case EBPF_OP_ADD_IMM:
@@ -958,6 +963,7 @@ validate(const struct ebpf_vm* vm, const struct ebpf_inst* insts, uint32_t num_i
                 *errmsg = ebpf_error("invalid call immediate at PC %d", i);
                 return false;
             }
+            // printf("func: %ld\n", vm->ext_funcs[inst.imm]);
             if (!vm->ext_funcs[inst.imm]) {
                 *errmsg = ebpf_error("call to nonexistent function %u at PC %d", inst.imm, i);
                 return false;

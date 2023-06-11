@@ -9,8 +9,8 @@
  *  || ctx->cpu_architecture >= CPU_ARCH_ARMv5TE)
  */
 
-#include "linux-bpf.h"
-#include "linux-errno.h"
+#include "linux_bpf.h"
+// #include "linux-errno.h"
 #include "bpf_jit_arch.h"
 #include <string.h>
 #include <stdlib.h>
@@ -103,7 +103,7 @@
  * version is not provided for BE32, but the prototype needs to be there
  * to compile patch.c.
  */
-extern __u32 __opcode_to_mem_thumb32(__u32);
+extern u32 __opcode_to_mem_thumb32(u32);
 #endif
 #else
 #define __opcode_to_mem_thumb32(x) ___opcode_swahw32(x)
@@ -361,7 +361,7 @@ static inline void emit(u32 inst, struct jit_ctx *ctx)
  * @word: value to rotate
  * @shift: bits to roll
  */
-static inline __u32 rol32(__u32 word, unsigned int shift)
+static inline u32 rol32(u32 word, unsigned int shift)
 {
 	return (word << (shift & 31)) | (word >> ((-shift) & 31));
 }
@@ -371,7 +371,7 @@ static inline __u32 rol32(__u32 word, unsigned int shift)
  * @word: value to rotate
  * @shift: bits to roll
  */
-static inline __u32 ror32(__u32 word, unsigned int shift)
+static inline u32 ror32(u32 word, unsigned int shift)
 {
 	return (word >> (shift & 31)) | (word << ((-shift) & 31));
 }
@@ -487,7 +487,7 @@ static void jit_fill_hole(void *area, unsigned int size)
 #endif
 
 /* total stack size used in JITed code */
-#define _STACK_SIZE	(ctx->prog->aux->stack_depth + SCRATCH_SIZE)
+#define _STACK_SIZE	(EBPF_STACK_SIZE + SCRATCH_SIZE)
 #define STACK_SIZE	ALIGN(_STACK_SIZE, STACK_ALIGNMENT)
 
 #if __LINUX_ARM_ARCH__ < 7
@@ -874,7 +874,7 @@ static inline void emit_a32_alu_r64(const bool is64, const s8 dst[],
 
 		/* ALU operation */
 		emit_alu_r(rd[1], rs, true, false, op, ctx);
-		if (!ctx->prog->aux->verifier_zext)
+		if (!ctx->prog->verifier_zext)
 			emit_a32_mov_i(rd[0], 0, ctx);
 	}
 
@@ -897,7 +897,7 @@ static inline void emit_a32_mov_r64(const bool is64, const s8 dst[],
 				  struct jit_ctx *ctx) {
 	if (!is64) {
 		emit_a32_mov_r(dst_lo, src_lo, ctx);
-		if (!ctx->prog->aux->verifier_zext)
+		if (!ctx->prog->verifier_zext)
 			/* Zero out high 4 bytes */
 			emit_a32_mov_i(dst_hi, 0, ctx);
 	} 
@@ -1221,19 +1221,19 @@ static inline void emit_ldx_r(const s8 dst[], const s8 src,
 	case BPF_B:
 		/* Load a Byte */
 		emit(ARM_LDRB_I(rd[1], rm, off), ctx);
-		if (!ctx->prog->aux->verifier_zext)
+		if (!ctx->prog->verifier_zext)
 			emit_a32_mov_i(rd[0], 0, ctx);
 		break;
 	case BPF_H:
 		/* Load a HalfWord */
 		emit(ARM_LDRH_I(rd[1], rm, off), ctx);
-		if (!ctx->prog->aux->verifier_zext)
+		if (!ctx->prog->verifier_zext)
 			emit_a32_mov_i(rd[0], 0, ctx);
 		break;
 	case BPF_W:
 		/* Load a Word */
 		emit(ARM_LDR_I(rd[1], rm, off), ctx);
-		if (!ctx->prog->aux->verifier_zext)
+		if (!ctx->prog->verifier_zext)
 			emit_a32_mov_i(rd[0], 0, ctx);
 		break;
 	case BPF_DW:
@@ -1292,6 +1292,7 @@ static int out_offset = -1; /* initialized on the first pass of build_body() */
 static int emit_bpf_tail_call(struct jit_ctx *ctx)
 {
 
+#if 0
 	/* bpf_tail_call(void *prog_ctx, struct bpf_array *array, u64 index) */
 	const s8 *r2 = bpf2a32[BPF_REG_2];
 	const s8 *r3 = bpf2a32[BPF_REG_3];
@@ -1367,6 +1368,7 @@ static int emit_bpf_tail_call(struct jit_ctx *ctx)
 	return 0;
 #undef cur_offset
 #undef jmp_offset
+#endif
 }
 
 /* 0xabcd => 0xcdab */
@@ -1602,7 +1604,7 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
 		}
 		emit_udivmod(rd_lo, rd_lo, rt, ctx, BPF_OP(code));
 		arm_bpf_put_reg32(dst_lo, rd_lo, ctx);
-		if (!ctx->prog->aux->verifier_zext)
+		if (!ctx->prog->verifier_zext)
 			emit_a32_mov_i(dst_hi, 0, ctx);
 		break;
 	case BPF_ALU64 | BPF_DIV | BPF_K:
@@ -1616,22 +1618,22 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
 	case BPF_ALU | BPF_LSH | BPF_K:
 	case BPF_ALU | BPF_RSH | BPF_K:
 	case BPF_ALU | BPF_ARSH | BPF_K:
-		if (unlikely(imm > 31))
+		if (imm > 31)
 			return -EINVAL;
 		if (imm)
 			emit_a32_alu_i(dst_lo, imm, ctx, BPF_OP(code));
-		if (!ctx->prog->aux->verifier_zext)
+		if (!ctx->prog->verifier_zext)
 			emit_a32_mov_i(dst_hi, 0, ctx);
 		break;
 	/* dst = dst << imm */
 	case BPF_ALU64 | BPF_LSH | BPF_K:
-		if (unlikely(imm > 63))
+		if (imm > 63)
 			return -EINVAL;
 		emit_a32_lsh_i64(dst, imm, ctx);
 		break;
 	/* dst = dst >> imm */
 	case BPF_ALU64 | BPF_RSH | BPF_K:
-		if (unlikely(imm > 63))
+		if (imm > 63)
 			return -EINVAL;
 		emit_a32_rsh_i64(dst, imm, ctx);
 		break;
@@ -1649,14 +1651,14 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
 		break;
 	/* dst = dst >> imm (signed) */
 	case BPF_ALU64 | BPF_ARSH | BPF_K:
-		if (unlikely(imm > 63))
+		if (imm > 63)
 			return -EINVAL;
 		emit_a32_arsh_i64(dst, imm, ctx);
 		break;
 	/* dst = ~dst */
 	case BPF_ALU | BPF_NEG:
 		emit_a32_alu_i(dst_lo, 0, ctx, BPF_OP(code));
-		if (!ctx->prog->aux->verifier_zext)
+		if (!ctx->prog->verifier_zext)
 			emit_a32_mov_i(dst_hi, 0, ctx);
 		break;
 	/* dst = ~dst (64 bit) */
@@ -1713,12 +1715,12 @@ emit_bswap_uxt:
 #else /* ARMv6+ */
 			emit(ARM_UXTH(rd[1], rd[1]), ctx);
 #endif
-			if (!ctx->prog->aux->verifier_zext)
+			if (!ctx->prog->verifier_zext)
 				emit(ARM_EOR_R(rd[0], rd[0], rd[0]), ctx);
 			break;
 		case 32:
 			/* zero-extend 32 bits into 64 bits */
-			if (!ctx->prog->aux->verifier_zext)
+			if (!ctx->prog->verifier_zext)
 				emit(ARM_EOR_R(rd[0], rd[0], rd[0]), ctx);
 			break;
 		case 64:
@@ -1920,7 +1922,7 @@ go_jmp:
 		const s8 *r3 = bpf2a32[BPF_REG_3];
 		const s8 *r4 = bpf2a32[BPF_REG_4];
 		const s8 *r5 = bpf2a32[BPF_REG_5];
-		const u32 func = (u32)__bpf_call_base + (u32)imm;
+		const u32 func = (u32)find_bpf_helper_func((u32)imm);
 
 		emit_a32_mov_r64(true, r0, r1, ctx);
 		emit_a32_mov_r64(true, r1, r2, ctx);
@@ -2142,9 +2144,9 @@ struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog)
 	}
 	// flush_icache_range((u32)header, (u32)(ctx.target + ctx.idx));
 
-	if (bpf_jit_enable > 1)
-		/* there are 2 passes here */
-		bpf_jit_dump(prog->len, image_size, 2, ctx.target);
+	// if (bpf_jit_enable > 1)
+	// 	/* there are 2 passes here */
+	// 	bpf_jit_dump(prog->len, image_size, 2, ctx.target);
 
 	// bpf_jit_binary_lock_ro(header);
 	prog->bpf_func = (void *)ctx.target;

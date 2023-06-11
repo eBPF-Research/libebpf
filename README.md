@@ -9,11 +9,19 @@
 arm32:
 
 ```bash
-sudo apt-get install gcc-arm-linux-gnueabi qemu-user
+sudo apt-get install -y gcc-arm-linux-gnueabi qemu-user
 ```
 
 arm64:
 
 ```bash
-sudo apt-get install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+```
+
+
+### 编译bpf指令  
+
+```bash
+$ python3 tools/compile_code.py -s example/bpf/test1.bpf.c 
+
 ```

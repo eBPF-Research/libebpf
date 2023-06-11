@@ -60,14 +60,14 @@ build-arm32: ## build the package on arm32
 	cmake --build build --config Debug
 
 run-arm32: build-arm32 ## run the binary on arm32 qemu
-	qemu-arm -L /usr/arm-linux-gnueabihf/ /home/yunwei/libebpf/build/bin/Debug/libebpf
+	qemu-arm -L /usr/arm-linux-gnueabihf/  build/bin/Debug/libebpf
 
 build-arm64: ## build the package on arm64
 	cmake -Bbuild -DCMAKE_TOOLCHAIN_FILE=cmake/aarch64-toolchain.cmake -DARCH=aarch64
 	cmake --build build --config Debug
 
 run-arm64: build-arm64 ## run the binary on arm32 qemu
-	qemu-aarch64 -L /usr/aarch64-linux-gnu/  /home/yunwei/libebpf/build/bin/Debug/libebpf
+	qemu-aarch64 -L /usr/aarch64-linux-gnu/ build/bin/Debug/libebpf
 
 install: ## install the package to the `INSTALL_LOCATION`
 	rm -rf build/

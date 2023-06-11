@@ -15,7 +15,7 @@
 
 static inline bool rvc_enabled(void)
 {
-	return IS_ENABLED(CONFIG_RISCV_ISA_C);
+	return true;
 }
 
 enum {
