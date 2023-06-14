@@ -278,4 +278,24 @@
 				 | (ra) << 12)
 #define ARM_UXTH(rd, rm)	(ARM_INST_UXTH | (rd) << 12 | (rm))
 
+struct jump
+{
+    uint32_t offset_loc;
+    uint32_t target_pc;
+};
+
+struct jit_state
+{
+    uint8_t* buf;
+    uint32_t offset;
+    uint32_t size;
+    uint32_t* pc_locs;
+    uint32_t exit_loc;
+    uint32_t unwind_loc;
+    struct jump* jumps;
+    int num_jumps;
+    uint32_t stack_size;
+};
+
+
 #endif /* PFILTER_OPCODES_ARM_H */

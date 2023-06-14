@@ -194,20 +194,20 @@ struct bpf_insn {
 };
 
 
-struct bpf_prog {
-	u16			jited:1,
-				jit_requested:1;/* archs need to JIT the prog */
+// struct bpf_prog {
+// 	u16			jited:1,
+// 				jit_requested:1;/* archs need to JIT the prog */
 	
-	u32			len;		/* Number of filter blocks */
-	u32			jited_len;	/* Size of jited insns in bytes */
+// 	u32			len;		/* Number of filter blocks */
+// 	u32			jited_len;	/* Size of jited insns in bytes */
 
-	bool verifier_zext;
-	unsigned int		(*bpf_func)(const void *ctx,
-					    const struct bpf_insn *insn);
+// 	bool verifier_zext;
+// 	unsigned int		(*bpf_func)(const void *ctx,
+// 					    const struct bpf_insn *insn);
 
-		/* Instructions for interpreter */
-	struct bpf_insn		insnsi[];
-};
+// 		/* Instructions for interpreter */
+// 	struct bpf_insn		insnsi[];
+// };
 
 #define __ALIGN_KERNEL_MASK(x, mask)	(((x) + (mask)) & ~(mask))
 #define __ALIGN_KERNEL(x, a)		__ALIGN_KERNEL_MASK(x, (__typeof__(x))(a) - 1)

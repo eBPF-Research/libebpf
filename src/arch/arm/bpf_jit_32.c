@@ -1292,121 +1292,21 @@ static int out_offset = -1; /* initialized on the first pass of build_body() */
 static int emit_bpf_tail_call(struct jit_ctx *ctx)
 {
 
-#if 0
-	/* bpf_tail_call(void *prog_ctx, struct bpf_array *array, u64 index) */
-	const s8 *r2 = bpf2a32[BPF_REG_2];
-	const s8 *r3 = bpf2a32[BPF_REG_3];
-	const s8 *tmp = bpf2a32[TMP_REG_1];
-	const s8 *tmp2 = bpf2a32[TMP_REG_2];
-	const s8 *tcc = bpf2a32[TCALL_CNT];
-	const s8 *tc;
-	const int idx0 = ctx->idx;
-#define cur_offset (ctx->idx - idx0)
-#define jmp_offset (out_offset - (cur_offset) - 2)
-	u32 lo, hi;
-	s8 r_array, r_index;
-	int off;
 
-	/* if (index >= array->map.max_entries)
-	 *	goto out;
-	 */
-	BUILD_BUG_ON(offsetof(struct bpf_array, map.max_entries) >
-		     ARM_INST_LDST__IMM12);
-	off = offsetof(struct bpf_array, map.max_entries);
-	r_array = arm_bpf_get_reg32(r2[1], tmp2[0], ctx);
-	/* index is 32-bit for arrays */
-	r_index = arm_bpf_get_reg32(r3[1], tmp2[1], ctx);
-	/* array->map.max_entries */
-	emit(ARM_LDR_I(tmp[1], r_array, off), ctx);
-	/* index >= array->map.max_entries */
-	emit(ARM_CMP_R(r_index, tmp[1]), ctx);
-	_emit(ARM_COND_CS, ARM_B(jmp_offset), ctx);
-
-	/* tmp2[0] = array, tmp2[1] = index */
-
-	/* if (tail_call_cnt > MAX_TAIL_CALL_CNT)
-	 *	goto out;
-	 * tail_call_cnt++;
-	 */
-	lo = (u32)MAX_TAIL_CALL_CNT;
-	hi = (u32)((u64)MAX_TAIL_CALL_CNT >> 32);
-	tc = arm_bpf_get_reg64(tcc, tmp, ctx);
-	emit(ARM_CMP_I(tc[0], hi), ctx);
-	_emit(ARM_COND_EQ, ARM_CMP_I(tc[1], lo), ctx);
-	_emit(ARM_COND_HI, ARM_B(jmp_offset), ctx);
-	emit(ARM_ADDS_I(tc[1], tc[1], 1), ctx);
-	emit(ARM_ADC_I(tc[0], tc[0], 0), ctx);
-	arm_bpf_put_reg64(tcc, tmp, ctx);
-
-	/* prog = array->ptrs[index]
-	 * if (prog == NULL)
-	 *	goto out;
-	 */
-	BUILD_BUG_ON(imm8m(offsetof(struct bpf_array, ptrs)) < 0);
-	off = imm8m(offsetof(struct bpf_array, ptrs));
-	emit(ARM_ADD_I(tmp[1], r_array, off), ctx);
-	emit(ARM_LDR_R_SI(tmp[1], tmp[1], r_index, SRTYPE_ASL, 2), ctx);
-	emit(ARM_CMP_I(tmp[1], 0), ctx);
-	_emit(ARM_COND_EQ, ARM_B(jmp_offset), ctx);
-
-	/* goto *(prog->bpf_func + prologue_size); */
-	BUILD_BUG_ON(offsetof(struct bpf_prog, bpf_func) >
-		     ARM_INST_LDST__IMM12);
-	off = offsetof(struct bpf_prog, bpf_func);
-	emit(ARM_LDR_I(tmp[1], tmp[1], off), ctx);
-	emit(ARM_ADD_I(tmp[1], tmp[1], ctx->prologue_bytes), ctx);
-	emit_bx_r(tmp[1], ctx);
-
-	/* out: */
-	if (out_offset == -1)
-		out_offset = cur_offset;
-	if (cur_offset != out_offset) {
-		printf("tail_call out_offset = %d, expected %d!\n",
-			    cur_offset, out_offset);
-		return -1;
-	}
-	return 0;
-#undef cur_offset
-#undef jmp_offset
-#endif
 }
 
 /* 0xabcd => 0xcdab */
 static inline void emit_rev16(const u8 rd, const u8 rn, struct jit_ctx *ctx)
 {
-#if __LINUX_ARM_ARCH__ < 6
-	const s8 *tmp2 = bpf2a32[TMP_REG_2];
-
-	emit(ARM_AND_I(tmp2[1], rn, 0xff), ctx);
-	emit(ARM_MOV_SI(tmp2[0], rn, SRTYPE_LSR, 8), ctx);
-	emit(ARM_AND_I(tmp2[0], tmp2[0], 0xff), ctx);
-	emit(ARM_ORR_SI(rd, tmp2[0], tmp2[1], SRTYPE_LSL, 8), ctx);
-#else /* ARMv6+ */
 	emit(ARM_REV16(rd, rn), ctx);
-#endif
 }
 
 /* 0xabcdefgh => 0xghefcdab */
 static inline void emit_rev32(const u8 rd, const u8 rn, struct jit_ctx *ctx)
 {
-#if __LINUX_ARM_ARCH__ < 6
-	const s8 *tmp2 = bpf2a32[TMP_REG_2];
 
-	emit(ARM_AND_I(tmp2[1], rn, 0xff), ctx);
-	emit(ARM_MOV_SI(tmp2[0], rn, SRTYPE_LSR, 24), ctx);
-	emit(ARM_ORR_SI(ARM_IP, tmp2[0], tmp2[1], SRTYPE_LSL, 24), ctx);
-
-	emit(ARM_MOV_SI(tmp2[1], rn, SRTYPE_LSR, 8), ctx);
-	emit(ARM_AND_I(tmp2[1], tmp2[1], 0xff), ctx);
-	emit(ARM_MOV_SI(tmp2[0], rn, SRTYPE_LSR, 16), ctx);
-	emit(ARM_AND_I(tmp2[0], tmp2[0], 0xff), ctx);
-	emit(ARM_MOV_SI(tmp2[0], tmp2[0], SRTYPE_LSL, 8), ctx);
-	emit(ARM_ORR_SI(tmp2[0], tmp2[0], tmp2[1], SRTYPE_LSL, 16), ctx);
-	emit(ARM_ORR_R(rd, ARM_IP, tmp2[0]), ctx);
-
-#else /* ARMv6+ */
 	emit(ARM_REV(rd, rn), ctx);
-#endif
+
 }
 
 // push the scratch stack register on top of the stack
