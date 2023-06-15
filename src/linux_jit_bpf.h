@@ -12,14 +12,12 @@ struct bpf_insn {
 	s32	imm;		/* signed immediate constant */
 };
 
-struct bpf_prog;
+struct ebpf_vm;
 
-struct bpf_prog *bpf_prog_load(const void* code, uint32_t code_len);
+struct ebpf_vm *linux_bpf_prog_load(const void* code, uint32_t code_len);
 
-struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog);
+struct ebpf_vm *linux_bpf_int_jit_compile(struct ebpf_vm *prog);
 
-unsigned int bpf_prog_run_jit(const struct bpf_prog *prog, const void *ctx);
-
-void bpf_prog_free(struct bpf_prog *prog);
+void linux_bpf_prog_free(struct ebpf_vm *prog);
 
 #endif

@@ -1,10 +1,9 @@
 #include <string.h>
 #include "minimal.h"
 #include "libebpf/libebpf.h"
-#include "libebpf/linux-jit-bpf.h"
 
-#define JIT_TEST_KERNEL 1
-// #define JIT_TEST_UBPF 1
+// #define JIT_TEST_KERNEL 1
+#define JIT_TEST_UBPF 1
 
 #define CHECK_EXIT(ret)                                                        \
 	if (ret != 0) {                                                        \
@@ -71,23 +70,6 @@ int main()
 	}
 
 	printf("%d + %d = %ld\n", m.a, m.b, res);
-
-#elif JIT_TEST_KERNEL
-	struct bpf_prog* prog = bpf_prog_load(TEST_BPF_CODE, sizeof(TEST_BPF_CODE) / sizeof(struct bpf_insn));
-	if (!prog) {
-		printf("Failed to load bpf program\n");
-		return 1;
-	}
-	printf("start to compile bpf program\n");
-	prog = bpf_int_jit_compile(prog);
-	if (!prog) {
-		printf("Failed to compile bpf program\n");
-		return 1;
-	}
-	printf("start to run bpf program\n");
-	res = bpf_prog_run_jit(prog, NULL);
-	printf("res = %ld\n", res);
-	bpf_prog_free(prog);
 #else
 	// using ubpf vm for other arch
 	struct ebpf_vm *vm = ebpf_create();

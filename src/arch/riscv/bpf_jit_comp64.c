@@ -6,6 +6,7 @@
  */
 
 #include "bpf_jit_arch.h"
+#include "ebpf_vm.h"
 
 #define RV_REG_TCC RV_REG_A6
 #define RV_REG_TCC_SAVED RV_REG_S6 /* Store A6 in S6 if program do calls */

@@ -11,10 +11,12 @@
 
 #include "type-fixes.h"
 #include "linux-errno.h"
-#include "linux-bpf.h"
+#include "linux_bpf.h"
 #include <string.h>
 #include <stdio.h>
 #include "bpf_jit_arch.h"
+#include "ebpf_vm.h"
+
 /*
  * eBPF prog stack layout:
  *
@@ -1353,7 +1355,7 @@ static u8 get_cond_jmp_opcode(const u8 op, bool is_cmp_lo)
 	return jmp_cond;
 }
 
-static int do_jit(struct bpf_prog *bpf_prog, int *addrs, u8 *image,
+static int do_jit(struct ebpf_vm *bpf_prog, int *addrs, u8 *image,
 		  int oldproglen, struct jit_context *ctx)
 {
 	struct bpf_insn *insn = bpf_prog->insnsi;
@@ -2191,10 +2193,10 @@ bool bpf_jit_needs_zext(void)
 	return true;
 }
 
-struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog)
+struct ebpf_vm *linux_bpf_int_jit_compile(struct ebpf_vm *prog)
 {
 	struct bpf_binary_header *header = NULL;
-	struct bpf_prog *tmp, *orig_prog = prog;
+	struct ebpf_vm *tmp, *orig_prog = prog;
 	int proglen, oldproglen = 0;
 	struct jit_context ctx = {};
 	bool tmp_blinded = false;

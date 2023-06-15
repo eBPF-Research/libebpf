@@ -13,7 +13,7 @@
 
 static int build_body(struct rv_jit_context *ctx, bool extra_pass, int *offset)
 {
-	const struct bpf_prog *prog = ctx->prog;
+	const struct ebpf_vm *prog = ctx->prog;
 	int i;
 
 	for (i = 0; i < prog->len; i++) {
@@ -37,10 +37,10 @@ bool bpf_jit_needs_zext(void)
 	return true;
 }
 
-struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog)
+struct ebpf_vm *linux_bpf_int_jit_compile(struct ebpf_vm *prog)
 {
 	bool tmp_blinded = false, extra_pass = false;
-	struct bpf_prog *tmp, *orig_prog = prog;
+	struct ebpf_vm *tmp, *orig_prog = prog;
 	int pass = 0, prev_ninsns = 0, i;
 	struct rv_jit_data *jit_data;
 	struct rv_jit_context *ctx;

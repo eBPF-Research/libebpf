@@ -6,10 +6,10 @@
 
 #include "linux-errno.h"
 #include "type-fixes.h"
-#include "libebpf/linux-jit-bpf.h"
 #include <stdio.h>
 
 struct bpf_trampoline;
+struct ebpf_vm;
 
 /* ArgX, context and stack frame pointer register positions. Note,
  * Arg1, Arg2, Arg3, etc are used as argument mappings of function
@@ -425,7 +425,7 @@ struct bpf_pidns_info {
 struct bpf_verifier_env;
 struct bpf_verifier_log;
 struct perf_event;
-struct bpf_prog;
+struct ebpf_vm;
 struct bpf_prog_aux;
 struct bpf_map;
 struct sock;
@@ -638,20 +638,9 @@ enum bpf_tramp_prog_type {
 };
 
 struct bpf_tramp_progs {
-	struct bpf_prog *progs[BPF_MAX_TRAMP_PROGS];
+	struct ebpf_vm *progs[BPF_MAX_TRAMP_PROGS];
 	int nr_progs;
 };
-
-#define BPF_DISPATCHER_MAX 48 /* Fits in 2048B */
-
-static __always_inline unsigned int bpf_dispatcher_nop_func(
-	const void *ctx,
-	const struct bpf_insn *insnsi,
-	unsigned int (*bpf_func)(const void *,
-				 const struct bpf_insn *))
-{
-	return bpf_func(ctx, insnsi);
-}
 
 struct bpf_func_info_aux {
 	u16 linkage;
@@ -729,12 +718,12 @@ typedef unsigned long (*bpf_ctx_copy_t)(void *dst, const void *src,
 typedef u32 (*bpf_convert_ctx_access_t)(enum bpf_access_type type,
 					const struct bpf_insn *src,
 					struct bpf_insn *dst,
-					struct bpf_prog *prog,
+					struct ebpf_vm *prog,
 					u32 *target_size);
 
 /* these two functions are called from generated trampoline */
 u64 __bpf_prog_enter(void);
-void __bpf_prog_exit(struct bpf_prog *prog, u64 start);
+void __bpf_prog_exit(struct ebpf_vm *prog, u64 start);
 
 
 /* Helper macros for filter block array initializers. */
@@ -885,7 +874,7 @@ struct bpf_prog_aux {
 	u32 max_rdwr_access;
 	struct btf *attach_btf;
 	const struct bpf_ctx_arg_aux *ctx_arg_info;
-	struct bpf_prog *dst_prog;
+	struct ebpf_vm *dst_prog;
 	struct bpf_trampoline *dst_trampoline;
 	bool verifier_zext; /* Zero extensions has been inserted by verifier. */
 	bool dev_bound; /* Program is bound to the netdev. */
@@ -897,7 +886,7 @@ struct bpf_prog_aux {
 	const struct btf_type *attach_func_proto;
 	/* function name for valid attach_btf_id */
 	const char *attach_func_name;
-	struct bpf_prog **func;
+	struct ebpf_vm **func;
 	void *jit_data; /* JIT specific data. arch dependent */
 	struct bpf_jit_poke_descriptor *poke_tab;
 	struct bpf_kfunc_desc_tab *kfunc_tab;
@@ -906,7 +895,7 @@ struct bpf_prog_aux {
 	const struct bpf_prog_ops *ops;
 	struct bpf_map **used_maps;
 	struct btf_mod_pair *used_btfs;
-	struct bpf_prog *prog;
+	struct ebpf_vm *prog;
 	struct user_struct *user;
 	u64 load_time; /* ns since boottime */
 	u32 verified_insns;
@@ -943,36 +932,13 @@ struct bpf_prog_aux {
 	struct exception_table_entry *extable;
 };
 
-struct bpf_prog {
-	u16			pages;		/* Number of allocated pages */
-	u16			jited:1,	/* Is our filter JIT'ed? */
-				jit_requested:1,/* archs need to JIT the prog */
-				gpl_compatible:1, /* Is filter GPL compatible? */
-				cb_access:1,	/* Is control block accessed? */
-				dst_needed:1,	/* Do we need dst entry? */
-				blinded:1,	/* Was blinded */
-				is_func:1,	/* program is a bpf function */
-				kprobe_override:1, /* Do we override a kprobe? */
-				has_callchain_buf:1, /* callchain buffer allocated? */
-				enforce_expected_attach_type:1; /* Enforce expected_attach_type checking at attach time */
-	u32			len;		/* Number of filter blocks */
-	u32			jited_len;	/* Size of jited insns in bytes */
-	u8			tag[BPF_TAG_SIZE];
-	struct bpf_prog_aux	*aux;		/* Auxiliary fields */
-	struct sock_fprog_kern	*orig_prog;	/* Original BPF program */
-	unsigned int		(*bpf_func)(const void *ctx,
-					    const struct bpf_insn *insn);
-	/* Instructions for interpreter */
-	struct bpf_insn		insnsi[];
-};
-
 u64 __bpf_call_base(u64 r1, u64 r2, u64 r3, u64 r4, u64 r5);
 #define __bpf_call_base_args \
 	((u64 (*)(u64, u64, u64, u64, u64, const struct bpf_insn *)) \
 	 __bpf_call_base)
 
-struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog);
-void bpf_jit_compile(struct bpf_prog *prog);
+struct ebpf_vm *linux_bpf_int_jit_compile(struct ebpf_vm *prog);
+void bpf_jit_compile(struct ebpf_vm *prog);
 bool bpf_jit_needs_zext(void);
 
 extern int bpf_jit_enable;
@@ -998,40 +964,16 @@ void bpf_jit_binary_free(struct bpf_binary_header *hdr);
 u64 bpf_jit_alloc_exec_limit(void);
 void *bpf_jit_alloc_exec(unsigned long size);
 void bpf_jit_free_exec(void *addr);
-void bpf_jit_free(struct bpf_prog *fp);
+void bpf_jit_free(struct ebpf_vm *fp);
 
-int bpf_jit_get_func_addr(const struct bpf_prog *prog,
-			  const struct bpf_insn *insn, bool extra_pass,
-			  u64 *func_addr, bool *func_addr_fixed);
+void bpf_jit_prog_release_other(struct ebpf_vm *fp, struct ebpf_vm *fp_other);
 
-struct bpf_prog *bpf_jit_blind_constants(struct bpf_prog *fp);
-void bpf_jit_prog_release_other(struct bpf_prog *fp, struct bpf_prog *fp_other);
-
-static inline bool bpf_jit_is_ebpf(void)
-{
-	return true;
-}
-
-static inline bool ebpf_jit_enabled(void)
-{
-	return bpf_jit_enable && bpf_jit_is_ebpf();
-}
-
-static inline bool bpf_prog_ebpf_jited(const struct bpf_prog *fp)
-{
-	return fp->jited && bpf_jit_is_ebpf();
-}
-
-static inline bool bpf_jit_blinding_enabled(struct bpf_prog *prog)
+static inline bool bpf_jit_blinding_enabled(struct ebpf_vm *prog)
 {
 	/* These are the prerequisites, should someone ever have the
 	 * idea to call blinding outside of them, we make sure to
 	 * bail out.
 	 */
-	if (!bpf_jit_is_ebpf())
-		return false;
-	if (!prog->jit_requested)
-		return false;
 	if (!bpf_jit_harden)
 		return false;
 	if (bpf_jit_harden == 1)
@@ -1066,24 +1008,18 @@ bpf_address_lookup(unsigned long addr, unsigned long *size,
 	return ret;
 }
 
-void bpf_prog_kallsyms_add(struct bpf_prog *fp);
-void bpf_prog_kallsyms_del(struct bpf_prog *fp);
+void bpf_prog_kallsyms_add(struct ebpf_vm *fp);
+void bpf_prog_kallsyms_del(struct ebpf_vm *fp);
 
-static inline unsigned int bpf_prog_size(unsigned int proglen)
-{
-	return max(sizeof(struct bpf_prog),
-		   offsetof(struct bpf_prog, insnsi[proglen]));
-}
-
-void bpf_prog_free_linfo(struct bpf_prog *prog);
-void bpf_prog_fill_jited_linfo(struct bpf_prog *prog,
+void bpf_prog_free_linfo(struct ebpf_vm *prog);
+void bpf_prog_fill_jited_linfo(struct ebpf_vm *prog,
 			       const u32 *insn_to_jit_off);
-int bpf_prog_alloc_jited_linfo(struct bpf_prog *prog);
-void bpf_prog_jit_attempt_done(struct bpf_prog *prog);
+int bpf_prog_alloc_jited_linfo(struct ebpf_vm *prog);
+void bpf_prog_jit_attempt_done(struct ebpf_vm *prog);
 
-struct bpf_prog *bpf_prog_alloc(unsigned int size);
-struct bpf_prog *bpf_prog_alloc_no_stats(unsigned int size);
-void __bpf_prog_free(struct bpf_prog *fp);
+struct ebpf_vm *bpf_prog_alloc(unsigned int size);
+struct ebpf_vm *bpf_prog_alloc_no_stats(unsigned int size);
+void __bpf_prog_free(struct ebpf_vm *fp);
 
 enum bpf_text_poke_type {
 	BPF_MOD_CALL,

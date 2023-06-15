@@ -11,7 +11,7 @@
 
 #include "type-fixes.h"
 #include "linux-errno.h"
-#include "linux-bpf.h"
+#include "linux_bpf.h"
 
 static inline bool rvc_enabled(void)
 {
@@ -66,7 +66,7 @@ static inline bool is_creg(u8 reg)
 }
 
 struct rv_jit_context {
-	struct bpf_prog *prog;
+	struct ebpf_vm *prog;
 	u16 *insns;		/* RV insns */
 	int ninsns;
 	int epilogue_offset;

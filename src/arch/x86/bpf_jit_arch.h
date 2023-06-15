@@ -7,7 +7,7 @@
 #ifndef _BPF_JIT_H
 #define _BPF_JIT_H
 
-#include "linux-bpf.h"
+#include "linux_bpf.h"
 
 /* PAGE_SHIFT determines the page size */
 #define PAGE_SHIFT		12

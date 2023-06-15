@@ -10,6 +10,7 @@
  */
 
 #include "bpf_jit_arch.h"
+#include "ebpf_vm.h"
 
 /*
  * Stack layout during BPF program execution:

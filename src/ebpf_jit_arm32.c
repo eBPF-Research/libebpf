@@ -9,9 +9,11 @@
  *  || ctx->cpu_architecture >= CPU_ARCH_ARMv5TE)
  */
 #include "libebpf/libebpf.h"
-#include "linux-bpf.h"
+#include "linux_bpf.h"
 #include "linux-errno.h"
 #include "ebpf_jit_arm32.h"
+#include "ebpf_vm.h"
+
 #include <string.h>
 #include <stdlib.h>
 
@@ -307,7 +309,7 @@ static const s8 bpf2a32[][2] = {
  */
 
 struct jit_ctx {
-	const struct bpf_prog *prog;
+	const struct ebpf_vm *prog;
 	unsigned int idx;
 	unsigned int prologue_bytes;
 	unsigned int epilogue_offset;
@@ -1772,7 +1774,7 @@ notyet:
 
 static int build_body(struct jit_ctx *ctx)
 {
-	const struct bpf_prog *prog = ctx->prog;
+	const struct ebpf_vm *prog = ctx->prog;
 	unsigned int i;
 
 	for (i = 0; i < prog->len; i++) {
@@ -1811,7 +1813,7 @@ static int validate_code(struct jit_ctx *ctx)
 	return 0;
 }
 
-void bpf_jit_compile(struct bpf_prog *prog)
+void bpf_jit_compile(struct ebpf_vm *prog)
 {
 	/* Nothing to do here. We support Internal BPF. */
 }
@@ -1821,9 +1823,9 @@ bool bpf_jit_needs_zext(void)
 	return true;
 }
 
-struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog)
+struct ebpf_vm *linux_bpf_int_jit_compile(struct ebpf_vm *prog)
 {
-	struct bpf_prog *tmp, *orig_prog = prog;
+	struct ebpf_vm *tmp, *orig_prog = prog;
 	struct bpf_binary_header *header;
 	bool tmp_blinded = false;
 	struct jit_ctx ctx;

@@ -7,11 +7,12 @@
  */
 #include "type-fixes.h"
 #include "linux-errno.h"
-#include "linux-bpf.h"
+#include "linux_bpf.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "bpf_jit_arch.h"
+#include "ebpf_vm.h"
 
 #ifndef __ASSEMBLY__
 
@@ -671,7 +672,7 @@ static bool ex_handler_bpf(const struct exception_table_entry *x,
 	return true;
 }
 
-static int do_jit(struct bpf_prog *bpf_prog, int *addrs, u8 *image,
+static int do_jit(struct ebpf_vm *bpf_prog, int *addrs, u8 *image,
 		  int oldproglen, struct jit_context *ctx)
 {
 	struct bpf_insn *insn = bpf_prog->insnsi;
@@ -1390,7 +1391,7 @@ static void restore_regs(const struct btf_func_model *m, u8 **prog, int nr_args,
 }
 
 static int invoke_bpf_prog(const struct btf_func_model *m, u8 **pprog,
-			   struct bpf_prog *p, int stack_size, bool mod_ret)
+			   struct ebpf_vm *p, int stack_size, bool mod_ret)
 {
 	u8 *prog = *pprog;
 	int cnt = 0;
@@ -1824,10 +1825,10 @@ struct x64_jit_data {
 	struct jit_context ctx;
 };
 
-struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog)
+struct ebpf_vm *linux_bpf_int_jit_compile(struct ebpf_vm *prog)
 {
 	struct bpf_binary_header *header = NULL;
-	struct bpf_prog *tmp, *orig_prog = prog;
+	struct ebpf_vm *tmp, *orig_prog = prog;
 	struct x64_jit_data *jit_data;
 	int proglen, oldproglen = 0;
 	struct jit_context ctx = {};

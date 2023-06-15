@@ -9,13 +9,13 @@
 
 #include "type-fixes.h"
 #include "linux-errno.h"
-#include "linux-bpf.h"
+#include "linux_bpf.h"
 #include <string.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include "bpf_jit_arch.h"
-
+#include "ebpf_vm.h"
 /**
  * __fls - find last (most-significant) set bit in a long word
  * @word: the word to search
@@ -173,7 +173,7 @@ static const int bpf2a64[] = {
 };
 
 struct jit_ctx {
-	const struct bpf_prog *prog;
+	const struct ebpf_vm *prog;
 	int idx;
 	int epilogue_offset;
 	int *offset;
@@ -310,7 +310,7 @@ static bool is_addsub_imm(u32 imm)
 
 static int build_prologue(struct jit_ctx *ctx, bool ebpf_from_cbpf)
 {
-	const struct bpf_prog *prog = ctx->prog;
+	const struct ebpf_vm *prog = ctx->prog;
 	const u8 r6 = bpf2a64[BPF_REG_6];
 	const u8 r7 = bpf2a64[BPF_REG_7];
 	const u8 r8 = bpf2a64[BPF_REG_8];
@@ -962,7 +962,7 @@ emit_cond_jmp:
 
 static int build_body(struct jit_ctx *ctx, bool extra_pass)
 {
-	const struct bpf_prog *prog = ctx->prog;
+	const struct ebpf_vm *prog = ctx->prog;
 	int i;
 
 	/*
@@ -1030,10 +1030,10 @@ struct arm64_jit_data {
 	struct jit_ctx ctx;
 };
 
-struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog)
+struct ebpf_vm *linux_bpf_int_jit_compile(struct ebpf_vm *prog)
 {
 	int image_size, prog_size, extable_size;
-	struct bpf_prog *tmp, *orig_prog = prog;
+	struct ebpf_vm *tmp, *orig_prog = prog;
 	struct bpf_binary_header *header;
 	struct arm64_jit_data *jit_data;
 	bool was_classic = false; // bpf_prog_was_classic(prog);

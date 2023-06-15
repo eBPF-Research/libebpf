@@ -69,7 +69,7 @@ function(set_project_warnings project_name)
         -fno-optimize-sibling-calls 
         -fno-stack-check
         -std=gnu99
-        -Wno-gnu
+        # -Wno-gnu
         -Wno-unused-function
   )
 

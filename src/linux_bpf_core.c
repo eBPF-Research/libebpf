@@ -1,8 +1,8 @@
 #include "type-fixes.h"
 #include "linux-errno.h"
-#include "linux-bpf.h"
+#include "linux_bpf.h"
 #include "bpf_jit_arch.h"
-#include "libebpf/linux-jit-bpf.h"
+#include "ebpf_vm.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -18,7 +18,7 @@ int bpf_jit_enable = true;
 // const long bpf_jit_limit;
 
 static inline struct bpf_binary_header *
-bpf_jit_binary_hdr(const struct bpf_prog *fp)
+bpf_jit_binary_hdr(const struct ebpf_vm *fp)
 {
 	unsigned long real_start = (unsigned long)fp->bpf_func;
 	unsigned long addr = real_start & PAGE_MASK;
@@ -30,7 +30,7 @@ bpf_jit_binary_hdr(const struct bpf_prog *fp)
  * requirements than the usual eBPF JITs, f.e. when they only
  * implement cBPF JIT, do not set images read-only, etc.
  */
-void bpf_jit_free(struct bpf_prog *fp)
+void bpf_jit_free(struct ebpf_vm *fp)
 {
 	if (fp->jited) {
 		struct bpf_binary_header *hdr = bpf_jit_binary_hdr(fp);
@@ -117,22 +117,10 @@ typedef unsigned int (*bpf_dispatcher_fn)(const void *ctx,
 					  unsigned int (*bpf_func)(const void *,
 								   const struct bpf_insn *));
 
-static u32 __bpf_prog_run(const struct bpf_prog *prog,
-					  const void *ctx,
-					  bpf_dispatcher_fn dfunc)
-{
-	return dfunc(ctx, prog->insnsi, prog->bpf_func);
-}
-
-unsigned int bpf_prog_run_jit(const struct bpf_prog *prog, const void *ctx) {
-	return __bpf_prog_run(prog, ctx, bpf_dispatcher_nop_func);
-}
-
-
-struct bpf_prog *bpf_prog_alloc_no_stats(unsigned int size)
+struct ebpf_vm *bpf_prog_alloc_no_stats(unsigned int size)
 {
 	struct bpf_prog_aux *aux;
-	struct bpf_prog *fp;
+	struct ebpf_vm *fp;
 
 	size = round_up(size, PAGE_SIZE);
 	fp = calloc(size, 1);
@@ -147,14 +135,14 @@ struct bpf_prog *bpf_prog_alloc_no_stats(unsigned int size)
 	fp->pages = size / PAGE_SIZE;
 	fp->aux = aux;
 	fp->aux->prog = fp;
-	fp->jit_requested = ebpf_jit_enabled();
+	fp->jit_requested = true;
 
 	return fp;
 }
 
-struct bpf_prog *bpf_prog_alloc(unsigned int size)
+struct ebpf_vm *bpf_prog_alloc(unsigned int size)
 {
-	struct bpf_prog *prog;
+	struct ebpf_vm *prog;
 
 	prog = bpf_prog_alloc_no_stats(size);
 	if (!prog)
@@ -163,7 +151,7 @@ struct bpf_prog *bpf_prog_alloc(unsigned int size)
 	return prog;
 }
 
-int bpf_prog_alloc_jited_linfo(struct bpf_prog *prog)
+int bpf_prog_alloc_jited_linfo(struct ebpf_vm *prog)
 {
 	if (!prog->aux->nr_linfo || !prog->jit_requested)
 		return 0;
@@ -176,7 +164,7 @@ int bpf_prog_alloc_jited_linfo(struct bpf_prog *prog)
 	return 0;
 }
 
-void bpf_prog_jit_attempt_done(struct bpf_prog *prog)
+void bpf_prog_jit_attempt_done(struct ebpf_vm *prog)
 {
 	if (prog->aux->jited_linfo &&
 	    (!prog->jited || !prog->aux->jited_linfo[0])) {
@@ -212,7 +200,7 @@ void bpf_prog_jit_attempt_done(struct bpf_prog *prog)
  * jited_linfo[i] = prog->bpf_func +
  *	insn_to_jit_off[linfo[i].insn_off - insn_start - 1]
  */
-void bpf_prog_fill_jited_linfo(struct bpf_prog *prog,
+void bpf_prog_fill_jited_linfo(struct ebpf_vm *prog,
 			       const u32 *insn_to_jit_off)
 {
 	u32 linfo_idx, insn_start, insn_end, nr_linfo, i;
@@ -241,7 +229,7 @@ void bpf_prog_fill_jited_linfo(struct bpf_prog *prog,
 			insn_to_jit_off[linfo[i].insn_off - insn_start - 1];
 }
 
-void __bpf_prog_free(struct bpf_prog *fp)
+void __bpf_prog_free(struct ebpf_vm *fp)
 {
 	if (fp->aux) {
 		free(fp->aux->poke_tab);
@@ -250,16 +238,14 @@ void __bpf_prog_free(struct bpf_prog *fp)
 	free(fp);
 }
 
-static inline u32 bpf_prog_insn_size(const struct bpf_prog *prog)
+static inline u32 bpf_prog_insn_size(const struct ebpf_vm *prog)
 {
 	return prog->len * sizeof(struct bpf_insn);
 }
 
-struct bpf_prog *bpf_prog_load(const void* code, uint32_t code_len)
+struct ebpf_vm *linux_bpf_prog_load(const void* code, uint32_t code_len)
 {
-	struct bpf_prog *prog, *dst_prog = NULL;
-	struct btf *attach_btf = NULL;
-	bool is_gpl = false;
+	struct ebpf_vm *prog = NULL;
 
 	/* plain bpf_prog allocation */
 	prog = bpf_prog_alloc(code_len);
@@ -284,7 +270,7 @@ struct bpf_prog *bpf_prog_load(const void* code, uint32_t code_len)
 }
 
 /* Free internal BPF program */
-void bpf_prog_free(struct bpf_prog *fp)
+void linux_bpf_prog_free(struct ebpf_vm *fp)
 {
 	struct bpf_prog_aux *aux = fp->aux;
 
@@ -297,7 +283,7 @@ void bpf_prog_free(struct bpf_prog *fp)
 	}
 }
 
-static void bpf_prog_clone_free(struct bpf_prog *fp)
+static void bpf_prog_clone_free(struct ebpf_vm *fp)
 {
 	/* aux was stolen by the other clone, so we cannot free
 	 * it from this path! It will be freed eventually by the
@@ -310,7 +296,7 @@ static void bpf_prog_clone_free(struct bpf_prog *fp)
 	__bpf_prog_free(fp);
 }
 
-void bpf_jit_prog_release_other(struct bpf_prog *fp, struct bpf_prog *fp_other)
+void bpf_jit_prog_release_other(struct ebpf_vm *fp, struct ebpf_vm *fp_other)
 {
 	/* We have to repoint aux->prog to self, as we don't
 	 * know whether fp here is the clone or the original.
@@ -348,13 +334,13 @@ u64 __bpf_prog_enter(void)
 	return start;
 }
 
-void __bpf_prog_exit(struct bpf_prog *prog, u64 start)
+void __bpf_prog_exit(struct ebpf_vm *prog, u64 start)
 {
 	// do nothing
 	printf("__bpf_prog_exit %lu\n", start);
 }
 
-int bpf_jit_get_func_addr(const struct bpf_prog *prog,
+int bpf_jit_get_func_addr(const struct ebpf_vm *prog,
 			  const struct bpf_insn *insn, bool extra_pass,
 			  u64 *func_addr, bool *func_addr_fixed)
 {

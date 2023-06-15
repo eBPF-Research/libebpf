@@ -191,18 +191,6 @@ ebpf_unload_code(struct ebpf_vm* vm)
     }
 }
 
-static uint32_t
-u32(uint64_t x)
-{
-    return x;
-}
-
-static int32_t
-i32(uint64_t x)
-{
-    return x;
-}
-
 #define IS_ALIGNED(x, a) (((uintptr_t)(x) & ((a)-1)) == 0)
 
 inline static uint64_t
@@ -314,11 +302,11 @@ ebpf_exec(const struct ebpf_vm* vm, void* mem, size_t mem_len, uint64_t* bpf_ret
             reg[inst.dst] &= UINT32_MAX;
             break;
         case EBPF_OP_DIV_IMM:
-            reg[inst.dst] = u32(inst.imm) ? u32(reg[inst.dst]) / u32(inst.imm) : 0;
+            reg[inst.dst] = (u32)(inst.imm) ? (u32)(reg[inst.dst]) / (u32)(inst.imm) : 0;
             reg[inst.dst] &= UINT32_MAX;
             break;
         case EBPF_OP_DIV_REG:
-            reg[inst.dst] = reg[inst.src] ? u32(reg[inst.dst]) / u32(reg[inst.src]) : 0;
+            reg[inst.dst] = reg[inst.src] ? (u32)(reg[inst.dst]) / (u32)(reg[inst.src]) : 0;
             reg[inst.dst] &= UINT32_MAX;
             break;
         case EBPF_OP_OR_IMM:
@@ -346,11 +334,11 @@ ebpf_exec(const struct ebpf_vm* vm, void* mem, size_t mem_len, uint64_t* bpf_ret
             reg[inst.dst] &= UINT32_MAX;
             break;
         case EBPF_OP_RSH_IMM:
-            reg[inst.dst] = u32(reg[inst.dst]) >> inst.imm;
+            reg[inst.dst] = (u32)(reg[inst.dst]) >> inst.imm;
             reg[inst.dst] &= UINT32_MAX;
             break;
         case EBPF_OP_RSH_REG:
-            reg[inst.dst] = u32(reg[inst.dst]) >> reg[inst.src];
+            reg[inst.dst] = (u32)(reg[inst.dst]) >> reg[inst.src];
             reg[inst.dst] &= UINT32_MAX;
             break;
         case EBPF_OP_NEG:
@@ -358,11 +346,11 @@ ebpf_exec(const struct ebpf_vm* vm, void* mem, size_t mem_len, uint64_t* bpf_ret
             reg[inst.dst] &= UINT32_MAX;
             break;
         case EBPF_OP_MOD_IMM:
-            reg[inst.dst] = u32(inst.imm) ? u32(reg[inst.dst]) % u32(inst.imm) : u32(reg[inst.dst]);
+            reg[inst.dst] = (u32)(inst.imm) ? (u32)(reg[inst.dst]) % (u32)(inst.imm) : (u32)(reg[inst.dst]);
             reg[inst.dst] &= UINT32_MAX;
             break;
         case EBPF_OP_MOD_REG:
-            reg[inst.dst] = u32(reg[inst.src]) ? u32(reg[inst.dst]) % u32(reg[inst.src]) : u32(reg[inst.dst]);
+            reg[inst.dst] = (u32)(reg[inst.src]) ? (u32)(reg[inst.dst]) % (u32)(reg[inst.src]) : (u32)(reg[inst.dst]);
             break;
         case EBPF_OP_XOR_IMM:
             reg[inst.dst] ^= inst.imm;
@@ -385,7 +373,7 @@ ebpf_exec(const struct ebpf_vm* vm, void* mem, size_t mem_len, uint64_t* bpf_ret
             reg[inst.dst] &= UINT32_MAX;
             break;
         case EBPF_OP_ARSH_REG:
-            reg[inst.dst] = (int32_t)reg[inst.dst] >> u32(reg[inst.src]);
+            reg[inst.dst] = (int32_t)reg[inst.dst] >> (u32)(reg[inst.src]);
             reg[inst.dst] &= UINT32_MAX;
             break;
 
@@ -554,7 +542,7 @@ ebpf_exec(const struct ebpf_vm* vm, void* mem, size_t mem_len, uint64_t* bpf_ret
             break;
 
         case EBPF_OP_LDDW:
-            reg[inst.dst] = u32(inst.imm) | ((uint64_t)ebpf_fetch_instruction(vm, pc++).imm << 32);
+            reg[inst.dst] = (u32)(inst.imm) | ((uint64_t)ebpf_fetch_instruction(vm, pc++).imm << 32);
             break;
 
         case EBPF_OP_JA:
@@ -571,17 +559,17 @@ ebpf_exec(const struct ebpf_vm* vm, void* mem, size_t mem_len, uint64_t* bpf_ret
             }
             break;
         case EBPF_OP_JEQ32_IMM:
-            if (u32(reg[inst.dst]) == u32(inst.imm)) {
+            if ((u32)(reg[inst.dst]) == (u32)(inst.imm)) {
                 pc += inst.offset;
             }
             break;
         case EBPF_OP_JEQ32_REG:
-            if (u32(reg[inst.dst]) == reg[inst.src]) {
+            if ((u32)(reg[inst.dst]) == reg[inst.src]) {
                 pc += inst.offset;
             }
             break;
         case EBPF_OP_JGT_IMM:
-            if (reg[inst.dst] > u32(inst.imm)) {
+            if (reg[inst.dst] > (u32)(inst.imm)) {
                 pc += inst.offset;
             }
             break;
@@ -591,17 +579,17 @@ ebpf_exec(const struct ebpf_vm* vm, void* mem, size_t mem_len, uint64_t* bpf_ret
             }
             break;
         case EBPF_OP_JGT32_IMM:
-            if (u32(reg[inst.dst]) > u32(inst.imm)) {
+            if ((u32)(reg[inst.dst]) > (u32)(inst.imm)) {
                 pc += inst.offset;
             }
             break;
         case EBPF_OP_JGT32_REG:
-            if (u32(reg[inst.dst]) > u32(reg[inst.src])) {
+            if ((u32)(reg[inst.dst]) > (u32)(reg[inst.src])) {
                 pc += inst.offset;
             }
             break;
         case EBPF_OP_JGE_IMM:
-            if (reg[inst.dst] >= u32(inst.imm)) {
+            if (reg[inst.dst] >= (u32)(inst.imm)) {
                 pc += inst.offset;
             }
             break;
@@ -611,17 +599,17 @@ ebpf_exec(const struct ebpf_vm* vm, void* mem, size_t mem_len, uint64_t* bpf_ret
             }
             break;
         case EBPF_OP_JGE32_IMM:
-            if (u32(reg[inst.dst]) >= u32(inst.imm)) {
+            if ((u32)(reg[inst.dst]) >= (u32)(inst.imm)) {
                 pc += inst.offset;
             }
             break;
         case EBPF_OP_JGE32_REG:
-            if (u32(reg[inst.dst]) >= u32(reg[inst.src])) {
+            if ((u32)(reg[inst.dst]) >= (u32)(reg[inst.src])) {
                 pc += inst.offset;
             }
             break;
         case EBPF_OP_JLT_IMM:
-            if (reg[inst.dst] < u32(inst.imm)) {
+            if (reg[inst.dst] < (u32)(inst.imm)) {
                 pc += inst.offset;
             }
             break;
@@ -631,17 +619,17 @@ ebpf_exec(const struct ebpf_vm* vm, void* mem, size_t mem_len, uint64_t* bpf_ret
             }
             break;
         case EBPF_OP_JLT32_IMM:
-            if (u32(reg[inst.dst]) < u32(inst.imm)) {
+            if ((u32)(reg[inst.dst]) < (u32)(inst.imm)) {
                 pc += inst.offset;
             }
             break;
         case EBPF_OP_JLT32_REG:
-            if (u32(reg[inst.dst]) < u32(reg[inst.src])) {
+            if ((u32)(reg[inst.dst]) < (u32)(reg[inst.src])) {
                 pc += inst.offset;
             }
             break;
         case EBPF_OP_JLE_IMM:
-            if (reg[inst.dst] <= u32(inst.imm)) {
+            if (reg[inst.dst] <= (u32)(inst.imm)) {
                 pc += inst.offset;
             }
             break;
@@ -651,12 +639,12 @@ ebpf_exec(const struct ebpf_vm* vm, void* mem, size_t mem_len, uint64_t* bpf_ret
             }
             break;
         case EBPF_OP_JLE32_IMM:
-            if (u32(reg[inst.dst]) <= u32(inst.imm)) {
+            if ((u32)(reg[inst.dst]) <= (u32)(inst.imm)) {
                 pc += inst.offset;
             }
             break;
         case EBPF_OP_JLE32_REG:
-            if (u32(reg[inst.dst]) <= u32(reg[inst.src])) {
+            if ((u32)(reg[inst.dst]) <= (u32)(reg[inst.src])) {
                 pc += inst.offset;
             }
             break;
@@ -671,12 +659,12 @@ ebpf_exec(const struct ebpf_vm* vm, void* mem, size_t mem_len, uint64_t* bpf_ret
             }
             break;
         case EBPF_OP_JSET32_IMM:
-            if (u32(reg[inst.dst]) & u32(inst.imm)) {
+            if ((u32)(reg[inst.dst]) & (u32)(inst.imm)) {
                 pc += inst.offset;
             }
             break;
         case EBPF_OP_JSET32_REG:
-            if (u32(reg[inst.dst]) & u32(reg[inst.src])) {
+            if ((u32)(reg[inst.dst]) & (u32)(reg[inst.src])) {
                 pc += inst.offset;
             }
             break;
@@ -691,12 +679,12 @@ ebpf_exec(const struct ebpf_vm* vm, void* mem, size_t mem_len, uint64_t* bpf_ret
             }
             break;
         case EBPF_OP_JNE32_IMM:
-            if (u32(reg[inst.dst]) != u32(inst.imm)) {
+            if ((u32)(reg[inst.dst]) != (u32)(inst.imm)) {
                 pc += inst.offset;
             }
             break;
         case EBPF_OP_JNE32_REG:
-            if (u32(reg[inst.dst]) != u32(reg[inst.src])) {
+            if ((u32)(reg[inst.dst]) != (u32)(reg[inst.src])) {
                 pc += inst.offset;
             }
             break;
@@ -711,12 +699,12 @@ ebpf_exec(const struct ebpf_vm* vm, void* mem, size_t mem_len, uint64_t* bpf_ret
             }
             break;
         case EBPF_OP_JSGT32_IMM:
-            if (i32(reg[inst.dst]) > i32(inst.imm)) {
+            if ((int32_t)(reg[inst.dst]) > (int32_t)(inst.imm)) {
                 pc += inst.offset;
             }
             break;
         case EBPF_OP_JSGT32_REG:
-            if (i32(reg[inst.dst]) > i32(reg[inst.src])) {
+            if ((int32_t)(reg[inst.dst]) > (int32_t)(reg[inst.src])) {
                 pc += inst.offset;
             }
             break;
@@ -731,12 +719,12 @@ ebpf_exec(const struct ebpf_vm* vm, void* mem, size_t mem_len, uint64_t* bpf_ret
             }
             break;
         case EBPF_OP_JSGE32_IMM:
-            if (i32(reg[inst.dst]) >= i32(inst.imm)) {
+            if ((int32_t)(reg[inst.dst]) >= (int32_t)(inst.imm)) {
                 pc += inst.offset;
             }
             break;
         case EBPF_OP_JSGE32_REG:
-            if (i32(reg[inst.dst]) >= i32(reg[inst.src])) {
+            if ((int32_t)(reg[inst.dst]) >= (int32_t)(reg[inst.src])) {
                 pc += inst.offset;
             }
             break;
@@ -751,12 +739,12 @@ ebpf_exec(const struct ebpf_vm* vm, void* mem, size_t mem_len, uint64_t* bpf_ret
             }
             break;
         case EBPF_OP_JSLT32_IMM:
-            if (i32(reg[inst.dst]) < i32(inst.imm)) {
+            if ((int32_t)(reg[inst.dst]) < (int32_t)(inst.imm)) {
                 pc += inst.offset;
             }
             break;
         case EBPF_OP_JSLT32_REG:
-            if (i32(reg[inst.dst]) < i32(reg[inst.src])) {
+            if ((int32_t)(reg[inst.dst]) < (int32_t)(reg[inst.src])) {
                 pc += inst.offset;
             }
             break;
@@ -771,12 +759,12 @@ ebpf_exec(const struct ebpf_vm* vm, void* mem, size_t mem_len, uint64_t* bpf_ret
             }
             break;
         case EBPF_OP_JSLE32_IMM:
-            if (i32(reg[inst.dst]) <= i32(inst.imm)) {
+            if ((int32_t)(reg[inst.dst]) <= (int32_t)(inst.imm)) {
                 pc += inst.offset;
             }
             break;
         case EBPF_OP_JSLE32_REG:
-            if (i32(reg[inst.dst]) <= i32(reg[inst.src])) {
+            if ((int32_t)(reg[inst.dst]) <= (int32_t)(reg[inst.src])) {
                 pc += inst.offset;
             }
             break;
