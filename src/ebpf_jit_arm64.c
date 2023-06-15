@@ -598,15 +598,15 @@ emit_function_epilogue(struct jit_state* state)
 }
 
 static bool
-is_imm_op(struct ebpf_inst const* inst)
+is_imm_op(struct bpf_insn const* inst)
 {
-    int class = inst->opcode & EBPF_CLS_MASK;
-    bool is_imm = (inst->opcode & EBPF_SRC_REG) == EBPF_SRC_IMM;
-    bool is_endian = (inst->opcode & EBPF_ALU_OP_MASK) == 0xd0;
-    bool is_neg = (inst->opcode & EBPF_ALU_OP_MASK) == 0x80;
-    bool is_call = inst->opcode == EBPF_OP_CALL;
-    bool is_exit = inst->opcode == EBPF_OP_EXIT;
-    bool is_ja = inst->opcode == EBPF_OP_JA;
+    int class = inst->code & EBPF_CLS_MASK;
+    bool is_imm = (inst->code & EBPF_SRC_REG) == EBPF_SRC_IMM;
+    bool is_endian = (inst->code & EBPF_ALU_OP_MASK) == 0xd0;
+    bool is_neg = (inst->code & EBPF_ALU_OP_MASK) == 0x80;
+    bool is_call = inst->code == EBPF_OP_CALL;
+    bool is_exit = inst->code == EBPF_OP_EXIT;
+    bool is_ja = inst->code == EBPF_OP_JA;
     bool is_alu = (class == EBPF_CLS_ALU || class == EBPF_CLS_ALU64) && !is_endian && !is_neg;
     bool is_jmp = (class == EBPF_CLS_JMP && !is_ja && !is_call && !is_exit);
     bool is_jmp32 = class == EBPF_CLS_JMP32;
@@ -615,16 +615,16 @@ is_imm_op(struct ebpf_inst const* inst)
 }
 
 static bool
-is_alu64_op(struct ebpf_inst const* inst)
+is_alu64_op(struct bpf_insn const* inst)
 {
-    int class = inst->opcode & EBPF_CLS_MASK;
+    int class = inst->code & EBPF_CLS_MASK;
     return class == EBPF_CLS_ALU64 || class == EBPF_CLS_JMP;
 }
 
 static bool
-is_simple_imm(struct ebpf_inst const* inst)
+is_simple_imm(struct bpf_insn const* inst)
 {
-    switch (inst->opcode) {
+    switch (inst->code) {
     case EBPF_OP_ADD_IMM:
     case EBPF_OP_ADD64_IMM:
     case EBPF_OP_SUB_IMM:
@@ -871,13 +871,13 @@ translate(struct ebpf_vm* vm, struct jit_state* state, char** errmsg)
     emit_function_prologue(state, EBPF_STACK_SIZE);
 
     for (i = 0; i < vm->num_insts; i++) {
-        struct ebpf_inst inst = ebpf_fetch_instruction(vm, i);
+        struct bpf_insn inst = ebpf_fetch_instruction(vm, i);
         state->pc_locs[i] = state->offset;
 
-        enum Registers dst = map_register(inst.dst);
-        enum Registers src = map_register(inst.src);
-        uint8_t opcode = inst.opcode;
-        uint32_t target_pc = i + inst.offset + 1;
+        enum Registers dst = map_register(inst.dst_reg);
+        enum Registers src = map_register(inst.src_reg);
+        uint8_t opcode = inst.code;
+        uint32_t target_pc = i + inst.off + 1;
 
         int sixty_four = is_alu64_op(&inst);
 
@@ -1043,16 +1043,16 @@ translate(struct ebpf_vm* vm, struct jit_state* state, char** errmsg)
         case EBPF_OP_LDXH:
         case EBPF_OP_LDXB:
         case EBPF_OP_LDXDW:
-            if (inst.offset >= -256 && inst.offset < 256) {
-                emit_loadstore_immediate(state, to_loadstore_opcode(opcode), dst, src, inst.offset);
+            if (inst.off >= -256 && inst.off < 256) {
+                emit_loadstore_immediate(state, to_loadstore_opcode(opcode), dst, src, inst.off);
             } else {
-                emit_movewide_immediate(state, true, offset_register, inst.offset);
+                emit_movewide_immediate(state, true, offset_register, inst.off);
                 emit_loadstore_register(state, to_loadstore_opcode(opcode), dst, src, offset_register);
             }
             break;
 
         case EBPF_OP_LDDW: {
-            struct ebpf_inst inst2 = ebpf_fetch_instruction(vm, ++i);
+            struct bpf_insn inst2 = ebpf_fetch_instruction(vm, ++i);
             uint64_t imm = (uint32_t)inst.imm | ((uint64_t)inst2.imm << 32);
             emit_movewide_immediate(state, true, dst, imm);
             break;

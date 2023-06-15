@@ -676,7 +676,7 @@ static int do_jit(struct ebpf_vm *bpf_prog, int *addrs, u8 *image,
 		  int oldproglen, struct jit_context *ctx)
 {
 	struct bpf_insn *insn = bpf_prog->insnsi;
-	int insn_cnt = bpf_prog->len;
+	int insn_cnt = bpf_prog->num_insts;
 	bool seen_exit = false;
 	u8 temp[BPF_MAX_INSN_SIZE + BPF_INSN_SAFETY];
 	int i, cnt = 0, excnt = 0;
@@ -1841,9 +1841,6 @@ struct ebpf_vm *linux_bpf_int_jit_compile(struct ebpf_vm *prog)
 
 	const size_t jit_data_size = 1024;
 
-	if (!prog->jit_requested)
-		return orig_prog;
-
 	jit_data = prog->aux->jit_data;
 	if (!jit_data) {
 		jit_data = calloc(jit_data_size, sizeof(*jit_data));
@@ -1862,7 +1859,7 @@ struct ebpf_vm *linux_bpf_int_jit_compile(struct ebpf_vm *prog)
 		extra_pass = true;
 		goto skip_init_addrs;
 	}
-	addrs = calloc(prog->len + 1, sizeof(*addrs));
+	addrs = calloc(prog->num_insts + 1, sizeof(*addrs));
 	if (!addrs) {
 		prog = orig_prog;
 		goto out_addrs;
@@ -1872,7 +1869,7 @@ struct ebpf_vm *linux_bpf_int_jit_compile(struct ebpf_vm *prog)
 	 * Before first pass, make a rough estimation of addrs[]
 	 * each BPF instruction is translated to less than 64 bytes
 	 */
-	for (proglen = 0, i = 0; i <= prog->len; i++) {
+	for (proglen = 0, i = 0; i <= prog->num_insts; i++) {
 		proglen += 64;
 		addrs[i] = proglen;
 	}
@@ -1927,13 +1924,13 @@ out_image:
 		// cond_resched();
 	}
 
-	bpf_jit_dump(prog->len, proglen, pass + 1, image);
+	// bpf_jit_dump(prog->len, proglen, pass + 1, image);
 
 	if (image) {
 		if (!prog->is_func || extra_pass) {
 			// bpf_tail_call_direct_fixup(prog);
 			// bpf_jit_binary_lock_ro(header);
-			printf("bpf_jit: %s size %d\n", prog->aux->name, proglen);
+			printf("bpf_jit: %s size %d\n", proglen);
 			printf("tail_call_not supported");
 		} else {
 			jit_data->addrs = addrs;

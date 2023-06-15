@@ -54,13 +54,13 @@ ebpf_compile(struct ebpf_vm* vm, char** errmsg)
     uint8_t* buffer = NULL;
     size_t jitted_size;
 
-    if (vm->jitted) {
-        return vm->jitted;
+    if (vm->jitted_function) {
+        return vm->jitted_function;
     }
 
     *errmsg = NULL;
 
-    if (!vm->insts) {
+    if (!vm->insnsi) {
         *errmsg = ebpf_error("code has not been loaded into this VM");
         return NULL;
     }
@@ -85,13 +85,13 @@ ebpf_compile(struct ebpf_vm* vm, char** errmsg)
         goto out;
     }
 
-    vm->jitted = jitted;
+    vm->jitted_function = jitted;
     vm->jitted_size = jitted_size;
 
 out:
     free(buffer);
-    if (jitted && vm->jitted == NULL) {
+    if (jitted && vm->jitted_function == NULL) {
         munmap(jitted, jitted_size);
     }
-    return vm->jitted;
+    return vm->jitted_function;
 }

@@ -1744,7 +1744,7 @@ go_jmp:
 		/* Optimization: when last instruction is EXIT
 		 * simply fallthrough to epilogue.
 		 */
-		if (i == ctx->prog->len - 1)
+		if (i == ctx->prog->num_insts - 1)
 			break;
 		jmp_offset = epilogue_offset(ctx);
 		check_imm24(jmp_offset);
@@ -1777,7 +1777,7 @@ static int build_body(struct jit_ctx *ctx)
 	const struct ebpf_vm *prog = ctx->prog;
 	unsigned int i;
 
-	for (i = 0; i < prog->len; i++) {
+	for (i = 0; i < prog->num_insts; i++) {
 		const struct bpf_insn *insn = &(prog->insnsi[i]);
 		int ret;
 
@@ -1863,7 +1863,7 @@ struct ebpf_vm *linux_bpf_int_jit_compile(struct ebpf_vm *prog)
 	 * we must fall back to the interpreter
 	 */
 	// ctx.target = (u32* )buffer;
-	ctx.offsets = calloc(prog->len, sizeof(int));
+	ctx.offsets = calloc(prog->num_insts, sizeof(int));
 	// pa: TODO: what's length is needed?
 	// if (ctx.offsets == NULL) {
 	// 	prog = orig_prog;
@@ -1942,7 +1942,7 @@ struct ebpf_vm *linux_bpf_int_jit_compile(struct ebpf_vm *prog)
 
 	if (bpf_jit_enable > 1)
 		/* there are 2 passes here */
-		bpf_jit_dump(prog->len, image_size, 2, ctx.target);
+		bpf_jit_dump(prog->num_insts, image_size, 2, ctx.target);
 
 	// bpf_jit_binary_lock_ro(header);
 	prog->bpf_func = (void *)ctx.target;

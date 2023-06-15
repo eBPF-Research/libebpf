@@ -859,8 +859,6 @@ void __bpf_prog_exit(struct ebpf_vm *prog, u64 start);
 	})
 
 struct bpf_prog_aux {
-	u32 used_map_cnt;
-	u32 used_btf_cnt;
 	u32 max_ctx_offset;
 	u32 max_pkt_offset;
 	u32 max_tp_access;
@@ -870,38 +868,22 @@ struct bpf_prog_aux {
 	u32 func_idx; /* 0 for non-func prog, the index in func array for func prog */
 	u32 attach_btf_id; /* in-kernel BTF type id to attach to */
 	u32 ctx_arg_info_size;
-	u32 max_rdonly_access;
-	u32 max_rdwr_access;
-	struct btf *attach_btf;
 	const struct bpf_ctx_arg_aux *ctx_arg_info;
-	struct ebpf_vm *dst_prog;
 	struct bpf_trampoline *dst_trampoline;
 	bool verifier_zext; /* Zero extensions has been inserted by verifier. */
-	bool dev_bound; /* Program is bound to the netdev. */
-	bool offload_requested; /* Program is bound and offloaded to the netdev. */
 	bool attach_btf_trace; /* true if attaching to BTF-enabled raw tp */
-	bool func_proto_unreliable;
-	bool tail_call_reachable;
-	/* BTF_KIND_FUNC_PROTO for valid attach_btf_id */
-	const struct btf_type *attach_func_proto;
 	/* function name for valid attach_btf_id */
 	const char *attach_func_name;
 	struct ebpf_vm **func;
 	void *jit_data; /* JIT specific data. arch dependent */
 	struct bpf_jit_poke_descriptor *poke_tab;
-	struct bpf_kfunc_desc_tab *kfunc_tab;
-	struct bpf_kfunc_btf_tab *kfunc_btf_tab;
-	u32 size_poke_tab;
 	const struct bpf_prog_ops *ops;
 	struct bpf_map **used_maps;
 	struct btf_mod_pair *used_btfs;
 	struct ebpf_vm *prog;
 	struct user_struct *user;
-	u64 load_time; /* ns since boottime */
 	u32 verified_insns;
 	int cgroup_atype; /* enum cgroup_bpf_attach_type */
-	struct bpf_map *cgroup_storage[MAX_BPF_CGROUP_STORAGE_TYPE];
-	char name[BPF_OBJ_NAME_LEN];
 	struct bpf_prog_offload *offload;
 	struct btf *btf;
 	struct bpf_func_info *func_info;

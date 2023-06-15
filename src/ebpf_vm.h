@@ -22,15 +22,15 @@
 #include "ebpf_inst.h"
 #include "linux_jit_bpf.h"
 
-struct ebpf_inst;
 typedef uint64_t (*ext_func)(uint64_t arg0, uint64_t arg1, uint64_t arg2, uint64_t arg3, uint64_t arg4);
 
 struct ebpf_vm
 {
     /* ubpf_defs*/
-    struct ebpf_inst* insts;
+    /* Instructions for interpreter */
+	struct bpf_insn		*insnsi;
     uint16_t num_insts;
-    ebpf_jit_fn jitted;
+    ebpf_jit_fn jitted_function;
     size_t jitted_size;
     ext_func* ext_funcs;
     const char** ext_func_names;
@@ -45,23 +45,13 @@ struct ebpf_vm
     /* linux defs: TODO: merge them together*/
 	u16			pages;		/* Number of allocated pages */
 	u16			jited:1,	/* Is our filter JIT'ed? */
-				jit_requested:1,/* archs need to JIT the prog */
-				gpl_compatible:1, /* Is filter GPL compatible? */
-				cb_access:1,	/* Is control block accessed? */
-				dst_needed:1,	/* Do we need dst entry? */
-				blinded:1,	/* Was blinded */
-				is_func:1,	/* program is a bpf function */
-				kprobe_override:1, /* Do we override a kprobe? */
-				has_callchain_buf:1, /* callchain buffer allocated? */
-				enforce_expected_attach_type:1; /* Enforce expected_attach_type checking at attach time */
-	u32			len;		/* Number of filter blocks */
+				is_func:1	/* program is a bpf function */
+                ;
 	u32			jited_len;	/* Size of jited insns in bytes */
 	struct bpf_prog_aux	*aux;		/* Auxiliary fields */
 	struct sock_fprog_kern	*orig_prog;	/* Original BPF program */
 	unsigned int		(*bpf_func)(const void *ctx,
 					    const struct bpf_insn *insn);
-	/* Instructions for interpreter */
-	struct bpf_insn		insnsi[];
 };
 
 /* The various JIT targets.  */
@@ -84,7 +74,7 @@ ebpf_lookup_registered_function(struct ebpf_vm* vm, const char* name);
  * @param[in] pc The index of the instruction to fetch.
  * @return The instruction.
  */
-struct ebpf_inst
+struct bpf_insn
 ebpf_fetch_instruction(const struct ebpf_vm* vm, uint16_t pc);
 
 /**
@@ -95,6 +85,6 @@ ebpf_fetch_instruction(const struct ebpf_vm* vm, uint16_t pc);
  * @param[in] inst The instruction to store.
  */
 void
-ebpf_store_instruction(const struct ebpf_vm* vm, uint16_t pc, struct ebpf_inst inst);
+ebpf_store_instruction(const struct ebpf_vm* vm, uint16_t pc, struct bpf_insn inst);
 
 #endif

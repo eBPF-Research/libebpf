@@ -140,14 +140,14 @@ translate(struct ebpf_vm* vm, struct jit_state* state, char** errmsg)
     emit_alu64_imm32(state, 0x81, 5, RSP, EBPF_STACK_SIZE);
 
     for (i = 0; i < vm->num_insts; i++) {
-        struct ebpf_inst inst = ebpf_fetch_instruction(vm, i);
+        struct bpf_insn inst = ebpf_fetch_instruction(vm, i);
         state->pc_locs[i] = state->offset;
 
-        int dst = map_register(inst.dst);
-        int src = map_register(inst.src);
-        uint32_t target_pc = i + inst.offset + 1;
+        int dst = map_register(inst.dst_reg);
+        int src = map_register(inst.src_reg);
+        uint32_t target_pc = i + inst.off + 1;
 
-        switch (inst.opcode) {
+        switch (inst.code) {
         case EBPF_OP_ADD_IMM:
             emit_alu32_imm32(state, 0x81, 0, dst, inst.imm);
             break;
@@ -166,7 +166,7 @@ translate(struct ebpf_vm* vm, struct jit_state* state, char** errmsg)
         case EBPF_OP_DIV_REG:
         case EBPF_OP_MOD_IMM:
         case EBPF_OP_MOD_REG:
-            muldivmod(state, inst.opcode, src, dst, inst.imm);
+            muldivmod(state, inst.code, src, dst, inst.imm);
             break;
         case EBPF_OP_OR_IMM:
             emit_alu32_imm32(state, 0x81, 1, dst, inst.imm);
@@ -253,7 +253,7 @@ translate(struct ebpf_vm* vm, struct jit_state* state, char** errmsg)
         case EBPF_OP_DIV64_REG:
         case EBPF_OP_MOD64_IMM:
         case EBPF_OP_MOD64_REG:
-            muldivmod(state, inst.opcode, src, dst, inst.imm);
+            muldivmod(state, inst.code, src, dst, inst.imm);
             break;
         case EBPF_OP_OR64_IMM:
             emit_alu64_imm32(state, 0x81, 1, dst, inst.imm);
@@ -500,53 +500,53 @@ translate(struct ebpf_vm* vm, struct jit_state* state, char** errmsg)
             break;
 
         case EBPF_OP_LDXW:
-            emit_load(state, S32, src, dst, inst.offset);
+            emit_load(state, S32, src, dst, inst.off);
             break;
         case EBPF_OP_LDXH:
-            emit_load(state, S16, src, dst, inst.offset);
+            emit_load(state, S16, src, dst, inst.off);
             break;
         case EBPF_OP_LDXB:
-            emit_load(state, S8, src, dst, inst.offset);
+            emit_load(state, S8, src, dst, inst.off);
             break;
         case EBPF_OP_LDXDW:
-            emit_load(state, S64, src, dst, inst.offset);
+            emit_load(state, S64, src, dst, inst.off);
             break;
 
         case EBPF_OP_STW:
-            emit_store_imm32(state, S32, dst, inst.offset, inst.imm);
+            emit_store_imm32(state, S32, dst, inst.off, inst.imm);
             break;
         case EBPF_OP_STH:
-            emit_store_imm32(state, S16, dst, inst.offset, inst.imm);
+            emit_store_imm32(state, S16, dst, inst.off, inst.imm);
             break;
         case EBPF_OP_STB:
-            emit_store_imm32(state, S8, dst, inst.offset, inst.imm);
+            emit_store_imm32(state, S8, dst, inst.off, inst.imm);
             break;
         case EBPF_OP_STDW:
-            emit_store_imm32(state, S64, dst, inst.offset, inst.imm);
+            emit_store_imm32(state, S64, dst, inst.off, inst.imm);
             break;
 
         case EBPF_OP_STXW:
-            emit_store(state, S32, src, dst, inst.offset);
+            emit_store(state, S32, src, dst, inst.off);
             break;
         case EBPF_OP_STXH:
-            emit_store(state, S16, src, dst, inst.offset);
+            emit_store(state, S16, src, dst, inst.off);
             break;
         case EBPF_OP_STXB:
-            emit_store(state, S8, src, dst, inst.offset);
+            emit_store(state, S8, src, dst, inst.off);
             break;
         case EBPF_OP_STXDW:
-            emit_store(state, S64, src, dst, inst.offset);
+            emit_store(state, S64, src, dst, inst.off);
             break;
 
         case EBPF_OP_LDDW: {
-            struct ebpf_inst inst2 = ebpf_fetch_instruction(vm, ++i);
+            struct bpf_insn inst2 = ebpf_fetch_instruction(vm, ++i);
             uint64_t imm = (uint32_t)inst.imm | ((uint64_t)inst2.imm << 32);
             emit_load_imm(state, dst, imm);
             break;
         }
 
         default:
-            *errmsg = ebpf_error("Unknown instruction at PC %d: opcode %02x", i, inst.opcode);
+            *errmsg = ebpf_error("Unknown instruction at PC %d: opcode %02x", i, inst.code);
             return -1;
         }
     }

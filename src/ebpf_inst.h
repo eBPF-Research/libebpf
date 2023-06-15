@@ -16,18 +16,16 @@
 
 #ifndef EBPF_INST_H
 #define EBPF_INST_H
-
+#include "type-fixes.h"
 #include <stdint.h>
 
 /* eBPF definitions */
-
-struct ebpf_inst
-{
-    uint8_t opcode;
-    uint8_t dst : 4;
-    uint8_t src : 4;
-    int16_t offset;
-    int32_t imm;
+struct bpf_insn {
+	u8	code;		/* opcode */
+	u8	dst_reg:4;	/* dest register */
+	u8	src_reg:4;	/* source register */
+	s16	off;		/* signed offset */
+	s32	imm;		/* signed immediate constant */
 };
 
 #define EBPF_CLS_MASK 0x07

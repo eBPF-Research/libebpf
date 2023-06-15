@@ -834,7 +834,7 @@ emit_cond_jmp:
 	case BPF_JMP | BPF_EXIT:
 		/* Optimization: when last instruction is EXIT,
 		   simply fallthrough to epilogue. */
-		if (i == ctx->prog->len - 1)
+		if (i == ctx->prog->num_insts - 1)
 			break;
 		jmp_offset = epilogue_offset(ctx);
 		check_imm26(jmp_offset);
@@ -974,7 +974,7 @@ static int build_body(struct jit_ctx *ctx, bool extra_pass)
 	 * - offset[3] - offset of the end of 3rd instruction,
 	 *   start of 4th instruction
 	 */
-	for (i = 0; i < prog->len; i++) {
+	for (i = 0; i < prog->num_insts; i++) {
 		const struct bpf_insn *insn = &prog->insnsi[i];
 		int ret;
 
@@ -1042,9 +1042,6 @@ struct ebpf_vm *linux_bpf_int_jit_compile(struct ebpf_vm *prog)
 	struct jit_ctx ctx;
 	u8 *image_ptr;
 
-	if (!prog->jit_requested)
-		return orig_prog;
-
 	// tmp = bpf_jit_blind_constants(prog);
 	/* If blinding was requested and we failed during blinding,
 	 * we must fall back to the interpreter.
@@ -1076,7 +1073,7 @@ struct ebpf_vm *linux_bpf_int_jit_compile(struct ebpf_vm *prog)
 	memset(&ctx, 0, sizeof(ctx));
 	ctx.prog = prog;
 
-	ctx.offset = calloc(prog->len + 1, sizeof(int));
+	ctx.offset = calloc(prog->num_insts + 1, sizeof(int));
 	if (ctx.offset == NULL) {
 		prog = orig_prog;
 		goto out_off;
@@ -1139,7 +1136,7 @@ skip_init_ctx:
 
 	/* And we're done. */
 	if (bpf_jit_enable > 1)
-		bpf_jit_dump(prog->len, prog_size, 2, ctx.image);
+		bpf_jit_dump(prog->num_insts, prog_size, 2, ctx.image);
 
 	bpf_flush_icache(header, ctx.image + ctx.idx);
 

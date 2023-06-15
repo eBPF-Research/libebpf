@@ -135,7 +135,6 @@ struct ebpf_vm *bpf_prog_alloc_no_stats(unsigned int size)
 	fp->pages = size / PAGE_SIZE;
 	fp->aux = aux;
 	fp->aux->prog = fp;
-	fp->jit_requested = true;
 
 	return fp;
 }
@@ -153,7 +152,7 @@ struct ebpf_vm *bpf_prog_alloc(unsigned int size)
 
 int bpf_prog_alloc_jited_linfo(struct ebpf_vm *prog)
 {
-	if (!prog->aux->nr_linfo || !prog->jit_requested)
+	if (!prog->aux->nr_linfo)
 		return 0;
 
 	prog->aux->jited_linfo = calloc(prog->aux->nr_linfo,
@@ -171,9 +170,6 @@ void bpf_prog_jit_attempt_done(struct ebpf_vm *prog)
 		free(prog->aux->jited_linfo);
 		prog->aux->jited_linfo = NULL;
 	}
-
-	free(prog->aux->kfunc_tab);
-	prog->aux->kfunc_tab = NULL;
 }
 
 /* The jit engine is responsible to provide an array
@@ -214,7 +210,7 @@ void bpf_prog_fill_jited_linfo(struct ebpf_vm *prog,
 	linfo_idx = prog->aux->linfo_idx;
 	linfo = &prog->aux->linfo[linfo_idx];
 	insn_start = linfo[0].insn_off;
-	insn_end = insn_start + prog->len;
+	insn_end = insn_start + prog->num_insts;
 
 	jited_linfo = &prog->aux->jited_linfo[linfo_idx];
 	jited_linfo[0] = prog->bpf_func;
@@ -238,11 +234,6 @@ void __bpf_prog_free(struct ebpf_vm *fp)
 	free(fp);
 }
 
-static inline u32 bpf_prog_insn_size(const struct ebpf_vm *prog)
-{
-	return prog->len * sizeof(struct bpf_insn);
-}
-
 struct ebpf_vm *linux_bpf_prog_load(const void* code, uint32_t code_len)
 {
 	struct ebpf_vm *prog = NULL;
@@ -253,14 +244,12 @@ struct ebpf_vm *linux_bpf_prog_load(const void* code, uint32_t code_len)
 		return NULL;
 	}
 
-	prog->aux->offload_requested = false; // origin is: !!attr->prog_ifindex;
-
 	prog->aux->user = NULL; // get_current_user();
-	prog->len = code_len;
+	prog->num_insts = code_len;
 
 	memcpy(prog->insnsi,
 			     (void*)code,
-			     bpf_prog_insn_size(prog));
+			     prog->num_insts * sizeof(struct bpf_insn));
 
 	prog->orig_prog = NULL;
 
