@@ -9,10 +9,11 @@ message(STATUS "Building for architecture: ${ARCH}")
 if(ARCH MATCHES "arm")
   message(STATUS "arm architecture detected")
   set(ARCH_SOURCES
-    src/arch/arm/bpf_jit_32.c
+    # src/arch/arm/bpf_jit_32.c
+    src/ebpf_jit_arm32.c
   )
   set(ARCH_HEADERS
-    src/arch/arm/
+    src/
   )
 elseif(ARCH MATCHES "aarch64")
   message(STATUS "arm64 architecture detected")
