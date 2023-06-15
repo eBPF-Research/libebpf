@@ -279,122 +279,7 @@ enum {
  */
 #define BPF_PSEUDO_CALL		1
 
-/* flags for BPF_MAP_UPDATE_ELEM command */
-enum {
-	BPF_ANY		= 0, /* create new element or update existing */
-	BPF_NOEXIST	= 1, /* create new element if it didn't exist */
-	BPF_EXIST	= 2, /* update existing element */
-	BPF_F_LOCK	= 4, /* spin_lock-ed map_lookup/map_update */
-};
-
-/* flags for BPF_MAP_CREATE command */
-enum {
-	BPF_F_NO_PREALLOC	= (1U << 0),
-/* Instead of having one common LRU list in the
- * BPF_MAP_TYPE_LRU_[PERCPU_]HASH map, use a percpu LRU list
- * which can scale and perform better.
- * Note, the LRU nodes (including free nodes) cannot be moved
- * across different LRU lists.
- */
-	BPF_F_NO_COMMON_LRU	= (1U << 1),
-/* Specify numa node during map creation */
-	BPF_F_NUMA_NODE		= (1U << 2),
-
-/* Flags for accessing BPF object from syscall side. */
-	BPF_F_RDONLY		= (1U << 3),
-	BPF_F_WRONLY		= (1U << 4),
-
-/* Flag for stack_map, store build_id+offset instead of pointer */
-	BPF_F_STACK_BUILD_ID	= (1U << 5),
-
-/* Zero-initialize hash function seed. This should only be used for testing. */
-	BPF_F_ZERO_SEED		= (1U << 6),
-
-/* Flags for accessing BPF object from program side. */
-	BPF_F_RDONLY_PROG	= (1U << 7),
-	BPF_F_WRONLY_PROG	= (1U << 8),
-
-/* Clone map from listener for newly accepted socket */
-	BPF_F_CLONE		= (1U << 9),
-
-/* Enable memory-mapping BPF map */
-	BPF_F_MMAPABLE		= (1U << 10),
-};
-
-/* Flags for BPF_PROG_QUERY. */
-
-/* Query effective (directly attached + inherited from ancestor cgroups)
- * programs that will be executed for events within a cgroup.
- * attach_flags with this flag are returned only for directly attached programs.
- */
-#define BPF_F_QUERY_EFFECTIVE	(1U << 0)
-
-/* type for BPF_ENABLE_STATS */
-enum bpf_stats_type {
-	/* enabled run_time_ns and run_cnt */
-	BPF_STATS_RUN_TIME = 0,
-};
-
-enum bpf_stack_build_id_status {
-	/* user space need an empty entry to identify end of a trace */
-	BPF_STACK_BUILD_ID_EMPTY = 0,
-	/* with valid build_id and offset */
-	BPF_STACK_BUILD_ID_VALID = 1,
-	/* couldn't get build_id, fallback to ip */
-	BPF_STACK_BUILD_ID_IP = 2,
-};
-
-#define BPF_BUILD_ID_SIZE 20
-struct bpf_stack_build_id {
-	s32		status;
-	unsigned char	build_id[BPF_BUILD_ID_SIZE];
-	union {
-		u64	offset;
-		u64	ip;
-	};
-};
-
 #define BPF_OBJ_NAME_LEN 16U
-
-#define BPF_TAG_SIZE	8
-
-struct bpf_prog_info {
-	u32 type;
-	u32 id;
-	u8  tag[BPF_TAG_SIZE];
-	u32 jited_prog_len;
-	u32 xlated_prog_len;
-	u64 jited_prog_insns;
-	u64 xlated_prog_insns;
-	u64 load_time;	/* ns since boottime */
-	u32 created_by_uid;
-	u32 nr_map_ids;
-	u64 map_ids;
-	char name[BPF_OBJ_NAME_LEN];
-	u32 ifindex;
-	u32 gpl_compatible:1;
-	u32 :31; /* alignment pad */
-	u64 netns_dev;
-	u64 netns_ino;
-	u32 nr_jited_ksyms;
-	u32 nr_jited_func_lens;
-	u64 jited_ksyms;
-	u64 jited_func_lens;
-	u32 btf_id;
-	u32 func_info_rec_size;
-	u64 func_info;
-	u32 nr_func_info;
-	u32 nr_line_info;
-	u64 line_info;
-	u64 jited_line_info;
-	u32 nr_jited_line_info;
-	u32 line_info_rec_size;
-	u32 jited_line_info_rec_size;
-	u32 nr_prog_tags;
-	u64 prog_tags;
-	u64 run_time_ns;
-	u64 run_cnt;
-} __attribute__((aligned(8)));
 
 struct bpf_btf_info {
 	u64 btf;
@@ -402,202 +287,11 @@ struct bpf_btf_info {
 	u32 id;
 } __attribute__((aligned(8)));
 
-struct bpf_func_info {
-	u32	insn_off;
-	u32	type_id;
-};
-
-#define BPF_LINE_INFO_LINE_NUM(line_col)	((line_col) >> 10)
-#define BPF_LINE_INFO_LINE_COL(line_col)	((line_col) & 0x3ff)
-
-struct bpf_line_info {
-	u32	insn_off;
-	u32	file_name_off;
-	u32	line_off;
-	u32	line_col;
-};
-
-struct bpf_pidns_info {
-	u32 pid;
-	u32 tgid;
-};
-
-struct bpf_verifier_env;
-struct bpf_verifier_log;
-struct perf_event;
 struct ebpf_vm;
-struct bpf_prog_aux;
 struct bpf_map;
-struct sock;
-struct seq_file;
 struct btf;
 struct btf_type;
 struct exception_table_entry;
-struct seq_operations;
-
-extern struct idr btf_idr;
-
-int map_check_no_btf(const struct bpf_map *map,
-		     const struct btf *btf,
-		     const struct btf_type *key_type,
-		     const struct btf_type *value_type);
-
-extern const struct bpf_map_ops bpf_map_offload_ops;
-
-/* function argument constraints */
-enum bpf_arg_type {
-	ARG_DONTCARE = 0,	/* unused argument in helper function */
-
-	/* the following constraints used to prototype
-	 * bpf_map_lookup/update/delete_elem() functions
-	 */
-	ARG_CONST_MAP_PTR,	/* const argument used as pointer to bpf_map */
-	ARG_PTR_TO_MAP_KEY,	/* pointer to stack used as map key */
-	ARG_PTR_TO_MAP_VALUE,	/* pointer to stack used as map value */
-	ARG_PTR_TO_UNINIT_MAP_VALUE,	/* pointer to valid memory used to store a map value */
-	ARG_PTR_TO_MAP_VALUE_OR_NULL,	/* pointer to stack used as map value or NULL */
-
-	/* the following constraints used to prototype bpf_memcmp() and other
-	 * functions that access data on eBPF program stack
-	 */
-	ARG_PTR_TO_MEM,		/* pointer to valid memory (stack, packet, map value) */
-	ARG_PTR_TO_MEM_OR_NULL, /* pointer to valid memory or NULL */
-	ARG_PTR_TO_UNINIT_MEM,	/* pointer to memory does not need to be initialized,
-				 * helper function must fill all bytes or clear
-				 * them in error case.
-				 */
-
-	ARG_CONST_SIZE,		/* number of bytes accessed from memory */
-	ARG_CONST_SIZE_OR_ZERO,	/* number of bytes accessed from memory or 0 */
-
-	ARG_PTR_TO_CTX,		/* pointer to context */
-	ARG_PTR_TO_CTX_OR_NULL,	/* pointer to context or NULL */
-	ARG_ANYTHING,		/* any (initialized) argument is ok */
-	ARG_PTR_TO_SPIN_LOCK,	/* pointer to bpf_spin_lock */
-	ARG_PTR_TO_SOCK_COMMON,	/* pointer to sock_common */
-	ARG_PTR_TO_INT,		/* pointer to int */
-	ARG_PTR_TO_LONG,	/* pointer to long */
-	ARG_PTR_TO_SOCKET,	/* pointer to bpf_sock (fullsock) */
-	ARG_PTR_TO_SOCKET_OR_NULL,	/* pointer to bpf_sock (fullsock) or NULL */
-	ARG_PTR_TO_BTF_ID,	/* pointer to in-kernel struct */
-	ARG_PTR_TO_ALLOC_MEM,	/* pointer to dynamically allocated memory */
-	ARG_PTR_TO_ALLOC_MEM_OR_NULL,	/* pointer to dynamically allocated memory or NULL */
-	ARG_CONST_ALLOC_SIZE_OR_ZERO,	/* number of allocated bytes requested */
-};
-
-/* type of values returned from helper functions */
-enum bpf_return_type {
-	RET_INTEGER,			/* function returns integer */
-	RET_VOID,			/* function doesn't return anything */
-	RET_PTR_TO_MAP_VALUE,		/* returns a pointer to map elem value */
-	RET_PTR_TO_MAP_VALUE_OR_NULL,	/* returns a pointer to map elem value or NULL */
-	RET_PTR_TO_SOCKET_OR_NULL,	/* returns a pointer to a socket or NULL */
-	RET_PTR_TO_TCP_SOCK_OR_NULL,	/* returns a pointer to a tcp_sock or NULL */
-	RET_PTR_TO_SOCK_COMMON_OR_NULL,	/* returns a pointer to a sock_common or NULL */
-	RET_PTR_TO_ALLOC_MEM_OR_NULL,	/* returns a pointer to dynamically allocated memory or NULL */
-	RET_PTR_TO_BTF_ID_OR_NULL,	/* returns a pointer to a btf_id or NULL */
-};
-
-/* eBPF function prototype used by verifier to allow BPF_CALLs from eBPF programs
- * to in-kernel helper functions and for adjusting imm32 field in BPF_CALL
- * instructions after verifying
- */
-struct bpf_func_proto {
-	u64 (*func)(u64 r1, u64 r2, u64 r3, u64 r4, u64 r5);
-	bool gpl_only;
-	bool pkt_access;
-	enum bpf_return_type ret_type;
-	union {
-		struct {
-			enum bpf_arg_type arg1_type;
-			enum bpf_arg_type arg2_type;
-			enum bpf_arg_type arg3_type;
-			enum bpf_arg_type arg4_type;
-			enum bpf_arg_type arg5_type;
-		};
-		enum bpf_arg_type arg_type[5];
-	};
-	int *btf_id; /* BTF ids of arguments */
-	bool (*check_btf_id)(u32 btf_id, u32 arg); /* if the argument btf_id is
-						    * valid. Often used if more
-						    * than one btf id is permitted
-						    * for this argument.
-						    */
-	int *ret_btf_id; /* return value btf_id */
-};
-
-/* bpf_context is intentionally undefined structure. Pointer to bpf_context is
- * the first argument to eBPF programs.
- * For socket filters: 'struct bpf_context *' == 'struct sk_buff *'
- */
-struct bpf_context;
-
-enum bpf_access_type {
-	BPF_READ = 1,
-	BPF_WRITE = 2
-};
-
-/* types of values stored in eBPF registers */
-/* Pointer types represent:
- * pointer
- * pointer + imm
- * pointer + (u16) var
- * pointer + (u16) var + imm
- * if (range > 0) then [ptr, ptr + range - off) is safe to access
- * if (id > 0) means that some 'var' was added
- * if (off > 0) means that 'imm' was added
- */
-enum bpf_reg_type {
-	NOT_INIT = 0,		 /* nothing was written into register */
-	SCALAR_VALUE,		 /* reg doesn't contain a valid pointer */
-	PTR_TO_CTX,		 /* reg points to bpf_context */
-	CONST_PTR_TO_MAP,	 /* reg points to struct bpf_map */
-	PTR_TO_MAP_VALUE,	 /* reg points to map element value */
-	PTR_TO_MAP_VALUE_OR_NULL,/* points to map elem value or NULL */
-	PTR_TO_STACK,		 /* reg == frame_pointer + offset */
-	PTR_TO_PACKET_META,	 /* skb->data - meta_len */
-	PTR_TO_PACKET,		 /* reg points to skb->data */
-	PTR_TO_PACKET_END,	 /* skb->data + headlen */
-	PTR_TO_FLOW_KEYS,	 /* reg points to bpf_flow_keys */
-	PTR_TO_SOCKET,		 /* reg points to struct bpf_sock */
-	PTR_TO_SOCKET_OR_NULL,	 /* reg points to struct bpf_sock or NULL */
-	PTR_TO_SOCK_COMMON,	 /* reg points to sock_common */
-	PTR_TO_SOCK_COMMON_OR_NULL, /* reg points to sock_common or NULL */
-	PTR_TO_TCP_SOCK,	 /* reg points to struct tcp_sock */
-	PTR_TO_TCP_SOCK_OR_NULL, /* reg points to struct tcp_sock or NULL */
-	PTR_TO_TP_BUFFER,	 /* reg points to a writable raw tp's buffer */
-	PTR_TO_XDP_SOCK,	 /* reg points to struct xdp_sock */
-	PTR_TO_BTF_ID,		 /* reg points to kernel struct */
-	PTR_TO_BTF_ID_OR_NULL,	 /* reg points to kernel struct or NULL */
-	PTR_TO_MEM,		 /* reg points to valid memory region */
-	PTR_TO_MEM_OR_NULL,	 /* reg points to valid memory region or NULL */
-};
-
-/* The information passed from prog-specific *_is_valid_access
- * back to the verifier.
- */
-struct bpf_insn_access_aux {
-	enum bpf_reg_type reg_type;
-	union {
-		int ctx_field_size;
-		u32 btf_id;
-	};
-	struct bpf_verifier_log *log; /* for verbose logs */
-};
-
-static inline void
-bpf_ctx_record_field_size(struct bpf_insn_access_aux *aux, u32 size)
-{
-	aux->ctx_field_size = size;
-}
-
-enum bpf_cgroup_storage_type {
-	BPF_CGROUP_STORAGE_SHARED,
-	BPF_CGROUP_STORAGE_PERCPU,
-	__BPF_CGROUP_STORAGE_MAX
-};
-
-#define MAX_BPF_CGROUP_STORAGE_TYPE __BPF_CGROUP_STORAGE_MAX
 
 /* The longest tracepoint has 12 args.
  * See include/trace/bpf_probe.h
@@ -642,59 +336,12 @@ struct bpf_tramp_progs {
 	int nr_progs;
 };
 
-struct bpf_func_info_aux {
-	u16 linkage;
-	bool unreliable;
-};
-
 enum bpf_jit_poke_reason {
 	BPF_POKE_REASON_TAIL_CALL,
 };
 
-/* Descriptor of pokes pointing /into/ the JITed image. */
-struct bpf_jit_poke_descriptor {
-	void *ip;
-	union {
-		struct {
-			struct bpf_map *map;
-			u32 key;
-		} tail_call;
-	};
-	bool ip_stable;
-	u8 adj_off;
-	u16 reason;
-};
-
-/* reg_type info for ctx arguments */
-struct bpf_ctx_arg_aux {
-	u32 offset;
-	enum bpf_reg_type reg_type;
-	u32 btf_id;
-};
-
-struct bpf_struct_ops_value;
 struct btf_type;
 struct btf_member;
-
-#define BPF_STRUCT_OPS_MAX_NR_MEMBERS 64
-struct bpf_struct_ops {
-	const struct bpf_verifier_ops *verifier_ops;
-	int (*init)(struct btf *btf);
-	int (*check_member)(const struct btf_type *t,
-			    const struct btf_member *member);
-	int (*init_member)(const struct btf_type *t,
-			   const struct btf_member *member,
-			   void *kdata, const void *udata);
-	int (*reg)(void *kdata);
-	void (*unreg)(void *kdata);
-	const struct btf_type *type;
-	const struct btf_type *value_type;
-	const char *name;
-	struct btf_func_model func_models[BPF_STRUCT_OPS_MAX_NR_MEMBERS];
-	u32 type_id;
-	u32 value_id;
-};
-
 
 #define BPF_COMPLEXITY_LIMIT_INSNS      1000000 /* yes. 1M insns */
 #define MAX_TAIL_CALL_CNT 32
@@ -704,23 +351,6 @@ struct bpf_struct_ops {
 				 BPF_F_WRONLY |		\
 				 BPF_F_WRONLY_PROG)
 
-#define BPF_MAP_CAN_READ	BIT(0)
-#define BPF_MAP_CAN_WRITE	BIT(1)
-
-static inline bool bpf_map_flags_access_ok(u32 access_flags)
-{
-	return (access_flags & (BPF_F_RDONLY_PROG | BPF_F_WRONLY_PROG)) !=
-	       (BPF_F_RDONLY_PROG | BPF_F_WRONLY_PROG);
-}
-
-typedef unsigned long (*bpf_ctx_copy_t)(void *dst, const void *src,
-					unsigned long off, unsigned long len);
-typedef u32 (*bpf_convert_ctx_access_t)(enum bpf_access_type type,
-					const struct bpf_insn *src,
-					struct bpf_insn *dst,
-					struct ebpf_vm *prog,
-					u32 *target_size);
-
 /* these two functions are called from generated trampoline */
 u64 __bpf_prog_enter(void);
 void __bpf_prog_exit(struct ebpf_vm *prog, u64 start);
@@ -728,12 +358,6 @@ void __bpf_prog_exit(struct ebpf_vm *prog, u64 start);
 
 /* Helper macros for filter block array initializers. */
 /* Internal classic blocks for direct assignment */
-
-#define __BPF_STMT(CODE, K)					\
-	((struct sock_filter) BPF_STMT(CODE, K))
-
-#define __BPF_JUMP(CODE, K, JT, JF)				\
-	((struct sock_filter) BPF_JUMP(CODE, K, JT, JF))
 
 #define bytes_to_bpf_size(bytes)				\
 ({								\
@@ -839,53 +463,14 @@ void __bpf_prog_exit(struct ebpf_vm *prog, u64 start);
 #define BPF_CALL_4(name, ...)	BPF_CALL_x(4, name, __VA_ARGS__)
 #define BPF_CALL_5(name, ...)	BPF_CALL_x(5, name, __VA_ARGS__)
 
-#define bpf_ctx_range(TYPE, MEMBER)						\
-	offsetof(TYPE, MEMBER) ... offsetofend(TYPE, MEMBER) - 1
-#define bpf_ctx_range_till(TYPE, MEMBER1, MEMBER2)				\
-	offsetof(TYPE, MEMBER1) ... offsetofend(TYPE, MEMBER2) - 1
-#if BITS_PER_LONG == 64
-# define bpf_ctx_range_ptr(TYPE, MEMBER)					\
-	offsetof(TYPE, MEMBER) ... offsetofend(TYPE, MEMBER) - 1
-#else
-# define bpf_ctx_range_ptr(TYPE, MEMBER)					\
-	offsetof(TYPE, MEMBER) ... offsetof(TYPE, MEMBER) + 8 - 1
-#endif /* BITS_PER_LONG == 64 */
-
-#define bpf_target_off(TYPE, MEMBER, SIZE, PTR_SIZE)				\
-	({									\
-		BUILD_BUG_ON(sizeof_field(TYPE, MEMBER) != (SIZE));		\
-		*(PTR_SIZE) = (SIZE);						\
-		offsetof(TYPE, MEMBER);						\
-	})
-
 struct bpf_prog_aux {
 	u32 stack_depth;
-	u32 id;
 	u32 func_cnt; /* used by non-func prog as the number of func progs */
-	u32 func_idx; /* 0 for non-func prog, the index in func array for func prog */
-	const struct bpf_ctx_arg_aux *ctx_arg_info;
-	struct bpf_trampoline *dst_trampoline;
 	bool verifier_zext; /* Zero extensions has been inserted by verifier. */
 	struct ebpf_vm **func;
 	void *jit_data; /* JIT specific data. arch dependent */
 	struct bpf_jit_poke_descriptor *poke_tab;
 	struct ebpf_vm *prog;
-	struct user_struct *user;
-	/* jited_linfo is the jited addr of the linfo.  It has a
-	 * one to one mapping to linfo:
-	 * jited_linfo[i] is the jited addr for the linfo[i]->insn_off.
-	 * Both the main and sub prog share the same jited_linfo.
-	 * The subprog can access its first jited_linfo by
-	 * using the linfo_idx.
-	 */
-	void **jited_linfo;
-	u32 func_info_cnt;
-	u32 nr_linfo;
-	/* subprog can use linfo_idx to access its first linfo and
-	 * jited_linfo.
-	 * main prog always has linfo_idx == 0
-	 */
-	u32 linfo_idx;
 	u32 num_exentries;
 	struct exception_table_entry *extable;
 };
@@ -898,11 +483,6 @@ u64 __bpf_call_base(u64 r1, u64 r2, u64 r3, u64 r4, u64 r5);
 struct ebpf_vm *linux_bpf_int_jit_compile(struct ebpf_vm *prog);
 void bpf_jit_compile(struct ebpf_vm *prog);
 bool bpf_jit_needs_zext(void);
-
-extern int bpf_jit_enable;
-extern int bpf_jit_harden;
-extern int bpf_jit_kallsyms;
-extern long bpf_jit_limit;
 
 typedef void (*bpf_jit_fill_hole_t)(void *area, unsigned int size);
 
@@ -921,37 +501,6 @@ bpf_jit_binary_alloc(unsigned int proglen, u8 **image_ptr,
 void *bpf_jit_alloc_exec(unsigned long size);
 void __bpf_prog_free(struct ebpf_vm *fp);
 
-void bpf_jit_prog_release_other(struct ebpf_vm *fp, struct ebpf_vm *fp_other);
-
-static inline bool bpf_jit_blinding_enabled(struct ebpf_vm *prog)
-{
-	/* These are the prerequisites, should someone ever have the
-	 * idea to call blinding outside of them, we make sure to
-	 * bail out.
-	 */
-	if (!bpf_jit_harden)
-		return false;
-	if (bpf_jit_harden == 1)
-		return false;
-
-	return true;
-}
-
-static inline bool bpf_jit_kallsyms_enabled(void)
-{
-	/* There are a couple of corner cases where kallsyms should
-	 * not be enabled f.e. on hardening.
-	 */
-	if (bpf_jit_harden)
-		return false;
-	if (!bpf_jit_kallsyms)
-		return false;
-	if (bpf_jit_kallsyms == 1)
-		return true;
-
-	return false;
-}
-
 static inline const char *
 bpf_address_lookup(unsigned long addr, unsigned long *size,
 		   unsigned long *off, char **modname, char *sym)
@@ -962,15 +511,6 @@ bpf_address_lookup(unsigned long addr, unsigned long *size,
 		*modname = NULL;
 	return ret;
 }
-
-void bpf_prog_kallsyms_add(struct ebpf_vm *fp);
-void bpf_prog_kallsyms_del(struct ebpf_vm *fp);
-
-void bpf_prog_free_linfo(struct ebpf_vm *prog);
-void bpf_prog_fill_jited_linfo(struct ebpf_vm *prog,
-			       const u32 *insn_to_jit_off);
-int bpf_prog_alloc_jited_linfo(struct ebpf_vm *prog);
-void bpf_prog_jit_attempt_done(struct ebpf_vm *prog);
 
 struct ebpf_vm *bpf_prog_alloc(unsigned int size);
 struct ebpf_vm *bpf_prog_alloc_no_stats(unsigned int size);
@@ -1005,11 +545,6 @@ static inline void bpf_jit_dump(unsigned int flen, unsigned int proglen,
 	       proglen, pass, image);
 }
 
-struct bpf_map_memory {
-	u32 pages;
-	struct user_struct *user;
-};
-
 enum bpf_map_type {
 	BPF_MAP_TYPE_UNSPEC,
 	BPF_MAP_TYPE_HASH,
@@ -1021,33 +556,16 @@ struct bpf_map {
 	 * are also accessed in fast-path (e.g. ops, max_entries).
 	 */
 	const struct bpf_map_ops *ops;
-	struct bpf_map *inner_map_meta;
-#ifdef CONFIG_SECURITY
-	void *security;
-#endif
 	enum bpf_map_type map_type;
 	u32 key_size;
 	u32 value_size;
 	u32 max_entries;
 	u32 map_flags;
-	int spin_lock_off; /* >=0 valid offset, <0 error */
 	u32 id;
-	int numa_node;
 	u32 btf_key_type_id;
 	u32 btf_value_type_id;
 	struct btf *btf;
-	struct bpf_map_memory memory;
 	char name[BPF_OBJ_NAME_LEN];
-	u32 btf_vmlinux_value_type_id;
-	bool bypass_spec_v1;
-	bool frozen; /* write-once; write-protected by freeze_mutex */
-	/* 22 bytes hole */
-
-	/* The 3rd and 4th cacheline with misc members to avoid false sharing
-	 * particularly with refcounting.
-	 */
-	// struct work_struct work;
-	u64 writecnt; /* writable mmap cnt; protected by freeze_mutex */
 };
 
 static void* find_bpf_helper_func(uint32_t helper_id) {

@@ -130,28 +130,6 @@ struct ebpf_vm *bpf_prog_alloc(unsigned int size)
 	return prog;
 }
 
-int bpf_prog_alloc_jited_linfo(struct ebpf_vm *prog)
-{
-	if (!prog->aux->nr_linfo)
-		return 0;
-
-	prog->aux->jited_linfo = calloc(prog->aux->nr_linfo,
-					  sizeof(*prog->aux->jited_linfo));
-	if (!prog->aux->jited_linfo)
-		return -ENOMEM;
-
-	return 0;
-}
-
-void bpf_prog_jit_attempt_done(struct ebpf_vm *prog)
-{
-	if (prog->aux->jited_linfo &&
-	    (!prog->jited || !prog->aux->jited_linfo[0])) {
-		free(prog->aux->jited_linfo);
-		prog->aux->jited_linfo = NULL;
-	}
-}
-
 void __bpf_prog_free(struct ebpf_vm *fp)
 {
 	if (fp->aux) {
@@ -171,7 +149,6 @@ struct ebpf_vm *linux_bpf_prog_load(const void* code, uint32_t code_len)
 		return NULL;
 	}
 
-	prog->aux->user = NULL; // get_current_user();
 	prog->num_insts = code_len;
 
 	memcpy(prog->insnsi,
@@ -197,28 +174,6 @@ void linux_bpf_prog_free(struct ebpf_vm *fp)
 	} else {
 		__bpf_prog_free(aux->prog);
 	}
-}
-
-static void bpf_prog_clone_free(struct ebpf_vm *fp)
-{
-	/* aux was stolen by the other clone, so we cannot free
-	 * it from this path! It will be freed eventually by the
-	 * other program on release.
-	 *
-	 * At this point, we don't need a deferred release since
-	 * clone is guaranteed to not be locked.
-	 */
-	fp->aux = NULL;
-	__bpf_prog_free(fp);
-}
-
-void bpf_jit_prog_release_other(struct ebpf_vm *fp, struct ebpf_vm *fp_other)
-{
-	/* We have to repoint aux->prog to self, as we don't
-	 * know whether fp here is the clone or the original.
-	 */
-	fp->aux->prog = fp;
-	bpf_prog_clone_free(fp_other);
 }
 
 /* Base function for offset calculation. Needs to go into .text section,

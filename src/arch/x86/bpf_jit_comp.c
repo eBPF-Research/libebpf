@@ -1832,7 +1832,6 @@ struct ebpf_vm *linux_bpf_int_jit_compile(struct ebpf_vm *prog)
 	struct x64_jit_data *jit_data;
 	int proglen, oldproglen = 0;
 	struct jit_context ctx = {};
-	bool tmp_blinded = false;
 	bool extra_pass = false;
 	u8 *image = NULL;
 	int *addrs;
@@ -1953,8 +1952,5 @@ out_addrs:
 		prog->aux->jit_data = NULL;
 	}
 out:
-	if (tmp_blinded)
-		bpf_jit_prog_release_other(prog, prog == orig_prog ?
-					   tmp : orig_prog);
 	return prog;
 }

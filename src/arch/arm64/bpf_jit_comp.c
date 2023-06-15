@@ -1037,21 +1037,9 @@ struct ebpf_vm *linux_bpf_int_jit_compile(struct ebpf_vm *prog)
 	struct bpf_binary_header *header;
 	struct arm64_jit_data *jit_data;
 	bool was_classic = false; // bpf_prog_was_classic(prog);
-	bool tmp_blinded = false;
 	bool extra_pass = false;
 	struct jit_ctx ctx;
 	u8 *image_ptr;
-
-	// tmp = bpf_jit_blind_constants(prog);
-	/* If blinding was requested and we failed during blinding,
-	 * we must fall back to the interpreter.
-	 */
-	// if (IS_ERR(tmp))
-	// 	return orig_prog;
-	// if (tmp != prog) {
-	// 	tmp_blinded = true;
-	// 	prog = tmp;
-	// }
 
 	jit_data = prog->aux->jit_data;
 	if (!jit_data) {
@@ -1135,8 +1123,7 @@ skip_init_ctx:
 	}
 
 	/* And we're done. */
-	if (bpf_jit_enable > 1)
-		bpf_jit_dump(prog->num_insts, prog_size, 2, ctx.image);
+	bpf_jit_dump(prog->num_insts, prog_size, 2, ctx.image);
 
 	bpf_flush_icache(header, ctx.image + ctx.idx);
 
@@ -1167,8 +1154,5 @@ out_off:
 		prog->aux->jit_data = NULL;
 	}
 out:
-	if (tmp_blinded)
-		bpf_jit_prog_release_other(prog, prog == orig_prog ?
-					   tmp : orig_prog);
 	return prog;
 }

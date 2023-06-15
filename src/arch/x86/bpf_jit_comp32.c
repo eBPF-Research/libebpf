@@ -2199,26 +2199,10 @@ struct ebpf_vm *linux_bpf_int_jit_compile(struct ebpf_vm *prog)
 	struct ebpf_vm *tmp, *orig_prog = prog;
 	int proglen, oldproglen = 0;
 	struct jit_context ctx = {};
-	bool tmp_blinded = false;
 	u8 *image = NULL;
 	int *addrs;
 	int pass;
 	int i;
-
-	if (!prog->jit_requested)
-		return orig_prog;
-
-	tmp = bpf_jit_blind_constants(prog);
-	/*
-	 * If blinding was requested and we failed during blinding,
-	 * we must fall back to the interpreter.
-	 */
-	if (IS_ERR(tmp))
-		return orig_prog;
-	if (tmp != prog) {
-		tmp_blinded = true;
-		prog = tmp;
-	}
 
 	addrs = kmalloc_array(prog->len, sizeof(*addrs), GFP_KERNEL);
 	if (!addrs) {
@@ -2286,8 +2270,5 @@ out_image:
 out_addrs:
 	free(addrs);
 out:
-	if (tmp_blinded)
-		bpf_jit_prog_release_other(prog, prog == orig_prog ?
-					   tmp : orig_prog);
 	return prog;
 }

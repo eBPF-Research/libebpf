@@ -39,7 +39,7 @@ bool bpf_jit_needs_zext(void)
 
 struct ebpf_vm *linux_bpf_int_jit_compile(struct ebpf_vm *prog)
 {
-	bool tmp_blinded = false, extra_pass = false;
+	bool extra_pass = false;
 	struct ebpf_vm *tmp, *orig_prog = prog;
 	int pass = 0, prev_ninsns = 0, i;
 	struct rv_jit_data *jit_data;
@@ -48,14 +48,6 @@ struct ebpf_vm *linux_bpf_int_jit_compile(struct ebpf_vm *prog)
 
 	if (!prog->jit_requested)
 		return orig_prog;
-
-	tmp = bpf_jit_blind_constants(prog);
-	if (IS_ERR(tmp))
-		return orig_prog;
-	if (tmp != prog) {
-		tmp_blinded = true;
-		prog = tmp;
-	}
 
 	jit_data = prog->aux->jit_data;
 	if (!jit_data) {
@@ -157,8 +149,5 @@ out_offset:
 	}
 out:
 
-	if (tmp_blinded)
-		bpf_jit_prog_release_other(prog, prog == orig_prog ?
-					   tmp : orig_prog);
 	return prog;
 }
