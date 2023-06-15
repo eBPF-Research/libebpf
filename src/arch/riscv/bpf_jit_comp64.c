@@ -286,58 +286,6 @@ static void emit_zext_32(u8 reg, struct rv_jit_context *ctx)
 	emit_srli(reg, reg, 32, ctx);
 }
 
-static int emit_bpf_tail_call(int insn, struct rv_jit_context *ctx)
-{
-	int tc_ninsn, off, start_insn = ctx->ninsns;
-	u8 tcc = rv_tail_call_reg(ctx);
-
-	/* a0: &ctx
-	 * a1: &array
-	 * a2: index
-	 *
-	 * if (index >= array->map.max_entries)
-	 *	goto out;
-	 */
-	tc_ninsn = insn ? ctx->offset[insn] - ctx->offset[insn - 1] :
-		   ctx->offset[0];
-	emit_zext_32(RV_REG_A2, ctx);
-
-	off = offsetof(struct bpf_array, map.max_entries);
-	if (is_12b_check(off, insn))
-		return -1;
-	emit(rv_lwu(RV_REG_T1, off, RV_REG_A1), ctx);
-	off = ninsns_rvoff(tc_ninsn - (ctx->ninsns - start_insn));
-	emit_branch(BPF_JGE, RV_REG_A2, RV_REG_T1, off, ctx);
-
-	/* if (TCC-- < 0)
-	 *     goto out;
-	 */
-	emit_addi(RV_REG_T1, tcc, -1, ctx);
-	off = ninsns_rvoff(tc_ninsn - (ctx->ninsns - start_insn));
-	emit_branch(BPF_JSLT, tcc, RV_REG_ZERO, off, ctx);
-
-	/* prog = array->ptrs[index];
-	 * if (!prog)
-	 *     goto out;
-	 */
-	emit_slli(RV_REG_T2, RV_REG_A2, 3, ctx);
-	emit_add(RV_REG_T2, RV_REG_T2, RV_REG_A1, ctx);
-	off = offsetof(struct bpf_array, ptrs);
-	if (is_12b_check(off, insn))
-		return -1;
-	emit_ld(RV_REG_T2, off, RV_REG_T2, ctx);
-	off = ninsns_rvoff(tc_ninsn - (ctx->ninsns - start_insn));
-	emit_branch(BPF_JEQ, RV_REG_T2, RV_REG_ZERO, off, ctx);
-
-	/* goto *(prog->bpf_func + 4); */
-	off = offsetof(struct bpf_prog, bpf_func);
-	if (is_12b_check(off, insn))
-		return -1;
-	emit_ld(RV_REG_T3, off, RV_REG_T2, ctx);
-	emit_mv(RV_REG_TCC, RV_REG_T1, ctx);
-	__build_epilogue(true, ctx);
-	return 0;
-}
 
 static void init_regs(u8 *rd, u8 *rs, const struct bpf_insn *insn,
 		      struct rv_jit_context *ctx)
@@ -863,8 +811,7 @@ out_be:
 	}
 	/* tail call */
 	case BPF_JMP | BPF_TAIL_CALL:
-		if (emit_bpf_tail_call(i, ctx))
-			return -1;
+		printf("BPF_TAIL_CALL not supported\n");
 		break;
 
 	/* function return */

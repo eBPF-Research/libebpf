@@ -499,149 +499,6 @@ int bpf_arch_text_poke(void *ip, enum bpf_text_poke_type t,
 	return __bpf_arch_text_poke(ip, t, old_addr, new_addr, true);
 }
 
-/*
- * Generate the following code:
- *
- * ... bpf_tail_call(void *ctx, struct bpf_array *array, u64 index) ...
- *   if (index >= array->map.max_entries)
- *     goto out;
- *   if (++tail_call_cnt > MAX_TAIL_CALL_CNT)
- *     goto out;
- *   prog = array->ptrs[index];
- *   if (prog == NULL)
- *     goto out;
- *   goto *(prog->bpf_func + prologue_size);
- * out:
- */
-static void emit_bpf_tail_call_indirect(u8 **pprog)
-{
-	u8 *prog = *pprog;
-	int label1, label2, label3;
-	int cnt = 0;
-
-	/*
-	 * rdi - pointer to ctx
-	 * rsi - pointer to bpf_array
-	 * rdx - index in bpf_array
-	 */
-
-	/*
-	 * if (index >= array->map.max_entries)
-	 *	goto out;
-	 */
-	EMIT2(0x89, 0xD2);                        /* mov edx, edx */
-	EMIT3(0x39, 0x56,                         /* cmp dword ptr [rsi + 16], edx */
-	      offsetof(struct bpf_array, map.max_entries));
-#define OFFSET1 (41 + RETPOLINE_RAX_BPF_JIT_SIZE) /* Number of bytes to jump */
-	EMIT2(X86_JBE, OFFSET1);                  /* jbe out */
-	label1 = cnt;
-
-	/*
-	 * if (tail_call_cnt > MAX_TAIL_CALL_CNT)
-	 *	goto out;
-	 */
-	EMIT2_off32(0x8B, 0x85, -36 - MAX_BPF_STACK); /* mov eax, dword ptr [rbp - 548] */
-	EMIT3(0x83, 0xF8, MAX_TAIL_CALL_CNT);     /* cmp eax, MAX_TAIL_CALL_CNT */
-#define OFFSET2 (30 + RETPOLINE_RAX_BPF_JIT_SIZE)
-	EMIT2(X86_JA, OFFSET2);                   /* ja out */
-	label2 = cnt;
-	EMIT3(0x83, 0xC0, 0x01);                  /* add eax, 1 */
-	EMIT2_off32(0x89, 0x85, -36 - MAX_BPF_STACK); /* mov dword ptr [rbp -548], eax */
-
-	/* prog = array->ptrs[index]; */
-	EMIT4_off32(0x48, 0x8B, 0x84, 0xD6,       /* mov rax, [rsi + rdx * 8 + offsetof(...)] */
-		    offsetof(struct bpf_array, ptrs));
-
-	/*
-	 * if (prog == NULL)
-	 *	goto out;
-	 */
-	EMIT3(0x48, 0x85, 0xC0);		  /* test rax,rax */
-#define OFFSET3 (8 + RETPOLINE_RAX_BPF_JIT_SIZE)
-	EMIT2(X86_JE, OFFSET3);                   /* je out */
-	label3 = cnt;
-
-	/* goto *(prog->bpf_func + prologue_size); */
-	EMIT4(0x48, 0x8B, 0x40,                   /* mov rax, qword ptr [rax + 32] */
-	      offsetof(struct bpf_prog, bpf_func));
-	EMIT4(0x48, 0x83, 0xC0, PROLOGUE_SIZE);   /* add rax, prologue_size */
-
-	/*
-	 * Wow we're ready to jump into next BPF program
-	 * rdi == ctx (1st arg)
-	 * rax == prog->bpf_func + prologue_size
-	 */
-	RETPOLINE_RAX_BPF_JIT();
-
-	/* out: */
-	BUILD_BUG_ON(cnt - label1 != OFFSET1);
-	BUILD_BUG_ON(cnt - label2 != OFFSET2);
-	BUILD_BUG_ON(cnt - label3 != OFFSET3);
-	*pprog = prog;
-}
-
-static void emit_bpf_tail_call_direct(struct bpf_jit_poke_descriptor *poke,
-				      u8 **pprog, int addr, u8 *image)
-{
-	u8 *prog = *pprog;
-	int cnt = 0;
-
-	/*
-	 * if (tail_call_cnt > MAX_TAIL_CALL_CNT)
-	 *	goto out;
-	 */
-	EMIT2_off32(0x8B, 0x85, -36 - MAX_BPF_STACK); /* mov eax, dword ptr [rbp - 548] */
-	EMIT3(0x83, 0xF8, MAX_TAIL_CALL_CNT);         /* cmp eax, MAX_TAIL_CALL_CNT */
-	EMIT2(X86_JA, 14);                            /* ja out */
-	EMIT3(0x83, 0xC0, 0x01);                      /* add eax, 1 */
-	EMIT2_off32(0x89, 0x85, -36 - MAX_BPF_STACK); /* mov dword ptr [rbp -548], eax */
-
-	poke->ip = image + (addr - X86_PATCH_SIZE);
-	poke->adj_off = PROLOGUE_SIZE;
-
-	memcpy(prog, ideal_nops[NOP_ATOMIC5], X86_PATCH_SIZE);
-	prog += X86_PATCH_SIZE;
-	/* out: */
-
-	*pprog = prog;
-}
-
-static void bpf_tail_call_direct_fixup(struct bpf_prog *prog)
-{
-	struct bpf_jit_poke_descriptor *poke;
-	struct bpf_array *array;
-	struct bpf_prog *target;
-	int i, ret;
-
-	for (i = 0; i < prog->aux->size_poke_tab; i++) {
-		poke = &prog->aux->poke_tab[i];
-		WARN_ON_ONCE(READ_ONCE(poke->ip_stable));
-
-		if (poke->reason != BPF_POKE_REASON_TAIL_CALL)
-			continue;
-
-		array = container_of(poke->tail_call.map, struct bpf_array, map);
-		// mutex_lock(&array->aux->poke_mutex);
-		target = array->ptrs[poke->tail_call.key];
-		if (target) {
-			/* Plain memcpy is used when image is not live yet
-			 * and still not locked as read-only. Once poke
-			 * location is active (poke->ip_stable), any parallel
-			 * bpf_arch_text_poke() might occur still on the
-			 * read-write image until we finally locked it as
-			 * read-only. Both modifications on the given image
-			 * are under text_mutex to avoid interference.
-			 */
-			ret = __bpf_arch_text_poke(poke->ip, BPF_MOD_JUMP, NULL,
-						   (u8 *)target->bpf_func +
-						   poke->adj_off, false);
-			BUG_ON(ret < 0);
-		}
-		WRITE_ONCE(poke->ip_stable, true);
-		// mutex_unlock(&array->aux->poke_mutex);
-	}
-}
-
 static void emit_mov_imm32(u8 **pprog, bool sign_propagate,
 			   u32 dst_reg, const u32 imm32)
 {
@@ -1269,11 +1126,8 @@ xadd:			if (is_imm8(insn->off))
 			break;
 
 		case BPF_JMP | BPF_TAIL_CALL:
-			if (imm32)
-				emit_bpf_tail_call_direct(&bpf_prog->aux->poke_tab[imm32 - 1],
-							  &prog, addrs[i], image);
-			else
-				emit_bpf_tail_call_indirect(&prog);
+			printf("BPF_TAIL_CALL not supported\n");
+			return -EINVAL;
 			break;
 
 			/* cond jump */
@@ -2076,8 +1930,10 @@ out_image:
 
 	if (image) {
 		if (!prog->is_func || extra_pass) {
-			bpf_tail_call_direct_fixup(prog);
+			// bpf_tail_call_direct_fixup(prog);
 			// bpf_jit_binary_lock_ro(header);
+			printf("bpf_jit: %s size %d\n", prog->aux->name, proglen);
+			printf("tail_call_not supported");
 		} else {
 			jit_data->addrs = addrs;
 			jit_data->ctx = ctx;

@@ -382,72 +382,6 @@ static int build_prologue(struct jit_ctx *ctx, bool ebpf_from_cbpf)
 	return 0;
 }
 
-static int out_offset = -1; /* initialized on the first pass of build_body() */
-static int emit_bpf_tail_call(struct jit_ctx *ctx)
-{
-	/* bpf_tail_call(void *prog_ctx, struct bpf_array *array, u64 index) */
-	const u8 r2 = bpf2a64[BPF_REG_2];
-	const u8 r3 = bpf2a64[BPF_REG_3];
-
-	const u8 tmp = bpf2a64[TMP_REG_1];
-	const u8 prg = bpf2a64[TMP_REG_2];
-	const u8 tcc = bpf2a64[TCALL_CNT];
-	const int idx0 = ctx->idx;
-#define cur_offset (ctx->idx - idx0)
-#define jmp_offset (out_offset - (cur_offset))
-	size_t off;
-
-	/* if (index >= array->map.max_entries)
-	 *     goto out;
-	 */
-	off = offsetof(struct bpf_array, map.max_entries);
-	emit_a64_mov_i64(tmp, off, ctx);
-	emit(A64_LDR32(tmp, r2, tmp), ctx);
-	emit(A64_MOV(0, r3, r3), ctx);
-	emit(A64_CMP(0, r3, tmp), ctx);
-	emit(A64_B_(A64_COND_CS, jmp_offset), ctx);
-
-	/* if (tail_call_cnt > MAX_TAIL_CALL_CNT)
-	 *     goto out;
-	 * tail_call_cnt++;
-	 */
-	emit_a64_mov_i64(tmp, MAX_TAIL_CALL_CNT, ctx);
-	emit(A64_CMP(1, tcc, tmp), ctx);
-	emit(A64_B_(A64_COND_HI, jmp_offset), ctx);
-	emit(A64_ADD_I(1, tcc, tcc, 1), ctx);
-
-	/* prog = array->ptrs[index];
-	 * if (prog == NULL)
-	 *     goto out;
-	 */
-	off = offsetof(struct bpf_array, ptrs);
-	emit_a64_mov_i64(tmp, off, ctx);
-	emit(A64_ADD(1, tmp, r2, tmp), ctx);
-	emit(A64_LSL(1, prg, r3, 3), ctx);
-	emit(A64_LDR64(prg, tmp, prg), ctx);
-	emit(A64_CBZ(1, prg, jmp_offset), ctx);
-
-	/* goto *(prog->bpf_func + prologue_offset); */
-	off = offsetof(struct bpf_prog, bpf_func);
-	emit_a64_mov_i64(tmp, off, ctx);
-	emit(A64_LDR64(tmp, prg, tmp), ctx);
-	emit(A64_ADD_I(1, tmp, tmp, sizeof(u32) * PROLOGUE_OFFSET), ctx);
-	emit(A64_ADD_I(1, A64_SP, A64_SP, ctx->stack_size), ctx);
-	emit(A64_BR(tmp), ctx);
-
-	/* out: */
-	if (out_offset == -1)
-		out_offset = cur_offset;
-	if (cur_offset != out_offset) {
-		printf("tail_call out_offset = %d, expected %d!\n",
-			    cur_offset, out_offset);
-		return -1;
-	}
-	return 0;
-#undef cur_offset
-#undef jmp_offset
-}
-
 static void build_epilogue(struct jit_ctx *ctx)
 {
 	const u8 r0 = bpf2a64[BPF_REG_0];
@@ -893,8 +827,8 @@ emit_cond_jmp:
 	}
 	/* tail call */
 	case BPF_JMP | BPF_TAIL_CALL:
-		if (emit_bpf_tail_call(ctx))
-			return -EFAULT;
+		printf("BPF_TAIL_CALL not supported\n");
+		return -EFAULT;
 		break;
 	/* function return */
 	case BPF_JMP | BPF_EXIT:

@@ -1265,110 +1265,6 @@ static void emit_epilogue(u8 **pprog, u32 stack_depth)
 	*pprog = prog;
 }
 
-/*
- * Generate the following code:
- * ... bpf_tail_call(void *ctx, struct bpf_array *array, u64 index) ...
- *   if (index >= array->map.max_entries)
- *     goto out;
- *   if (++tail_call_cnt > MAX_TAIL_CALL_CNT)
- *     goto out;
- *   prog = array->ptrs[index];
- *   if (prog == NULL)
- *     goto out;
- *   goto *(prog->bpf_func + prologue_size);
- * out:
- */
-static void emit_bpf_tail_call(u8 **pprog)
-{
-	u8 *prog = *pprog;
-	int cnt = 0;
-	const u8 *r1 = bpf2ia32[BPF_REG_1];
-	const u8 *r2 = bpf2ia32[BPF_REG_2];
-	const u8 *r3 = bpf2ia32[BPF_REG_3];
-	const u8 *tcc = bpf2ia32[TCALL_CNT];
-	u32 lo, hi;
-	static int jmp_label1 = -1;
-
-	/*
-	 * if (index >= array->map.max_entries)
-	 *     goto out;
-	 */
-	/* mov eax,dword ptr [ebp+off] */
-	EMIT3(0x8B, add_2reg(0x40, IA32_EBP, IA32_EAX), STACK_VAR(r2[0]));
-	/* mov edx,dword ptr [ebp+off] */
-	EMIT3(0x8B, add_2reg(0x40, IA32_EBP, IA32_EDX), STACK_VAR(r3[0]));
-
-	/* cmp dword ptr [eax+off],edx */
-	EMIT3(0x39, add_2reg(0x40, IA32_EAX, IA32_EDX),
-	      offsetof(struct bpf_array, map.max_entries));
-	/* jbe out */
-	EMIT2(IA32_JBE, jmp_label(jmp_label1, 2));
-
-	/*
-	 * if (tail_call_cnt > MAX_TAIL_CALL_CNT)
-	 *     goto out;
-	 */
-	lo = (u32)MAX_TAIL_CALL_CNT;
-	hi = (u32)((u64)MAX_TAIL_CALL_CNT >> 32);
-	EMIT3(0x8B, add_2reg(0x40, IA32_EBP, IA32_ECX), STACK_VAR(tcc[0]));
-	EMIT3(0x8B, add_2reg(0x40, IA32_EBP, IA32_EBX), STACK_VAR(tcc[1]));
-
-	/* cmp edx,hi */
-	EMIT3(0x83, add_1reg(0xF8, IA32_EBX), hi);
-	EMIT2(IA32_JNE, 3);
-	/* cmp ecx,lo */
-	EMIT3(0x83, add_1reg(0xF8, IA32_ECX), lo);
-
-	/* ja out */
-	EMIT2(IA32_JAE, jmp_label(jmp_label1, 2));
-
-	/* add eax,0x1 */
-	EMIT3(0x83, add_1reg(0xC0, IA32_ECX), 0x01);
-	/* adc ebx,0x0 */
-	EMIT3(0x83, add_1reg(0xD0, IA32_EBX), 0x00);
-
-	/* mov dword ptr [ebp+off],eax */
-	EMIT3(0x89, add_2reg(0x40, IA32_EBP, IA32_ECX), STACK_VAR(tcc[0]));
-	/* mov dword ptr [ebp+off],edx */
-	EMIT3(0x89, add_2reg(0x40, IA32_EBP, IA32_EBX), STACK_VAR(tcc[1]));
-
-	/* prog = array->ptrs[index]; */
-	/* mov edx, [eax + edx * 4 + offsetof(...)] */
-	EMIT3_off32(0x8B, 0x94, 0x90, offsetof(struct bpf_array, ptrs));
-
-	/*
-	 * if (prog == NULL)
-	 *     goto out;
-	 */
-	/* test edx,edx */
-	EMIT2(0x85, add_2reg(0xC0, IA32_EDX, IA32_EDX));
-	/* je out */
-	EMIT2(IA32_JE, jmp_label(jmp_label1, 2));
-
-	/* goto *(prog->bpf_func + prologue_size); */
-	/* mov edx, dword ptr [edx + 32] */
-	EMIT3(0x8B, add_2reg(0x40, IA32_EDX, IA32_EDX),
-	      offsetof(struct bpf_prog, bpf_func));
-	/* add edx,prologue_size */
-	EMIT3(0x83, add_1reg(0xC0, IA32_EDX), PROLOGUE_SIZE);
-
-	/* mov eax,dword ptr [ebp+off] */
-	EMIT3(0x8B, add_2reg(0x40, IA32_EBP, IA32_EAX), STACK_VAR(r1[0]));
-
-	/*
-	 * Now we're ready to jump into next BPF program:
-	 * eax == ctx (1st arg)
-	 * edx == prog->bpf_func + prologue_size
-	 */
-	RETPOLINE_EDX_BPF_JIT();
-
-	if (jmp_label1 == -1)
-		jmp_label1 = cnt;
-
-	/* out: */
-	*pprog = prog;
-}
-
 /* Push the scratch stack register on top of the stack. */
 static inline void emit_push_r64(const u8 src[], u8 **pprog)
 {
@@ -1921,7 +1817,8 @@ static int do_jit(struct bpf_prog *bpf_prog, int *addrs, u8 *image,
 			break;
 		}
 		case BPF_JMP | BPF_TAIL_CALL:
-			emit_bpf_tail_call(&prog);
+			printf("BPF_TAIL_CALL not supported\n");
+			return -EINVAL;
 			break;
 
 		/* cond jump */

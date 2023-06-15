@@ -1148,8 +1148,7 @@ int bpf_jit_emit_insn(const struct bpf_insn *insn, struct rv_jit_context *ctx,
 	}
 
 	case BPF_JMP | BPF_TAIL_CALL:
-		if (emit_bpf_tail_call(i, ctx))
-			return -1;
+		printf("BPF_TAIL_CALL not supported\n");
 		break;
 
 	case BPF_JMP | BPF_JEQ | BPF_X:

@@ -246,17 +246,6 @@ enum {
 
 #define MAX_BPF_ATTACH_TYPE __MAX_BPF_ATTACH_TYPE
 
-enum bpf_link_type {
-	BPF_LINK_TYPE_UNSPEC = 0,
-	BPF_LINK_TYPE_RAW_TRACEPOINT = 1,
-	BPF_LINK_TYPE_TRACING = 2,
-	BPF_LINK_TYPE_CGROUP = 3,
-	BPF_LINK_TYPE_ITER = 4,
-	BPF_LINK_TYPE_NETNS = 5,
-
-	MAX_BPF_LINK_TYPE,
-};
-
 /* If BPF_F_STRICT_ALIGNMENT is used in BPF_PROG_LOAD command, the
  * verifier will perform strict alignment checking as if the kernel
  * has been built with CONFIG_EFFICIENT_UNALIGNED_ACCESS not set,
@@ -435,164 +424,11 @@ struct bpf_prog_info {
 	__u64 run_cnt;
 } __attribute__((aligned(8)));
 
-struct bpf_map_info {
-	u32 type;
-	u32 id;
-	u32 key_size;
-	u32 value_size;
-	u32 max_entries;
-	u32 map_flags;
-	char  name[BPF_OBJ_NAME_LEN];
-	u32 ifindex;
-	u32 btf_vmlinux_value_type_id;
-	__u64 netns_dev;
-	__u64 netns_ino;
-	u32 btf_id;
-	u32 btf_key_type_id;
-	u32 btf_value_type_id;
-} __attribute__((aligned(8)));
-
 struct bpf_btf_info {
 	__aligned_u64 btf;
 	u32 btf_size;
 	u32 id;
 } __attribute__((aligned(8)));
-
-struct bpf_link_info {
-	u32 type;
-	u32 id;
-	u32 prog_id;
-	union {
-		struct {
-			__aligned_u64 tp_name; /* in/out: tp_name buffer ptr */
-			u32 tp_name_len;     /* in/out: tp_name buffer len */
-		} raw_tracepoint;
-		struct {
-			u32 attach_type;
-		} tracing;
-		struct {
-			__u64 cgroup_id;
-			u32 attach_type;
-		} cgroup;
-		struct  {
-			u32 netns_ino;
-			u32 attach_type;
-		} netns;
-	};
-} __attribute__((aligned(8)));
-
-struct bpf_raw_tracepoint_args {
-	__u64 args[0];
-};
-
-/* DIRECT:  Skip the FIB rules and go to FIB table associated with device
- * OUTPUT:  Do lookup from egress perspective; default is ingress
- */
-enum {
-	BPF_FIB_LOOKUP_DIRECT  = (1U << 0),
-	BPF_FIB_LOOKUP_OUTPUT  = (1U << 1),
-};
-
-enum {
-	BPF_FIB_LKUP_RET_SUCCESS,      /* lookup successful */
-	BPF_FIB_LKUP_RET_BLACKHOLE,    /* dest is blackholed; can be dropped */
-	BPF_FIB_LKUP_RET_UNREACHABLE,  /* dest is unreachable; can be dropped */
-	BPF_FIB_LKUP_RET_PROHIBIT,     /* dest not allowed; can be dropped */
-	BPF_FIB_LKUP_RET_NOT_FWDED,    /* packet is not forwarded */
-	BPF_FIB_LKUP_RET_FWD_DISABLED, /* fwding is not enabled on ingress */
-	BPF_FIB_LKUP_RET_UNSUPP_LWT,   /* fwd requires encapsulation */
-	BPF_FIB_LKUP_RET_NO_NEIGH,     /* no neighbor entry for nh */
-	BPF_FIB_LKUP_RET_FRAG_NEEDED,  /* fragmentation required to fwd */
-};
-
-struct bpf_fib_lookup {
-	/* input:  network family for lookup (AF_INET, AF_INET6)
-	 * output: network family of egress nexthop
-	 */
-	__u8	family;
-
-	/* set if lookup is to consider L4 data - e.g., FIB rules */
-	__u8	l4_protocol;
-	__be16	sport;
-	__be16	dport;
-
-	/* total length of packet from network header - used for MTU check */
-	__u16	tot_len;
-
-	/* input: L3 device index for lookup
-	 * output: device index from FIB lookup
-	 */
-	u32	ifindex;
-
-	union {
-		/* inputs to lookup */
-		__u8	tos;		/* AF_INET  */
-		__be32	flowinfo;	/* AF_INET6, flow_label + priority */
-
-		/* output: metric of fib result (IPv4/IPv6 only) */
-		u32	rt_metric;
-	};
-
-	union {
-		__be32		ipv4_src;
-		u32		ipv6_src[4];  /* in6_addr; network order */
-	};
-
-	/* input to bpf_fib_lookup, ipv{4,6}_dst is destination address in
-	 * network header. output: bpf_fib_lookup sets to gateway address
-	 * if FIB lookup returns gateway route
-	 */
-	union {
-		__be32		ipv4_dst;
-		u32		ipv6_dst[4];  /* in6_addr; network order */
-	};
-
-	/* output */
-	__be16	h_vlan_proto;
-	__be16	h_vlan_TCI;
-	__u8	smac[6];     /* ETH_ALEN */
-	__u8	dmac[6];     /* ETH_ALEN */
-};
-
-enum bpf_task_fd_type {
-	BPF_FD_TYPE_RAW_TRACEPOINT,	/* tp name */
-	BPF_FD_TYPE_TRACEPOINT,		/* tp name */
-	BPF_FD_TYPE_KPROBE,		/* (symbol + offset) or addr */
-	BPF_FD_TYPE_KRETPROBE,		/* (symbol + offset) or addr */
-	BPF_FD_TYPE_UPROBE,		/* filename + offset */
-	BPF_FD_TYPE_URETPROBE,		/* filename + offset */
-};
-
-enum {
-	BPF_FLOW_DISSECTOR_F_PARSE_1ST_FRAG		= (1U << 0),
-	BPF_FLOW_DISSECTOR_F_STOP_AT_FLOW_LABEL		= (1U << 1),
-	BPF_FLOW_DISSECTOR_F_STOP_AT_ENCAP		= (1U << 2),
-};
-
-struct bpf_flow_keys {
-	__u16	nhoff;
-	__u16	thoff;
-	__u16	addr_proto;			/* ETH_P_* of valid addrs */
-	__u8	is_frag;
-	__u8	is_first_frag;
-	__u8	is_encap;
-	__u8	ip_proto;
-	__be16	n_proto;
-	__be16	sport;
-	__be16	dport;
-	union {
-		struct {
-			__be32	ipv4_src;
-			__be32	ipv4_dst;
-		};
-		struct {
-			u32	ipv6_src[4];	/* in6_addr; network order */
-			u32	ipv6_dst[4];	/* in6_addr; network order */
-		};
-	};
-	u32	flags;
-	__be32	flow_label;
-};
 
 struct bpf_func_info {
 	u32	insn_off;
@@ -607,19 +443,6 @@ struct bpf_line_info {
 	u32	file_name_off;
 	u32	line_off;
 	u32	line_col;
-};
-
-struct bpf_spin_lock {
-	u32	val;
-};
-
-struct bpf_sysctl {
-	u32	write;		/* Sysctl is being read (= 0) or written (= 1).
-				 * Allows 1,2,4-byte read, but no write.
-				 */
-	u32	file_pos;	/* Sysctl file position to read from, write to.
-				 * Allows 1,2,4-byte read an 4-byte write.
-				 */
 };
 
 struct bpf_pidns_info {
@@ -1009,12 +832,6 @@ typedef u32 (*bpf_convert_ctx_access_t)(enum bpf_access_type type,
 					struct bpf_prog *prog,
 					u32 *target_size);
 
-#define BPF_PROG_RUN_ARRAY(array, ctx, func)		\
-	__BPF_PROG_RUN_ARRAY(array, ctx, func, false)
-
-#define BPF_PROG_RUN_ARRAY_CHECK(array, ctx, func)	\
-	__BPF_PROG_RUN_ARRAY(array, ctx, func, true)
-
 /* these two functions are called from generated trampoline */
 u64 __bpf_prog_enter(void);
 void __bpf_prog_exit(struct bpf_prog *prog, u64 start);
@@ -1198,9 +1015,6 @@ struct bpf_prog_aux {
 	int cgroup_atype; /* enum cgroup_bpf_attach_type */
 	struct bpf_map *cgroup_storage[MAX_BPF_CGROUP_STORAGE_TYPE];
 	char name[BPF_OBJ_NAME_LEN];
-#ifdef CONFIG_SECURITY
-	void *security;
-#endif
 	struct bpf_prog_offload *offload;
 	struct btf *btf;
 	struct bpf_func_info *func_info;
@@ -1253,7 +1067,6 @@ struct bpf_prog {
 	unsigned int		(*bpf_func)(const void *ctx,
 					    const struct bpf_insn *insn);
 	/* Instructions for interpreter */
-	struct sock_filter	insns[0];
 	struct bpf_insn		insnsi[];
 };
 
@@ -1265,7 +1078,6 @@ u64 __bpf_call_base(u64 r1, u64 r2, u64 r3, u64 r4, u64 r5);
 struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog);
 void bpf_jit_compile(struct bpf_prog *prog);
 bool bpf_jit_needs_zext(void);
-bool bpf_helper_changes_pkt_data(void *func);
 
 extern int bpf_jit_enable;
 extern int bpf_jit_harden;
@@ -1347,12 +1159,6 @@ static inline bool bpf_jit_kallsyms_enabled(void)
 	return false;
 }
 
-const char *__bpf_address_lookup(unsigned long addr, unsigned long *size,
-				 unsigned long *off, char *sym);
-bool is_bpf_text_address(unsigned long addr);
-int bpf_get_kallsym(unsigned int symnum, unsigned long *value, char *type,
-		    char *sym);
-
 static inline const char *
 bpf_address_lookup(unsigned long addr, unsigned long *size,
 		   unsigned long *off, char **modname, char *sym)
@@ -1370,7 +1176,7 @@ void bpf_prog_kallsyms_del(struct bpf_prog *fp);
 static inline unsigned int bpf_prog_size(unsigned int proglen)
 {
 	return max(sizeof(struct bpf_prog),
-		   offsetof(struct bpf_prog, insns[proglen]));
+		   offsetof(struct bpf_prog, insnsi[proglen]));
 }
 
 static inline bool bpf_prog_was_classic(const struct bpf_prog *prog)
@@ -1401,18 +1207,8 @@ enum bpf_text_poke_type {
 int bpf_arch_text_poke(void *ip, enum bpf_text_poke_type t,
 		       void *addr1, void *addr2);
 
-
 /* map is generic key/value storage optionally accesible by eBPF programs */
 struct bpf_map_ops {
-	/* funcs callable from userspace (via syscall) */
-	int (*map_alloc_check)(union bpf_attr *attr);
-	struct bpf_map *(*map_alloc)(union bpf_attr *attr);
-	void (*map_release)(struct bpf_map *map, struct file *map_file);
-	void (*map_free)(struct bpf_map *map);
-	int (*map_get_next_key)(struct bpf_map *map, void *key, void *next_key);
-	void (*map_release_uref)(struct bpf_map *map);
-	void *(*map_lookup_elem_sys_only)(struct bpf_map *map, void *key);
-
 	/* funcs callable from userspace and from eBPF programs */
 	void *(*map_lookup_elem)(struct bpf_map *map, void *key);
 	int (*map_update_elem)(struct bpf_map *map, void *key, void *value, u64 flags);
@@ -1420,33 +1216,6 @@ struct bpf_map_ops {
 	int (*map_push_elem)(struct bpf_map *map, void *value, u64 flags);
 	int (*map_pop_elem)(struct bpf_map *map, void *value);
 	int (*map_peek_elem)(struct bpf_map *map, void *value);
-
-	/* funcs called by prog_array and perf_event_array map */
-	void *(*map_fd_get_ptr)(struct bpf_map *map, struct file *map_file,
-				int fd);
-	void (*map_fd_put_ptr)(void *ptr);
-	u32 (*map_gen_lookup)(struct bpf_map *map, struct bpf_insn *insn_buf);
-	u32 (*map_fd_sys_lookup_elem)(void *ptr);
-	void (*map_seq_show_elem)(struct bpf_map *map, void *key,
-				  struct seq_file *m);
-	int (*map_check_btf)(const struct bpf_map *map,
-			     const struct btf *btf,
-			     const struct btf_type *key_type,
-			     const struct btf_type *value_type);
-
-	/* Prog poke tracking helpers. */
-	int (*map_poke_track)(struct bpf_map *map, struct bpf_prog_aux *aux);
-	void (*map_poke_untrack)(struct bpf_map *map, struct bpf_prog_aux *aux);
-	void (*map_poke_run)(struct bpf_map *map, u32 key, struct bpf_prog *old,
-			     struct bpf_prog *new);
-
-	/* Direct value access helpers. */
-	int (*map_direct_value_addr)(const struct bpf_map *map,
-				     u64 *imm, u32 off);
-	int (*map_direct_value_meta)(const struct bpf_map *map,
-				     u64 imm, u32 *off);
-	int (*map_mmap)(struct bpf_map *map, struct vm_area_struct *vma);
-
 	/* BTF name and id of struct allocated by map_alloc */
 	const char * const map_btf_name;
 	int *map_btf_id;
@@ -1498,16 +1267,8 @@ struct bpf_map {
 	u64 writecnt; /* writable mmap cnt; protected by freeze_mutex */
 };
 
-struct bpf_array {
-	struct bpf_map map;
-	u32 elem_size;
-	u32 index_mask;
-	struct bpf_array_aux *aux;
-	union {
-		char value[0] __aligned(8);
-		void *ptrs[0] __aligned(8);
-		void *pptrs[0] __aligned(8);
-	};
-};
+static void* find_bpf_helper_func(uint32_t helper_id) {
+	return NULL;
+}
 
 #endif /* _LINUX_BPF_H */

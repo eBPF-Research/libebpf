@@ -51,11 +51,15 @@ docs: ## generate Doxygen HTML documentation, including API docs
 	cmake --build build --target doxygen-docs
 	$(BROWSER) docs/html/index.html
 
-build: ## build the package
+build: build-x86 build-arm32 build-arm64
+
+build-x86: ## build the package
+	rm -rf build/
 	cmake -Bbuild
 	cmake --build build --config Debug
 
 build-arm32: ## build the package on arm32
+	rm -rf build/
 	cmake -Bbuild -DCMAKE_TOOLCHAIN_FILE=cmake/arm-toolchain.cmake -DARCH=arm
 	cmake --build build --config Debug
 
@@ -63,6 +67,7 @@ run-arm32: build-arm32 ## run the binary on arm32 qemu
 	qemu-arm -L /usr/arm-linux-gnueabihf/  build/bin/Debug/libebpf
 
 build-arm64: ## build the package on arm64
+	rm -rf build/
 	cmake -Bbuild -DCMAKE_TOOLCHAIN_FILE=cmake/aarch64-toolchain.cmake -DARCH=aarch64
 	cmake --build build --config Debug
 
