@@ -44,8 +44,7 @@ struct ebpf_vm
 #endif
     /* linux defs: TODO: merge them together*/
 	u16			pages;		/* Number of allocated pages */
-	u16			jited:1,	/* Is our filter JIT'ed? */
-				is_func:1	/* program is a bpf function */
+	u16			jited:1	/* Is our filter JIT'ed? */
                 ;
 	u32			jited_len;	/* Size of jited insns in bytes */
 	struct bpf_prog_aux	*aux;		/* Auxiliary fields */

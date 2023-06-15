@@ -859,42 +859,18 @@ void __bpf_prog_exit(struct ebpf_vm *prog, u64 start);
 	})
 
 struct bpf_prog_aux {
-	u32 max_ctx_offset;
-	u32 max_pkt_offset;
-	u32 max_tp_access;
 	u32 stack_depth;
 	u32 id;
 	u32 func_cnt; /* used by non-func prog as the number of func progs */
 	u32 func_idx; /* 0 for non-func prog, the index in func array for func prog */
-	u32 attach_btf_id; /* in-kernel BTF type id to attach to */
-	u32 ctx_arg_info_size;
 	const struct bpf_ctx_arg_aux *ctx_arg_info;
 	struct bpf_trampoline *dst_trampoline;
 	bool verifier_zext; /* Zero extensions has been inserted by verifier. */
-	bool attach_btf_trace; /* true if attaching to BTF-enabled raw tp */
-	/* function name for valid attach_btf_id */
-	const char *attach_func_name;
 	struct ebpf_vm **func;
 	void *jit_data; /* JIT specific data. arch dependent */
 	struct bpf_jit_poke_descriptor *poke_tab;
-	const struct bpf_prog_ops *ops;
-	struct bpf_map **used_maps;
-	struct btf_mod_pair *used_btfs;
 	struct ebpf_vm *prog;
 	struct user_struct *user;
-	u32 verified_insns;
-	int cgroup_atype; /* enum cgroup_bpf_attach_type */
-	struct bpf_prog_offload *offload;
-	struct btf *btf;
-	struct bpf_func_info *func_info;
-	struct bpf_func_info_aux *func_info_aux;
-	/* bpf_line_info loaded from userspace.  linfo->insn_off
-	 * has the xlated insn offset.
-	 * Both the main and sub prog share the same linfo.
-	 * The subprog can access its first linfo by
-	 * using the linfo_idx.
-	 */
-	struct bpf_line_info *linfo;
 	/* jited_linfo is the jited addr of the linfo.  It has a
 	 * one to one mapping to linfo:
 	 * jited_linfo[i] is the jited addr for the linfo[i]->insn_off.
@@ -942,11 +918,8 @@ struct bpf_binary_header *
 bpf_jit_binary_alloc(unsigned int proglen, u8 **image_ptr,
 		     unsigned int alignment,
 		     bpf_jit_fill_hole_t bpf_fill_ill_insns);
-void bpf_jit_binary_free(struct bpf_binary_header *hdr);
-u64 bpf_jit_alloc_exec_limit(void);
 void *bpf_jit_alloc_exec(unsigned long size);
-void bpf_jit_free_exec(void *addr);
-void bpf_jit_free(struct ebpf_vm *fp);
+void __bpf_prog_free(struct ebpf_vm *fp);
 
 void bpf_jit_prog_release_other(struct ebpf_vm *fp, struct ebpf_vm *fp_other);
 

@@ -1925,7 +1925,7 @@ struct ebpf_vm *linux_bpf_int_jit_compile(struct ebpf_vm *prog)
 	 */
 	if (build_body(&ctx) < 0) {
 		image_ptr = NULL;
-		bpf_jit_binary_free(header);
+		bpf_jit_free_exec(header);
 		prog = orig_prog;
 		goto out_imms;
 	}
@@ -1934,7 +1934,7 @@ struct ebpf_vm *linux_bpf_int_jit_compile(struct ebpf_vm *prog)
 	/* 3.) Extra pass to validate JITed Code */
 	if (validate_code(&ctx)) {
 		image_ptr = NULL;
-		bpf_jit_binary_free(header);
+		bpf_jit_free_exec(header);
 		prog = orig_prog;
 		goto out_imms;
 	}

@@ -123,7 +123,7 @@ struct ebpf_vm *linux_bpf_int_jit_compile(struct ebpf_vm *prog)
 
 	if (i == NR_JIT_ITERATIONS) {
 		printf("bpf-jit: image did not converge in <%d passes!\n", i);
-		bpf_jit_binary_free(jit_data->header);
+		bpf_jit_free_exec(jit_data->header);
 		prog = orig_prog;
 		goto out_offset;
 	}
@@ -134,7 +134,7 @@ skip_init_ctx:
 
 	bpf_jit_build_prologue(ctx);
 	if (build_body(ctx, extra_pass, NULL)) {
-		bpf_jit_binary_free(jit_data->header);
+		bpf_jit_free_exec(jit_data->header);
 		prog = orig_prog;
 		goto out_offset;
 	}

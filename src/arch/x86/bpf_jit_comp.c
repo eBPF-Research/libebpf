@@ -1888,7 +1888,7 @@ skip_init_addrs:
 out_image:
 			image = NULL;
 			if (header)
-				bpf_jit_binary_free(header);
+				bpf_jit_free_exec(header);
 			prog = orig_prog;
 			goto out_addrs;
 		}
@@ -1927,7 +1927,7 @@ out_image:
 	// bpf_jit_dump(prog->len, proglen, pass + 1, image);
 
 	if (image) {
-		if (!prog->is_func || extra_pass) {
+		if (extra_pass) {
 			// bpf_tail_call_direct_fixup(prog);
 			// bpf_jit_binary_lock_ro(header);
 			printf("bpf_jit: %s size %d\n", proglen);
@@ -1946,9 +1946,7 @@ out_image:
 		prog = orig_prog;
 	}
 
-	if (!image || !prog->is_func || extra_pass) {
-		if (image)
-			bpf_prog_fill_jited_linfo(prog, (const u32 *)(addrs + 1));
+	if (!image || extra_pass) {
 out_addrs:
 		free(addrs);
 		free(jit_data);

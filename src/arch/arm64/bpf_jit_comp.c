@@ -1120,7 +1120,7 @@ skip_init_ctx:
 	build_prologue(&ctx, was_classic);
 
 	if (build_body(&ctx, extra_pass)) {
-		bpf_jit_binary_free(header);
+		bpf_jit_free_exec(header);
 		prog = orig_prog;
 		goto out_off;
 	}
@@ -1129,7 +1129,7 @@ skip_init_ctx:
 
 	/* 3. Extra pass to validate JITed code. */
 	if (validate_code(&ctx)) {
-		bpf_jit_binary_free(header);
+		bpf_jit_free_exec(header);
 		prog = orig_prog;
 		goto out_off;
 	}
@@ -1140,11 +1140,11 @@ skip_init_ctx:
 
 	bpf_flush_icache(header, ctx.image + ctx.idx);
 
-	if (!prog->is_func || extra_pass) {
+	if (extra_pass) {
 		if (extra_pass && ctx.idx != jit_data->ctx.idx) {
 			printf("multi-func JIT bug %d != %d\n",
 				    ctx.idx, jit_data->ctx.idx);
-			bpf_jit_binary_free(header);
+			bpf_jit_free_exec(header);
 			prog->bpf_func = NULL;
 			prog->jited = 0;
 			goto out_off;
@@ -1159,8 +1159,8 @@ skip_init_ctx:
 	prog->jited = 1;
 	prog->jited_len = prog_size;
 
-	if (!prog->is_func || extra_pass) {
-		bpf_prog_fill_jited_linfo(prog, (const u32 *)ctx.offset + 1);
+	if (extra_pass) {
+		// bpf_prog_fill_jited_linfo(prog, (const u32 *)ctx.offset + 1);
 out_off:
 		free(ctx.offset);
 		free(jit_data);

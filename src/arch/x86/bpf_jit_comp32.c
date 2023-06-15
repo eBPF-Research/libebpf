@@ -2248,7 +2248,7 @@ struct ebpf_vm *linux_bpf_int_jit_compile(struct ebpf_vm *prog)
 out_image:
 			image = NULL;
 			if (header)
-				bpf_jit_binary_free(header);
+				bpf_jit_free_exec(header);
 			prog = orig_prog;
 			goto out_addrs;
 		}

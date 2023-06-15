@@ -26,21 +26,6 @@ bpf_jit_binary_hdr(const struct ebpf_vm *fp)
 	return (void *)addr;
 }
 
-/* This symbol is only overridden by archs that have different
- * requirements than the usual eBPF JITs, f.e. when they only
- * implement cBPF JIT, do not set images read-only, etc.
- */
-void bpf_jit_free(struct ebpf_vm *fp)
-{
-	if (fp->jited) {
-		struct bpf_binary_header *hdr = bpf_jit_binary_hdr(fp);
-
-		// bpf_jit_binary_free(hdr);
-	}
-
-	__bpf_prog_free(fp);
-}
-
 void *bpf_jit_alloc_exec(unsigned long size)
 {
 	printf("bpf_jit_alloc_exec for size: %ld\n", size);
@@ -107,11 +92,6 @@ bpf_jit_binary_alloc(unsigned int proglen, u8 **image_ptr,
 	return hdr;
 }
 
-void bpf_jit_binary_free(struct bpf_binary_header *hdr)
-{
-	bpf_jit_free_exec(hdr);
-}
-
 typedef unsigned int (*bpf_dispatcher_fn)(const void *ctx,
 					  const struct bpf_insn *insnsi,
 					  unsigned int (*bpf_func)(const void *,
@@ -172,59 +152,6 @@ void bpf_prog_jit_attempt_done(struct ebpf_vm *prog)
 	}
 }
 
-/* The jit engine is responsible to provide an array
- * for insn_off to the jited_off mapping (insn_to_jit_off).
- *
- * The idx to this array is the insn_off.  Hence, the insn_off
- * here is relative to the prog itself instead of the main prog.
- * This array has one entry for each xlated bpf insn.
- *
- * jited_off is the byte off to the last byte of the jited insn.
- *
- * Hence, with
- * insn_start:
- *      The first bpf insn off of the prog.  The insn off
- *      here is relative to the main prog.
- *      e.g. if prog is a subprog, insn_start > 0
- * linfo_idx:
- *      The prog's idx to prog->aux->linfo and jited_linfo
- *
- * jited_linfo[linfo_idx] = prog->bpf_func
- *
- * For i > linfo_idx,
- *
- * jited_linfo[i] = prog->bpf_func +
- *	insn_to_jit_off[linfo[i].insn_off - insn_start - 1]
- */
-void bpf_prog_fill_jited_linfo(struct ebpf_vm *prog,
-			       const u32 *insn_to_jit_off)
-{
-	u32 linfo_idx, insn_start, insn_end, nr_linfo, i;
-	const struct bpf_line_info *linfo;
-	void **jited_linfo;
-
-	if (!prog->aux->jited_linfo)
-		/* Userspace did not provide linfo */
-		return;
-
-	linfo_idx = prog->aux->linfo_idx;
-	linfo = &prog->aux->linfo[linfo_idx];
-	insn_start = linfo[0].insn_off;
-	insn_end = insn_start + prog->num_insts;
-
-	jited_linfo = &prog->aux->jited_linfo[linfo_idx];
-	jited_linfo[0] = prog->bpf_func;
-
-	nr_linfo = prog->aux->nr_linfo - linfo_idx;
-
-	for (i = 1; i < nr_linfo && linfo[i].insn_off < insn_end; i++)
-		/* The verifier ensures that linfo[i].insn_off is
-		 * strictly increasing
-		 */
-		jited_linfo[i] = prog->bpf_func +
-			insn_to_jit_off[linfo[i].insn_off - insn_start - 1];
-}
-
 void __bpf_prog_free(struct ebpf_vm *fp)
 {
 	if (fp->aux) {
@@ -264,11 +191,11 @@ void linux_bpf_prog_free(struct ebpf_vm *fp)
 	struct bpf_prog_aux *aux = fp->aux;
 
 	for (int i = 0; i < aux->func_cnt; i++)
-		bpf_jit_free(aux->func[i]);
+		__bpf_prog_free(aux->func[i]);
 	if (aux->func_cnt) {
 		free(aux->func);
 	} else {
-		bpf_jit_free(aux->prog);
+		__bpf_prog_free(aux->prog);
 	}
 }
 
