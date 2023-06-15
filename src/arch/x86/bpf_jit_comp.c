@@ -1338,7 +1338,7 @@ emit_jmp:
 		}
 
 		if (image) {
-			if (unlikely(proglen + ilen > oldproglen)) {
+			if ( (proglen + ilen > oldproglen)) {
 				printf("bpf_jit: fatal error\n");
 				return -EFAULT;
 			}

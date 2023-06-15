@@ -1424,7 +1424,7 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
 	case BPF_ALU | BPF_LSH | BPF_K:
 	case BPF_ALU | BPF_RSH | BPF_K:
 	case BPF_ALU | BPF_ARSH | BPF_K:
-		if (unlikely(imm > 31))
+		if ( (imm > 31))
 			return -EINVAL;
 		if (imm)
 			emit_a32_alu_i(dst_lo, imm, ctx, BPF_OP(code));
@@ -1433,13 +1433,13 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
 		break;
 	/* dst = dst << imm */
 	case BPF_ALU64 | BPF_LSH | BPF_K:
-		if (unlikely(imm > 63))
+		if ( (imm > 63))
 			return -EINVAL;
 		emit_a32_lsh_i64(dst, imm, ctx);
 		break;
 	/* dst = dst >> imm */
 	case BPF_ALU64 | BPF_RSH | BPF_K:
-		if (unlikely(imm > 63))
+		if ( (imm > 63))
 			return -EINVAL;
 		emit_a32_rsh_i64(dst, imm, ctx);
 		break;
@@ -1457,7 +1457,7 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
 		break;
 	/* dst = dst >> imm (signed) */
 	case BPF_ALU64 | BPF_ARSH | BPF_K:
-		if (unlikely(imm > 63))
+		if ( (imm > 63))
 			return -EINVAL;
 		emit_a32_arsh_i64(dst, imm, ctx);
 		break;

@@ -297,7 +297,7 @@ int  aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt)
 		.text_addrs = addrs,
 		.new_insns = insns,
 		.insn_cnt = cnt,
-		.cpu_count = ATOMIC_INIT(0),
+		.cpu_count = (0),
 	};
 
 	if (cnt <= 0)

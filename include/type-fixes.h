@@ -82,8 +82,6 @@ typedef struct {
 	int counter;
 } atomic_t;
 
-#define ATOMIC_INIT(i) { (i) }
-
 #define SZ_1				0x00000001
 #define SZ_2				0x00000002
 #define SZ_4				0x00000004
@@ -98,35 +96,13 @@ typedef struct {
 #define SZ_1K				0x00000400
 #define SZ_2K				0x00000800
 #define SZ_4K				0x00001000
-#define SZ_8K				0x00002000
-#define SZ_16K				0x00004000
-#define SZ_32K				0x00008000
 #define SZ_64K				0x00010000
-#define SZ_128K				0x00020000
 #define SZ_256K				0x00040000
-#define SZ_512K				0x00080000
 
 #define SZ_1M				0x00100000
 #define SZ_2M				0x00200000
-#define SZ_4M				0x00400000
-#define SZ_8M				0x00800000
-#define SZ_16M				0x01000000
-#define SZ_32M				0x02000000
-#define SZ_64M				0x04000000
 #define SZ_128M				0x08000000
-#define SZ_256M				0x10000000
 #define SZ_512M				0x20000000
-
-#define SZ_1G				0x40000000
-#define SZ_2G				0x80000000
-
-/*
- * This looks more complex than it should be. But we need to
- * get the type for the ~ right in round_down (it needs to be
- * as wide as the result!), and we want to evaluate the macro
- * arguments just once each.
- */
-#define __round_mask(x, y) ((__typeof__(x))((y)-1))
 
 /**
  * round_up - round up to next specified power of 2
@@ -136,7 +112,7 @@ typedef struct {
  * Rounds @x up to next multiple of @y (which must be a power of 2).
  * To perform arbitrary rounding up, use roundup() below.
  */
-#define round_up(x, y) ((((x)-1) | __round_mask(x, y))+1)
+#define round_up(x, y) ((((x)-1) | ((__typeof__(x))((y)-1)))+1)
 
 /**
  * round_down - round down to next specified power of 2
@@ -146,7 +122,7 @@ typedef struct {
  * Rounds @x down to next multiple of @y (which must be a power of 2).
  * To perform arbitrary rounding down, use rounddown() below.
  */
-#define round_down(x, y) ((x) & ~__round_mask(x, y))
+#define round_down(x, y) ((x) & ~((__typeof__(x))((y)-1)))
 
 /*
  * Compiler (optimization) barrier.
@@ -193,7 +169,7 @@ bool is_power_of_2(unsigned long n)
 
 #define WARN_ON_ONCE(condition) ({ \
    int __ret_warn_on = !!(condition); \
-   unlikely(__ret_warn_on); })
+    (__ret_warn_on); })
 
 /**
  * BUILD_BUG_ON - break compile if a condition is true.
@@ -205,18 +181,6 @@ bool is_power_of_2(unsigned long n)
  */
 #define BUILD_BUG_ON(condition) \
    ((void)sizeof(char[1 - 2*!!(condition)]))
-
-/*
- * Using __builtin_constant_p(x) to ignore cases where the return
- * value is always the same.  This idea is taken from a similar patch
- * written by Daniel Walker.
- */
-# ifndef likely
-#  define likely(x) (x)
-# endif
-# ifndef unlikely
-#  define unlikely(x) (x)
-# endif
 
 #define WRITE_ONCE(x, val) \
 do { \
@@ -231,14 +195,6 @@ do { \
 })
 
 #define BUG_ON(condition) assert(!(condition))
-
-/*
- * Note the missing underscores.
- *
- *   gcc: https://gcc.gnu.org/onlinedocs/gcc/Common-Function-Attributes.html#index-noinline-function-attribute
- * clang: mentioned
- */
-#define   noinline                      __attribute__((__noinline__))
 
 /*
  * Bitfield access macros

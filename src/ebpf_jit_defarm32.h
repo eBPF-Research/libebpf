@@ -1,7 +1,7 @@
 #ifndef MY_LINUX_BPF_H_
 #define MY_LINUX_BPF_H_
 
-
+#include <stdio.h>
 #include <stddef.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -178,6 +178,7 @@ enum {
 #define offsetof(t, d) __builtin_offsetof(t, d)
 
 static void* find_bpf_helper_func(uint32_t helper_id) {
+	printf("unimplement find_bpf_helper_func\n");
 	return NULL;
 }
 
