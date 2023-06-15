@@ -822,8 +822,8 @@ static inline unsigned long __ffs64(u64 word)
 	return __ffs((unsigned long)word);
 }
 
-unsigned long __sw_hweight64(__u64 w);
-static inline unsigned long __arch_hweight64(__u64 w)
+unsigned long __sw_hweight64(u64 w);
+static inline unsigned long __arch_hweight64(u64 w)
 {
 	return __sw_hweight64(w);
 }

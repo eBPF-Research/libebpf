@@ -682,8 +682,8 @@ static int do_jit(struct bpf_prog *bpf_prog, int *addrs, u8 *image,
 	int proglen = 0;
 	u8 *prog = temp;
 
-	emit_prologue(&prog, bpf_prog->aux->stack_depth,
-		      bpf_prog_was_classic(bpf_prog));
+	emit_prologue(&prog, bpf_prog->aux->stack_depth, false);
+		      // bpf_prog_was_classic(bpf_prog));
 	addrs[0] = prog - temp;
 
 	for (i = 1; i <= insn_cnt; i++, insn++) {
@@ -1310,7 +1310,7 @@ emit_jmp:
 			seen_exit = true;
 			/* Update cleanup_addr */
 			ctx->cleanup_addr = proglen;
-			if (!bpf_prog_was_classic(bpf_prog))
+			// if (!bpf_prog_was_classic(bpf_prog))
 				EMIT1(0x5B); /* get rid of tail_call_cnt */
 			EMIT2(0x41, 0x5F);   /* pop r15 */
 			EMIT2(0x41, 0x5E);   /* pop r14 */

@@ -3,8 +3,8 @@
 #include "libebpf/libebpf.h"
 #include "libebpf/linux-jit-bpf.h"
 
-// #define JIT_TEST_KERNEL 1
-#define JIT_TEST_UBPF 1
+#define JIT_TEST_KERNEL 1
+// #define JIT_TEST_UBPF 1
 
 #define CHECK_EXIT(ret)                                                        \
 	if (ret != 0) {                                                        \
@@ -73,14 +73,7 @@ int main()
 	printf("%d + %d = %ld\n", m.a, m.b, res);
 
 #elif JIT_TEST_KERNEL
-	union bpf_attr attr;
-	attr.insn_cnt = sizeof(TEST_BPF_CODE) / sizeof(struct bpf_insn);
-	attr.insns = (uint64_t)TEST_BPF_CODE;
-	strcpy(attr.prog_name, "add_one");
-	attr.prog_type = BPF_PROG_TYPE_UNSPEC;
-	attr.log_buf = (uint64_t)errmsg;
-	attr.license = (uint64_t)"GPL";
-	struct bpf_prog* prog = bpf_prog_load(&attr);
+	struct bpf_prog* prog = bpf_prog_load(TEST_BPF_CODE, sizeof(TEST_BPF_CODE) / sizeof(struct bpf_insn));
 	if (!prog) {
 		printf("Failed to load bpf program\n");
 		return 1;

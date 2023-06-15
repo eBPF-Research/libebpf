@@ -9,18 +9,7 @@
 #include "libebpf/linux-jit-bpf.h"
 #include <stdio.h>
 
-struct sk_buff;
-struct sock;
-struct seccomp_data;
-struct bpf_prog_aux;
-struct xdp_rxq_info;
-struct xdp_buff;
-struct sock_reuseport;
-struct ctl_table;
-struct ctl_table_header;
 struct bpf_trampoline;
-struct file;
-struct vm_area_struct;
 
 /* ArgX, context and stack frame pointer register positions. Note,
  * Arg1, Arg2, Arg3, etc are used as argument mappings of function
@@ -69,23 +58,6 @@ struct vm_area_struct;
  */
 #define BPF_MAJOR_VERSION 1
 #define BPF_MINOR_VERSION 1
-
-/*
- *	Try and keep these values and structures similar to BSD, especially
- *	the BPF code definitions which need to match so you can share filters
- */
- 
-struct sock_filter {	/* Filter block */
-	__u16	code;   /* Actual filter code */
-	__u8	jt;	/* Jump true */
-	__u8	jf;	/* Jump false */
-	u32	k;      /* Generic multiuse field */
-};
-
-struct sock_fprog {	/* Required for SO_ATTACH_FILTER. */
-	unsigned short		len;	/* Number of filter blocks */
-	struct sock_filter *filter;
-};
 
 /* ret - BPF_K and BPF_X also apply */
 #define BPF_RVAL(code)  ((code) & 0x18)
@@ -374,11 +346,11 @@ enum bpf_stack_build_id_status {
 
 #define BPF_BUILD_ID_SIZE 20
 struct bpf_stack_build_id {
-	__s32		status;
+	s32		status;
 	unsigned char	build_id[BPF_BUILD_ID_SIZE];
 	union {
-		__u64	offset;
-		__u64	ip;
+		u64	offset;
+		u64	ip;
 	};
 };
 
@@ -389,43 +361,43 @@ struct bpf_stack_build_id {
 struct bpf_prog_info {
 	u32 type;
 	u32 id;
-	__u8  tag[BPF_TAG_SIZE];
+	u8  tag[BPF_TAG_SIZE];
 	u32 jited_prog_len;
 	u32 xlated_prog_len;
-	__aligned_u64 jited_prog_insns;
-	__aligned_u64 xlated_prog_insns;
-	__u64 load_time;	/* ns since boottime */
+	u64 jited_prog_insns;
+	u64 xlated_prog_insns;
+	u64 load_time;	/* ns since boottime */
 	u32 created_by_uid;
 	u32 nr_map_ids;
-	__aligned_u64 map_ids;
+	u64 map_ids;
 	char name[BPF_OBJ_NAME_LEN];
 	u32 ifindex;
 	u32 gpl_compatible:1;
 	u32 :31; /* alignment pad */
-	__u64 netns_dev;
-	__u64 netns_ino;
+	u64 netns_dev;
+	u64 netns_ino;
 	u32 nr_jited_ksyms;
 	u32 nr_jited_func_lens;
-	__aligned_u64 jited_ksyms;
-	__aligned_u64 jited_func_lens;
+	u64 jited_ksyms;
+	u64 jited_func_lens;
 	u32 btf_id;
 	u32 func_info_rec_size;
-	__aligned_u64 func_info;
+	u64 func_info;
 	u32 nr_func_info;
 	u32 nr_line_info;
-	__aligned_u64 line_info;
-	__aligned_u64 jited_line_info;
+	u64 line_info;
+	u64 jited_line_info;
 	u32 nr_jited_line_info;
 	u32 line_info_rec_size;
 	u32 jited_line_info_rec_size;
 	u32 nr_prog_tags;
-	__aligned_u64 prog_tags;
-	__u64 run_time_ns;
-	__u64 run_cnt;
+	u64 prog_tags;
+	u64 run_time_ns;
+	u64 run_cnt;
 } __attribute__((aligned(8)));
 
 struct bpf_btf_info {
-	__aligned_u64 btf;
+	u64 btf;
 	u32 btf_size;
 	u32 id;
 } __attribute__((aligned(8)));
@@ -681,46 +653,6 @@ static __always_inline unsigned int bpf_dispatcher_nop_func(
 	return bpf_func(ctx, insnsi);
 }
 
-struct bpf_trampoline *bpf_trampoline_lookup(u64 key);
-int bpf_trampoline_link_prog(struct bpf_prog *prog);
-int bpf_trampoline_unlink_prog(struct bpf_prog *prog);
-void bpf_trampoline_put(struct bpf_trampoline *tr);
-#define BPF_DISPATCHER_INIT(_name) {				\
-	.mutex = __MUTEX_INITIALIZER(_name.mutex),		\
-	.func = &_name##_func,					\
-	.progs = {},						\
-	.num_progs = 0,						\
-	.image = NULL,						\
-	.image_off = 0,						\
-	.ksym = {						\
-		.name  = #_name,				\
-		.lnode = LIST_HEAD_INIT(_name.ksym.lnode),	\
-	},							\
-}
-
-#define DEFINE_BPF_DISPATCHER(name)					\
-	noinline unsigned int bpf_dispatcher_##name##_func(		\
-		const void *ctx,					\
-		const struct bpf_insn *insnsi,				\
-		unsigned int (*bpf_func)(const void *,			\
-					 const struct bpf_insn *))	\
-	{								\
-		return bpf_func(ctx, insnsi);				\
-	}								\
-	EXPORT_SYMBOL(bpf_dispatcher_##name##_func);			\
-	struct bpf_dispatcher bpf_dispatcher_##name =			\
-		BPF_DISPATCHER_INIT(bpf_dispatcher_##name);
-#define DECLARE_BPF_DISPATCHER(name)					\
-	unsigned int bpf_dispatcher_##name##_func(			\
-		const void *ctx,					\
-		const struct bpf_insn *insnsi,				\
-		unsigned int (*bpf_func)(const void *,			\
-					 const struct bpf_insn *));	\
-	extern struct bpf_dispatcher bpf_dispatcher_##name;
-#define BPF_DISPATCHER_FUNC(name) bpf_dispatcher_##name##_func
-#define BPF_DISPATCHER_PTR(name) (&bpf_dispatcher_##name)
-
-
 struct bpf_func_info_aux {
 	u16 linkage;
 	bool unreliable;
@@ -774,38 +706,6 @@ struct bpf_struct_ops {
 	u32 value_id;
 };
 
-#if defined(CONFIG_BPF_JIT) && defined(CONFIG_BPF_SYSCALL)
-#define BPF_MODULE_OWNER ((void *)((0xeB9FUL << 2) + POISON_POINTER_DELTA))
-const struct bpf_struct_ops *bpf_struct_ops_find(u32 type_id);
-void bpf_struct_ops_init(struct btf *btf, struct bpf_verifier_log *log);
-bool bpf_struct_ops_get(const void *kdata);
-void bpf_struct_ops_put(const void *kdata);
-int bpf_struct_ops_map_sys_lookup_elem(struct bpf_map *map, void *key,
-				       void *value);
-static inline bool bpf_try_module_get(const void *data, struct module *owner)
-{
-	if (owner == BPF_MODULE_OWNER)
-		return bpf_struct_ops_get(data);
-	else
-		return try_module_get(owner);
-}
-static inline void bpf_module_put(const void *data, struct module *owner)
-{
-	if (owner == BPF_MODULE_OWNER)
-		bpf_struct_ops_put(data);
-	else
-		module_put(owner);
-}
-#else
-static inline const struct bpf_struct_ops *bpf_struct_ops_find(u32 type_id)
-{
-	return NULL;
-}
-static inline void bpf_struct_ops_init(struct btf *btf,
-				       struct bpf_verifier_log *log)
-{
-}
-#endif
 
 #define BPF_COMPLEXITY_LIMIT_INSNS      1000000 /* yes. 1M insns */
 #define MAX_TAIL_CALL_CNT 32
@@ -987,8 +887,6 @@ struct bpf_prog_aux {
 	const struct bpf_ctx_arg_aux *ctx_arg_info;
 	struct bpf_prog *dst_prog;
 	struct bpf_trampoline *dst_trampoline;
-	enum bpf_prog_type saved_dst_prog_type;
-	enum bpf_attach_type saved_dst_attach_type;
 	bool verifier_zext; /* Zero extensions has been inserted by verifier. */
 	bool dev_bound; /* Program is bound to the netdev. */
 	bool offload_requested; /* Program is bound and offloaded to the netdev. */
@@ -1057,8 +955,6 @@ struct bpf_prog {
 				kprobe_override:1, /* Do we override a kprobe? */
 				has_callchain_buf:1, /* callchain buffer allocated? */
 				enforce_expected_attach_type:1; /* Enforce expected_attach_type checking at attach time */
-	enum bpf_prog_type	type;		/* Type of BPF program */
-	enum bpf_attach_type	expected_attach_type; /* For some prog types */
 	u32			len;		/* Number of filter blocks */
 	u32			jited_len;	/* Size of jited insns in bytes */
 	u8			tag[BPF_TAG_SIZE];
@@ -1179,16 +1075,6 @@ static inline unsigned int bpf_prog_size(unsigned int proglen)
 		   offsetof(struct bpf_prog, insnsi[proglen]));
 }
 
-static inline bool bpf_prog_was_classic(const struct bpf_prog *prog)
-{
-	/* When classic BPF programs have been loaded and the arch
-	 * does not have a classic BPF JIT (anymore), they have been
-	 * converted via bpf_migrate_filter() to eBPF and thus always
-	 * have an unspec program type.
-	 */
-	return prog->type == BPF_PROG_TYPE_UNSPEC;
-}
-
 void bpf_prog_free_linfo(struct bpf_prog *prog);
 void bpf_prog_fill_jited_linfo(struct bpf_prog *prog,
 			       const u32 *insn_to_jit_off);
@@ -1231,6 +1117,12 @@ static inline void bpf_jit_dump(unsigned int flen, unsigned int proglen,
 struct bpf_map_memory {
 	u32 pages;
 	struct user_struct *user;
+};
+
+enum bpf_map_type {
+	BPF_MAP_TYPE_UNSPEC,
+	BPF_MAP_TYPE_HASH,
+	BPF_MAP_TYPE_ARRAY
 };
 
 struct bpf_map {

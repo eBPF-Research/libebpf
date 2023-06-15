@@ -65,7 +65,7 @@ static __always_inline unsigned long __fls(unsigned long word)
  * at position 64.
  */
 #if BITS_PER_LONG == 32
-static __always_inline int fls64(__u64 x)
+static __always_inline int fls64(u64 x)
 {
 	u32 h = x >> 32;
 	if (h)
@@ -73,7 +73,7 @@ static __always_inline int fls64(__u64 x)
 	return fls(x);
 }
 #elif BITS_PER_LONG == 64
-static __always_inline int fls64(__u64 x)
+static __always_inline int fls64(u64 x)
 {
 	if (x == 0)
 		return 0;
@@ -87,10 +87,10 @@ static __always_inline int fls64(__u64 x)
  * User structures for general purpose, floating point and debug registers.
  */
 struct user_pt_regs {
-	__u64		regs[31];
-	__u64		sp;
-	__u64		pc;
-	__u64		pstate;
+	u64		regs[31];
+	u64		sp;
+	u64		pc;
+	u64		pstate;
 };
 /*
  * This struct defines the way the registers are stored on the stack during an
@@ -1036,7 +1036,7 @@ struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog)
 	struct bpf_prog *tmp, *orig_prog = prog;
 	struct bpf_binary_header *header;
 	struct arm64_jit_data *jit_data;
-	bool was_classic = bpf_prog_was_classic(prog);
+	bool was_classic = false; // bpf_prog_was_classic(prog);
 	bool tmp_blinded = false;
 	bool extra_pass = false;
 	struct jit_ctx ctx;

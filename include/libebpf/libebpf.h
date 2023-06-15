@@ -133,28 +133,6 @@ int ebpf_load(struct ebpf_vm* vm, const void* code, uint32_t code_len, char** er
 void ebpf_unload_code(struct ebpf_vm* vm);
 
 /**
- * @brief Load code from an ELF file.
-
- * This must be done before calling ebpf_exec or ebpf_compile and after
- * registering all functions.
- *
- * 'elf' should point to a copy of an ELF file in memory and 'elf_len' should
- * be the size in bytes of that buffer.
- *
- * The ELF file must be 64-bit little-endian with a single text section
- * containing the eBPF bytecodes. This is compatible with the output of
- * Clang.
- *
- * @param[in] vm The VM to load the code into.
- * @param[in] elf A pointer to a copy of an ELF file in memory.
- * @param[in] elf_len The size of the ELF file.
- * @param[out] errmsg The error message, if any. This should be freed by the caller.
- * @retval 0 Success.
- * @retval -1 Failure.
- */
-int ebpf_load_elf(struct ebpf_vm* vm, const void* elf, size_t elf_len, char** errmsg);
-
-/**
  * @brief Execute a BPF program in the VM using the interpreter.
  *
  * A program must be loaded into the VM and all external functions must be

@@ -1749,7 +1749,7 @@ u32 aarch64_insn_gen_extr(enum aarch64_insn_variant variant,
 	return aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RM, insn, Rm);
 }
 
-unsigned long __sw_hweight64(__u64 w)
+unsigned long __sw_hweight64(u64 w)
 {
 #if BITS_PER_LONG == 32
 	return __sw_hweight32((unsigned int)(w >> 32)) +
@@ -1761,7 +1761,7 @@ unsigned long __sw_hweight64(__u64 w)
 	w =  (w + (w >> 4)) & 0x0f0f0f0f0f0f0f0ful;
 	return (w * 0x0101010101010101ul) >> 56;
 #else
-	__u64 res = w - ((w >> 1) & 0x5555555555555555ul);
+	u64 res = w - ((w >> 1) & 0x5555555555555555ul);
 	res = (res & 0x3333333333333333ul) + ((res >> 2) & 0x3333333333333333ul);
 	res = (res + (res >> 4)) & 0x0F0F0F0F0F0F0F0Ful;
 	res = res + (res >> 8);

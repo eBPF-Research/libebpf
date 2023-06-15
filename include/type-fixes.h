@@ -37,38 +37,17 @@ typedef int64_t s64;
 #define __bitwise
 #endif
 
-/*
- * __xx is ok: it doesn't pollute the POSIX namespace. Use these in the
- * header files exported to user space
- */
-typedef __signed__ char __s8;
-typedef unsigned char __u8;
-
-typedef __signed__ short __s16;
-typedef unsigned short __u16;
-
-typedef __signed__ int __s32;
-typedef unsigned int u32;
-
-#ifdef __GNUC__
-__extension__ typedef __signed__ long long __s64;
-__extension__ typedef unsigned long long __u64;
-#else
-typedef __signed__ long long __s64;
-typedef unsigned long long __u64;
-#endif
-
 /* The kernel doesn't use this legacy form, but user space does */
 #define __bitwise__ __bitwise
 
-typedef __u16 __bitwise __le16;
-typedef __u16 __bitwise __be16;
+typedef u16 __bitwise __le16;
+typedef u16 __bitwise __be16;
 typedef u32 __bitwise __le32;
 typedef u32 __bitwise __be32;
-typedef __u64 __bitwise __le64;
-typedef __u64 __bitwise __be64;
+typedef u64 __bitwise __le64;
+typedef u64 __bitwise __be64;
 
-typedef __u16 __bitwise __sum16;
+typedef u16 __bitwise __sum16;
 typedef u32 __bitwise __wsum;
 
 #define __aligned_be64 __be64 __attribute__((aligned(8)))

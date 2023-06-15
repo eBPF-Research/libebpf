@@ -255,41 +255,28 @@ static inline u32 bpf_prog_insn_size(const struct bpf_prog *prog)
 	return prog->len * sizeof(struct bpf_insn);
 }
 
-struct bpf_prog *bpf_prog_load(union bpf_attr *attr)
+struct bpf_prog *bpf_prog_load(const void* code, uint32_t code_len)
 {
 	struct bpf_prog *prog, *dst_prog = NULL;
 	struct btf *attach_btf = NULL;
 	bool is_gpl = false;
 
-	/* remove kernel checkers here */
-
 	/* plain bpf_prog allocation */
-	prog = bpf_prog_alloc(bpf_prog_size(attr->insn_cnt));
+	prog = bpf_prog_alloc(code_len);
 	if (!prog) {
 		return NULL;
 	}
 
-	prog->expected_attach_type = attr->expected_attach_type;
-	prog->aux->attach_btf = attach_btf;
-	prog->aux->attach_btf_id = attr->attach_btf_id;
-	prog->aux->dst_prog = dst_prog;
 	prog->aux->offload_requested = false; // origin is: !!attr->prog_ifindex;
 
 	prog->aux->user = NULL; // get_current_user();
-	prog->len = attr->insn_cnt;
+	prog->len = code_len;
 
 	memcpy(prog->insnsi,
-			     (void*)attr->insns,
+			     (void*)code,
 			     bpf_prog_insn_size(prog));
 
 	prog->orig_prog = NULL;
-	prog->jited = 0;
-
-	prog->gpl_compatible = is_gpl ? 1 : 0;
-
-	prog->aux->load_time = 0;
-	strncpy(prog->aux->name, attr->prog_name,
-			       sizeof(attr->prog_name));
 
 	/* run eBPF verifier */
 	// err = bpf_check(&prog, attr, uattr);
