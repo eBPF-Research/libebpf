@@ -79,7 +79,7 @@ struct sock_filter {	/* Filter block */
 	__u16	code;   /* Actual filter code */
 	__u8	jt;	/* Jump true */
 	__u8	jf;	/* Jump false */
-	__u32	k;      /* Generic multiuse field */
+	u32	k;      /* Generic multiuse field */
 };
 
 struct sock_fprog {	/* Required for SO_ATTACH_FILTER. */
@@ -398,85 +398,85 @@ struct bpf_stack_build_id {
 #define BPF_TAG_SIZE	8
 
 struct bpf_prog_info {
-	__u32 type;
-	__u32 id;
+	u32 type;
+	u32 id;
 	__u8  tag[BPF_TAG_SIZE];
-	__u32 jited_prog_len;
-	__u32 xlated_prog_len;
+	u32 jited_prog_len;
+	u32 xlated_prog_len;
 	__aligned_u64 jited_prog_insns;
 	__aligned_u64 xlated_prog_insns;
 	__u64 load_time;	/* ns since boottime */
-	__u32 created_by_uid;
-	__u32 nr_map_ids;
+	u32 created_by_uid;
+	u32 nr_map_ids;
 	__aligned_u64 map_ids;
 	char name[BPF_OBJ_NAME_LEN];
-	__u32 ifindex;
-	__u32 gpl_compatible:1;
-	__u32 :31; /* alignment pad */
+	u32 ifindex;
+	u32 gpl_compatible:1;
+	u32 :31; /* alignment pad */
 	__u64 netns_dev;
 	__u64 netns_ino;
-	__u32 nr_jited_ksyms;
-	__u32 nr_jited_func_lens;
+	u32 nr_jited_ksyms;
+	u32 nr_jited_func_lens;
 	__aligned_u64 jited_ksyms;
 	__aligned_u64 jited_func_lens;
-	__u32 btf_id;
-	__u32 func_info_rec_size;
+	u32 btf_id;
+	u32 func_info_rec_size;
 	__aligned_u64 func_info;
-	__u32 nr_func_info;
-	__u32 nr_line_info;
+	u32 nr_func_info;
+	u32 nr_line_info;
 	__aligned_u64 line_info;
 	__aligned_u64 jited_line_info;
-	__u32 nr_jited_line_info;
-	__u32 line_info_rec_size;
-	__u32 jited_line_info_rec_size;
-	__u32 nr_prog_tags;
+	u32 nr_jited_line_info;
+	u32 line_info_rec_size;
+	u32 jited_line_info_rec_size;
+	u32 nr_prog_tags;
 	__aligned_u64 prog_tags;
 	__u64 run_time_ns;
 	__u64 run_cnt;
 } __attribute__((aligned(8)));
 
 struct bpf_map_info {
-	__u32 type;
-	__u32 id;
-	__u32 key_size;
-	__u32 value_size;
-	__u32 max_entries;
-	__u32 map_flags;
+	u32 type;
+	u32 id;
+	u32 key_size;
+	u32 value_size;
+	u32 max_entries;
+	u32 map_flags;
 	char  name[BPF_OBJ_NAME_LEN];
-	__u32 ifindex;
-	__u32 btf_vmlinux_value_type_id;
+	u32 ifindex;
+	u32 btf_vmlinux_value_type_id;
 	__u64 netns_dev;
 	__u64 netns_ino;
-	__u32 btf_id;
-	__u32 btf_key_type_id;
-	__u32 btf_value_type_id;
+	u32 btf_id;
+	u32 btf_key_type_id;
+	u32 btf_value_type_id;
 } __attribute__((aligned(8)));
 
 struct bpf_btf_info {
 	__aligned_u64 btf;
-	__u32 btf_size;
-	__u32 id;
+	u32 btf_size;
+	u32 id;
 } __attribute__((aligned(8)));
 
 struct bpf_link_info {
-	__u32 type;
-	__u32 id;
-	__u32 prog_id;
+	u32 type;
+	u32 id;
+	u32 prog_id;
 	union {
 		struct {
 			__aligned_u64 tp_name; /* in/out: tp_name buffer ptr */
-			__u32 tp_name_len;     /* in/out: tp_name buffer len */
+			u32 tp_name_len;     /* in/out: tp_name buffer len */
 		} raw_tracepoint;
 		struct {
-			__u32 attach_type;
+			u32 attach_type;
 		} tracing;
 		struct {
 			__u64 cgroup_id;
-			__u32 attach_type;
+			u32 attach_type;
 		} cgroup;
 		struct  {
-			__u32 netns_ino;
-			__u32 attach_type;
+			u32 netns_ino;
+			u32 attach_type;
 		} netns;
 	};
 } __attribute__((aligned(8)));
@@ -522,7 +522,7 @@ struct bpf_fib_lookup {
 	/* input: L3 device index for lookup
 	 * output: device index from FIB lookup
 	 */
-	__u32	ifindex;
+	u32	ifindex;
 
 	union {
 		/* inputs to lookup */
@@ -530,12 +530,12 @@ struct bpf_fib_lookup {
 		__be32	flowinfo;	/* AF_INET6, flow_label + priority */
 
 		/* output: metric of fib result (IPv4/IPv6 only) */
-		__u32	rt_metric;
+		u32	rt_metric;
 	};
 
 	union {
 		__be32		ipv4_src;
-		__u32		ipv6_src[4];  /* in6_addr; network order */
+		u32		ipv6_src[4];  /* in6_addr; network order */
 	};
 
 	/* input to bpf_fib_lookup, ipv{4,6}_dst is destination address in
@@ -544,7 +544,7 @@ struct bpf_fib_lookup {
 	 */
 	union {
 		__be32		ipv4_dst;
-		__u32		ipv6_dst[4];  /* in6_addr; network order */
+		u32		ipv6_dst[4];  /* in6_addr; network order */
 	};
 
 	/* output */
@@ -586,45 +586,45 @@ struct bpf_flow_keys {
 			__be32	ipv4_dst;
 		};
 		struct {
-			__u32	ipv6_src[4];	/* in6_addr; network order */
-			__u32	ipv6_dst[4];	/* in6_addr; network order */
+			u32	ipv6_src[4];	/* in6_addr; network order */
+			u32	ipv6_dst[4];	/* in6_addr; network order */
 		};
 	};
-	__u32	flags;
+	u32	flags;
 	__be32	flow_label;
 };
 
 struct bpf_func_info {
-	__u32	insn_off;
-	__u32	type_id;
+	u32	insn_off;
+	u32	type_id;
 };
 
 #define BPF_LINE_INFO_LINE_NUM(line_col)	((line_col) >> 10)
 #define BPF_LINE_INFO_LINE_COL(line_col)	((line_col) & 0x3ff)
 
 struct bpf_line_info {
-	__u32	insn_off;
-	__u32	file_name_off;
-	__u32	line_off;
-	__u32	line_col;
+	u32	insn_off;
+	u32	file_name_off;
+	u32	line_off;
+	u32	line_col;
 };
 
 struct bpf_spin_lock {
-	__u32	val;
+	u32	val;
 };
 
 struct bpf_sysctl {
-	__u32	write;		/* Sysctl is being read (= 0) or written (= 1).
+	u32	write;		/* Sysctl is being read (= 0) or written (= 1).
 				 * Allows 1,2,4-byte read, but no write.
 				 */
-	__u32	file_pos;	/* Sysctl file position to read from, write to.
+	u32	file_pos;	/* Sysctl file position to read from, write to.
 				 * Allows 1,2,4-byte read an 4-byte write.
 				 */
 };
 
 struct bpf_pidns_info {
-	__u32 pid;
-	__u32 tgid;
+	u32 pid;
+	u32 tgid;
 };
 
 struct bpf_verifier_env;

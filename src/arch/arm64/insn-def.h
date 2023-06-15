@@ -56,8 +56,8 @@
 
 #define cpu_to_le64(x) (( __le64)(__u64)(x))
 #define le64_to_cpu(x) (( __u64)(__le64)(x))
-#define cpu_to_le32(x) (( __le32)(__u32)(x))
-#define le32_to_cpu(x) (( __u32)(__le32)(x))
+#define cpu_to_le32(x) (( __le32)(u32)(x))
+#define le32_to_cpu(x) (( u32)(__le32)(x))
 #define cpu_to_le16(x) (( __le16)(__u16)(x))
 #define le16_to_cpu(x) (( __u16)(__le16)(x))
 
@@ -69,13 +69,13 @@ static __always_inline __u64 __le64_to_cpup(const __le64 *p)
 {
 	return ( __u64)*p;
 }
-static __always_inline __le32 __cpu_to_le32p(const __u32 *p)
+static __always_inline __le32 __cpu_to_le32p(const u32 *p)
 {
 	return ( __le32)*p;
 }
-static __always_inline __u32 __le32_to_cpup(const __le32 *p)
+static __always_inline u32 __le32_to_cpup(const __le32 *p)
 {
-	return ( __u32)*p;
+	return ( u32)*p;
 }
 static __always_inline __le16 __cpu_to_le16p(const __u16 *p)
 {

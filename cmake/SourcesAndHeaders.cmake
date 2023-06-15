@@ -13,7 +13,7 @@ if(ARCH MATCHES "arm")
     src/ebpf_jit_arm32.c
   )
   set(ARCH_HEADERS
-    src/
+    src/arch/arm/
   )
 elseif(ARCH MATCHES "aarch64")
   message(STATUS "arm64 architecture detected")
