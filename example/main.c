@@ -2,7 +2,7 @@
 #include "minimal.h"
 #include "libebpf/libebpf.h"
 #include <stdlib.h>
-// #define JIT_TEST_KERNEL 1
+
 #define JIT_TEST_UBPF 1
 
 #define CHECK_EXIT(ret)                                                        \

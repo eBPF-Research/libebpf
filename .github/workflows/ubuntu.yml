@@ -28,6 +28,8 @@ jobs:
       run: make build
     - name: install test deps
       run: |
+        sudo apt update
+        sudo apt install python3.8
         sudo apt install python3-pytest
 
     - name: run tests

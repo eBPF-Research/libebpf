@@ -27,10 +27,6 @@
 #include <math.h>
 #include "libebpf/libebpf.h"
 
-// #if defined(UBPF_HAS_ELF_H)
-#include <elf.h>
-// #endif
-
 void
 ebpf_set_register_offset(int x);
 static void*
