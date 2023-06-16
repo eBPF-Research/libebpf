@@ -1033,7 +1033,7 @@ void bpf_jit_build_prologue(struct rv_jit_context *ctx)
 	 * (TCC) register. This instruction is skipped for tail calls.
 	 * Force using a 4-byte (non-compressed) instruction.
 	 */
-	emit(rv_addi(RV_REG_TCC, RV_REG_ZERO, MAX_TAIL_CALL_CNT), ctx);
+	// emit(rv_addi(RV_REG_TCC, RV_REG_ZERO, MAX_TAIL_CALL_CNT), ctx);
 
 	emit_addi(RV_REG_SP, RV_REG_SP, -stack_adjust, ctx);
 

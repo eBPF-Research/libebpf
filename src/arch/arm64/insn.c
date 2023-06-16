@@ -12,6 +12,16 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define ALIGN_DOWN(x, a)	__ALIGN_KERNEL((x) - ((a) - 1), (a))
+
+typedef struct {
+	int counter;
+} atomic_t;
+
+#define SZ_16				0x00000010
+#define SZ_32				0x00000020
+#define SZ_64				0x00000040
+
 void atomic_add(int i, atomic_t *v) {
     __sync_add_and_fetch(&v->counter, i);
 }
@@ -181,9 +191,9 @@ enum aarch64_insn_encoding_class  aarch64_get_insn_class(u32 insn)
 
 static void  *patch_map(void *addr, int fixmap)
 {
-	unsigned long uintaddr = (uintptr_t) addr;
+	// unsigned long uintaddr = (uintptr_t) addr;
 	// bool image = is_image_text(uintaddr);
-	struct page *page;
+	// struct page *page;
 
 	printf("patch_map addr %p fixmap %d\n", addr, fixmap);
 	// if (image)
@@ -191,7 +201,7 @@ static void  *patch_map(void *addr, int fixmap)
 	// else if (IS_ENABLED(CONFIG_STRICT_MODULE_RWX))
 	// 	page = vmalloc_to_page(addr);
 	// else
-		return addr;
+	return addr;
 
 	// BUG_ON(!page);
 	// return (void *)set_fixmap_offset(fixmap, page_to_phys(page) +
@@ -211,7 +221,7 @@ static void  patch_unmap(int fixmap)
 int  aarch64_insn_read(void *addr, u32 *insnp)
 {
 	// void * ret;
-	__le32 val;
+	 u32 val;
 
 	memcpy(&val, addr, AARCH64_INSN_SIZE);
 	// if (!ret)
@@ -220,7 +230,7 @@ int  aarch64_insn_read(void *addr, u32 *insnp)
 	return 0;
 }
 
-static int  __aarch64_insn_write(void *addr, __le32 insn)
+static int  __aarch64_insn_write(void *addr,  u32 insn)
 {
 	void *waddr = addr;
 	// unsigned long flags = 0;
@@ -293,12 +303,12 @@ static int  aarch64_insn_patch_text_cb(void *arg)
 
 int  aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt)
 {
-	struct aarch64_insn_patch patch = {
-		.text_addrs = addrs,
-		.new_insns = insns,
-		.insn_cnt = cnt,
-		.cpu_count = (0),
-	};
+	// struct aarch64_insn_patch patch = {
+	// 	.text_addrs = addrs,
+	// 	.new_insns = insns,
+	// 	.insn_cnt = cnt,
+	// 	.cpu_count = (0),
+	// };
 
 	if (cnt <= 0)
 		return -EINVAL;
@@ -1438,13 +1448,13 @@ u32 aarch64_set_branch_offset(u32 insn, s32 offset)
 
 s32 aarch64_insn_adrp_get_offset(u32 insn)
 {
-	BUG_ON(!aarch64_insn_is_adrp(insn));
+	assert(aarch64_insn_is_adrp(insn));
 	return aarch64_insn_decode_immediate(AARCH64_INSN_IMM_ADR, insn) << 12;
 }
 
 u32 aarch64_insn_adrp_set_offset(u32 insn, s32 offset)
 {
-	BUG_ON(!aarch64_insn_is_adrp(insn));
+	assert(aarch64_insn_is_adrp(insn));
 	return aarch64_insn_encode_immediate(AARCH64_INSN_IMM_ADR, insn,
 						offset >> 12);
 }

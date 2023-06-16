@@ -111,7 +111,7 @@ static inline void emit(const u32 insn, struct rv_jit_context *ctx)
 /* Emit a 2-byte riscv compressed instruction. */
 static inline void emitc(const u16 insn, struct rv_jit_context *ctx)
 {
-	BUILD_BUG_ON(!rvc_enabled());
+	static_assert(!rvc_enabled());
 
 	if (ctx->insns)
 		ctx->insns[ctx->ninsns] = insn;

@@ -14,6 +14,17 @@
 #include "bpf_jit_arch.h"
 #include "ebpf_vm.h"
 
+#define WARN_ON_ONCE(condition) ({ \
+   int __ret_warn_on = !!(condition); \
+    (__ret_warn_on); })
+
+/*
+ * Compiler (optimization) barrier.
+ */
+#ifndef barrier
+#define barrier() asm volatile("" ::: "memory")
+#endif
+
 #ifndef __ASSEMBLY__
 
 struct pt_regs {
@@ -411,7 +422,7 @@ static void emit_prologue(u8 **pprog, u32 stack_depth, bool ebpf_from_cbpf)
 	if (!ebpf_from_cbpf) {
 		/* zero init tail_call_cnt */
 		EMIT2(0x6a, 0x00);
-		BUILD_BUG_ON(cnt != PROLOGUE_SIZE);
+		assert(cnt != PROLOGUE_SIZE);
 	}
 	*pprog = prog;
 }
@@ -1529,7 +1540,7 @@ static int invoke_bpf_mod_ret(const struct btf_func_model *m, u8 **pprog,
 }
 
 /* Example:
- * __be16 eth_type_trans(struct sk_buff *skb, struct net_device *dev);
+ *  u16 eth_type_trans(struct sk_buff *skb, struct net_device *dev);
  * its 'struct btf_func_model' will be nr_args=2
  * The assembly code when eth_type_trans is executing after trampoline:
  *

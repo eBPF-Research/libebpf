@@ -1236,7 +1236,7 @@ static void emit_prologue(u8 **pprog, u32 stack_depth)
 	EMIT3(0x89, add_2reg(0x40, IA32_EBP, IA32_EBX), STACK_VAR(tcc[0]));
 	EMIT3(0x89, add_2reg(0x40, IA32_EBP, IA32_EBX), STACK_VAR(tcc[1]));
 
-	BUILD_BUG_ON(cnt != PROLOGUE_SIZE);
+	assert(cnt != PROLOGUE_SIZE);
 	*pprog = prog;
 }
 
@@ -2204,7 +2204,7 @@ struct ebpf_vm *linux_bpf_int_jit_compile(struct ebpf_vm *prog)
 	int pass;
 	int i;
 
-	addrs = kmalloc_array(prog->len, sizeof(*addrs), GFP_KERNEL);
+	addrs = malloc(prog->len, sizeof(*addrs));
 	if (!addrs) {
 		prog = orig_prog;
 		goto out;

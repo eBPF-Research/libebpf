@@ -78,41 +78,6 @@ struct ebpf_vm;
 #define BPF_JUMP(code, k, jt, jf) { (unsigned short)(code), jt, jf, k }
 #endif
 
-/*
- * Number of scratch memory words for: BPF_ST and BPF_STX
- */
-#define BPF_MEMWORDS 16
-
-/* RATIONALE. Negative offsets are invalid in BPF.
-   We use them to reference ancillary data.
-   Unlike introduction new instructions, it does not break
-   existing compilers/optimizers.
- */
-#define SKF_AD_OFF    (-0x1000)
-#define SKF_AD_PROTOCOL 0
-#define SKF_AD_PKTTYPE 	4
-#define SKF_AD_IFINDEX 	8
-#define SKF_AD_NLATTR	12
-#define SKF_AD_NLATTR_NEST	16
-#define SKF_AD_MARK 	20
-#define SKF_AD_QUEUE	24
-#define SKF_AD_HATYPE	28
-#define SKF_AD_RXHASH	32
-#define SKF_AD_CPU	36
-#define SKF_AD_ALU_XOR_X	40
-#define SKF_AD_VLAN_TAG	44
-#define SKF_AD_VLAN_TAG_PRESENT 48
-#define SKF_AD_PAY_OFFSET	52
-#define SKF_AD_RANDOM	56
-#define SKF_AD_VLAN_TPID	60
-#define SKF_AD_MAX	64
-
-#define SKF_NET_OFF	(-0x100000)
-#define SKF_LL_OFF	(-0x200000)
-
-#define BPF_NET_OFF	SKF_NET_OFF
-#define BPF_LL_OFF	SKF_LL_OFF
-
 /* Instruction classes */
 #define BPF_CLASS(code) ((code) & 0x07)
 #define		BPF_LD		0x00
@@ -218,62 +183,6 @@ enum {
 
 #define MAX_BPF_ATTACH_TYPE __MAX_BPF_ATTACH_TYPE
 
-/* If BPF_F_STRICT_ALIGNMENT is used in BPF_PROG_LOAD command, the
- * verifier will perform strict alignment checking as if the kernel
- * has been built with CONFIG_EFFICIENT_UNALIGNED_ACCESS not set,
- * and NET_IP_ALIGN defined to 2.
- */
-#define BPF_F_STRICT_ALIGNMENT	(1U << 0)
-
-/* If BPF_F_ANY_ALIGNMENT is used in BPF_PROF_LOAD command, the
- * verifier will allow any alignment whatsoever.  On platforms
- * with strict alignment requirements for loads ands stores (such
- * as sparc and mips) the verifier validates that all loads and
- * stores provably follow this requirement.  This flag turns that
- * checking and enforcement off.
- *
- * It is mostly used for testing when we want to validate the
- * context and memory access aspects of the verifier, but because
- * of an unaligned access the alignment check would trigger before
- * the one we are interested in.
- */
-#define BPF_F_ANY_ALIGNMENT	(1U << 1)
-
-/* BPF_F_TEST_RND_HI32 is used in BPF_PROG_LOAD command for testing purpose.
- * Verifier does sub-register def/use analysis and identifies instructions whose
- * def only matters for low 32-bit, high 32-bit is never referenced later
- * through implicit zero extension. Therefore verifier notifies JIT back-ends
- * that it is safe to ignore clearing high 32-bit for these instructions. This
- * saves some back-ends a lot of code-gen. However such optimization is not
- * necessary on some arches, for example x86_64, arm64 etc, whose JIT back-ends
- * hence hasn't used verifier's analysis result. But, we really want to have a
- * way to be able to verify the correctness of the described optimization on
- * x86_64 on which testsuites are frequently exercised.
- *
- * So, this flag is introduced. Once it is set, verifier will randomize high
- * 32-bit for those instructions who has been identified as safe to ignore them.
- * Then, if verifier is not doing correct analysis, such randomization will
- * regress tests to expose bugs.
- */
-#define BPF_F_TEST_RND_HI32	(1U << 2)
-
-/* The verifier internal test flag. Behavior is undefined */
-#define BPF_F_TEST_STATE_FREQ	(1U << 3)
-
-/* When BPF ldimm64's insn[0].src_reg != 0 then this can have
- * two extensions:
- *
- * insn[0].src_reg:  BPF_PSEUDO_MAP_FD   BPF_PSEUDO_MAP_VALUE
- * insn[0].imm:      map fd              map fd
- * insn[1].imm:      0                   offset into value
- * insn[0].off:      0                   0
- * insn[1].off:      0                   0
- * ldimm64 rewrite:  address of map      address of map[0]+offset
- * verifier type:    CONST_PTR_TO_MAP    PTR_TO_MAP_VALUE
- */
-#define BPF_PSEUDO_MAP_FD	1
-#define BPF_PSEUDO_MAP_VALUE	2
-
 /* when bpf_call->src_reg == BPF_PSEUDO_CALL, bpf_call->imm == pc-relative
  * offset to another bpf function
  */
@@ -343,9 +252,6 @@ enum bpf_jit_poke_reason {
 struct btf_type;
 struct btf_member;
 
-#define BPF_COMPLEXITY_LIMIT_INSNS      1000000 /* yes. 1M insns */
-#define MAX_TAIL_CALL_CNT 32
-
 #define BPF_F_ACCESS_MASK	(BPF_F_RDONLY |		\
 				 BPF_F_RDONLY_PROG |	\
 				 BPF_F_WRONLY |		\
@@ -354,7 +260,6 @@ struct btf_member;
 /* these two functions are called from generated trampoline */
 u64 __bpf_prog_enter(void);
 void __bpf_prog_exit(struct ebpf_vm *prog, u64 start);
-
 
 /* Helper macros for filter block array initializers. */
 /* Internal classic blocks for direct assignment */
@@ -394,14 +299,14 @@ void __bpf_prog_exit(struct ebpf_vm *prog, u64 start);
 #define BPF_SIZEOF(type)					\
 	({							\
 		const int __size = bytes_to_bpf_size(sizeof(type)); \
-		BUILD_BUG_ON(__size < 0);			\
+		static_assert(__size < 0);			\
 		__size;						\
 	})
 
 #define BPF_FIELD_SIZEOF(type, field)				\
 	({							\
 		const int __size = bytes_to_bpf_size(sizeof_field(type, field)); \
-		BUILD_BUG_ON(__size < 0);			\
+		static_assert(__size < 0);			\
 		__size;						\
 	})
 
@@ -500,17 +405,6 @@ bpf_jit_binary_alloc(unsigned int proglen, u8 **image_ptr,
 		     bpf_jit_fill_hole_t bpf_fill_ill_insns);
 void *bpf_jit_alloc_exec(unsigned long size);
 void __bpf_prog_free(struct ebpf_vm *fp);
-
-static inline const char *
-bpf_address_lookup(unsigned long addr, unsigned long *size,
-		   unsigned long *off, char **modname, char *sym)
-{
-	const char *ret = __bpf_address_lookup(addr, size, off, sym);
-
-	if (ret && modname)
-		*modname = NULL;
-	return ret;
-}
 
 struct ebpf_vm *bpf_prog_alloc(unsigned int size);
 struct ebpf_vm *bpf_prog_alloc_no_stats(unsigned int size);

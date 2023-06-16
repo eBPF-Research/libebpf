@@ -1306,7 +1306,8 @@ void bpf_jit_build_prologue(struct rv_jit_context *ctx)
 	 * The first instruction sets the tail-call-counter (TCC) register.
 	 * This instruction is skipped by tail calls.
 	 */
-	emit(rv_addi(RV_REG_TCC, RV_REG_ZERO, MAX_TAIL_CALL_CNT), ctx);
+	// #define MAX_TAIL_CALL_CNT 32
+	// emit(rv_addi(RV_REG_TCC, RV_REG_ZERO, MAX_TAIL_CALL_CNT), ctx);
 
 	emit(rv_addi(RV_REG_SP, RV_REG_SP, -stack_adjust), ctx);
 

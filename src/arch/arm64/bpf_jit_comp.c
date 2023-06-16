@@ -14,8 +14,80 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <assert.h>
 #include "bpf_jit_arch.h"
 #include "ebpf_vm.h"
+
+#define __bf_shf(x) (__builtin_ffsll(x) - 1)
+
+#ifdef CHECK_BF_FIELD
+#define BUILD_BUG_ON_MSG(cond, msg) _Static_assert(!(cond), msg)
+/* Force a compilation error if a constant expression is not a power of 2 */
+#define __BUILD_BUG_ON_NOT_POWER_OF_2(n)	\
+	_Static_assert(((n) & ((n) - 1)) != 0)
+
+#define __BF_FIELD_CHECK(_mask, _reg, _val, _pfx)			\
+	({								\
+		BUILD_BUG_ON_MSG(!__builtin_constant_p(_mask),		\
+				 _pfx "mask is not constant");		\
+		BUILD_BUG_ON_MSG((_mask) == 0, _pfx "mask is zero");	\
+		BUILD_BUG_ON_MSG(__builtin_constant_p(_val) ?		\
+				 ~((_mask) >> __bf_shf(_mask)) & (_val) : 0, \
+				 _pfx "value too large for the field"); \
+		BUILD_BUG_ON_MSG((_mask) > (typeof(_reg))~0ull,		\
+				 _pfx "type of reg too small for mask"); \
+		__BUILD_BUG_ON_NOT_POWER_OF_2((_mask) +			\
+					      (1ULL << __bf_shf(_mask))); \
+	})
+#else
+#define __BF_FIELD_CHECK(_mask, _reg, _val, _pfx) ({ })
+#endif
+/**
+ * FIELD_FIT() - check if value fits in the field
+ * @_mask: shifted mask defining the field's length and position
+ * @_val:  value to test against the field
+ *
+ * Return: true if @_val can fit inside @_mask, false if @_val is too big.
+ */
+#define FIELD_FIT(_mask, _val)						\
+	({								\
+		__BF_FIELD_CHECK(_mask, 0ULL, _val, "FIELD_FIT: ");	\
+		!((((typeof(_mask))_val) << __bf_shf(_mask)) & ~(_mask)); \
+	})
+
+/**
+ * FIELD_PREP() - prepare a bitfield element
+ * @_mask: shifted mask defining the field's length and position
+ * @_val:  value to put in the field
+ *
+ * FIELD_PREP() masks and shifts up the value.  The result should
+ * be combined with other fields of the bitfield using logical OR.
+ */
+#define FIELD_PREP(_mask, _val)						\
+	({								\
+		__BF_FIELD_CHECK(_mask, 0ULL, _val, "FIELD_PREP: ");	\
+		((typeof(_mask))(_val) << __bf_shf(_mask)) & (_mask);	\
+	})
+
+/**
+ * FIELD_GET() - extract a bitfield element
+ * @_mask: shifted mask defining the field's length and position
+ * @_reg:  value of entire bitfield
+ *
+ * FIELD_GET() extracts the field specified by @_mask from the
+ * bitfield passed in as @_reg by masking and shifting it down.
+ */
+#define FIELD_GET(_mask, _reg)						\
+	({								\
+		__BF_FIELD_CHECK(_mask, _reg, 0U, "FIELD_GET: ");	\
+		(typeof(_mask))(((_reg) & (_mask)) >> __bf_shf(_mask));	\
+	})
+
+#define WARN_ON_ONCE(condition) ({ \
+   int __ret_warn_on = !!(condition); \
+    (__ret_warn_on); })
+
+
 /**
  * __fls - find last (most-significant) set bit in a long word
  * @word: the word to search
@@ -178,7 +250,7 @@ struct jit_ctx {
 	int epilogue_offset;
 	int *offset;
 	int exentry_idx;
-	__le32 *image;
+	 u32 *image;
 	u32 stack_size;
 };
 
@@ -278,7 +350,7 @@ static inline int bpf2a64_offset(int bpf_insn, int off,
 
 static void jit_fill_hole(void *area, unsigned int size)
 {
-	__le32 *ptr;
+	 u32 *ptr;
 	/* We are guaranteed to have aligned memory. */
 	for (ptr = area; size >= sizeof(u32); size -= sizeof(u32))
 		*ptr++ = cpu_to_le32(AARCH64_BREAK_FAULT);
@@ -1098,7 +1170,7 @@ struct ebpf_vm *linux_bpf_int_jit_compile(struct ebpf_vm *prog)
 
 	/* 2. Now, the actual pass. */
 
-	ctx.image = (__le32 *)image_ptr;
+	ctx.image = ( u32 *)image_ptr;
 	if (extable_size)
 		prog->aux->extable = (void *)image_ptr + prog_size;
 skip_init_ctx:
