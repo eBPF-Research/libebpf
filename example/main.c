@@ -10,8 +10,8 @@
 		fprintf(stderr, "Failed to load code: %s\n", errmsg);          \
 	}
 
-#define TEST_BPF_CODE ebpf_code
-// bpf_mul_64_bit
+#define TEST_BPF_CODE bpf_mul_64_bit
+#define TEST_BPF_SIZE sizeof(TEST_BPF_CODE)
 
 char *errmsg;
 struct mem {
@@ -48,11 +48,11 @@ int main()
 	ebpf_toggle_bounds_check(vm, false);
 
 	// remove 0, in the end
-	CHECK_EXIT(ebpf_load(vm, TEST_BPF_CODE, sizeof(TEST_BPF_CODE) - 1,
+	CHECK_EXIT(ebpf_load(vm, TEST_BPF_CODE, TEST_BPF_SIZE,
 			     &errmsg));
 
 	// EBPF_OP_CALL
-	printf("code len: %d\n", sizeof(TEST_BPF_CODE));
+	printf("code len: %d\n", TEST_BPF_SIZE);
 
 	int mem_len = 1024 * 1024;
 	char *mem = malloc(mem_len);

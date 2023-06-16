@@ -1454,8 +1454,6 @@ static void build_epilogue(struct jit_ctx *ctx)
 #endif
 }
 
-// TODO: 以上两函数均只是使用emit结构，可以直接使用jit_state结构替换
-
 /*
  * Convert an eBPF instruction to native instruction, i.e
  * JITs an eBPF instruction.
@@ -1478,6 +1476,10 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
 	const s8 *rd, *rs;
 	s8 rd_lo, rt, rm, rn;
 	s32 jmp_offset;
+
+	u64 insn64 = *((u64 *)insn);
+	printf("%08llx, [%2d] %d %d %d %d\n", insn64, i, 
+	       insn->dst_reg, insn->src_reg, insn->off, insn->imm);
 
 #define check_imm(bits, imm) do {				\
 	if ((imm) >= (1 << ((bits) - 1)) ||			\
@@ -2015,10 +2017,10 @@ struct ebpf_vm *linux_bpf_int_jit_compile(struct ebpf_vm *prog)
 	// ctx.target = (u32* )buffer;
 	ctx.offsets = calloc(prog->num_insts, sizeof(int));
 	// pa: TODO: what's length is needed?
-	// if (ctx.offsets == NULL) {
-	// 	prog = orig_prog;
-	// 	goto out;
-	// }
+	if (ctx.offsets == NULL) {
+		prog = orig_prog;
+		goto out;
+	}
 
 	/* 1) fake pass to find in the length of the JITed code,
 	 * to compute ctx->offsets and other context variables
@@ -2030,10 +2032,10 @@ struct ebpf_vm *linux_bpf_int_jit_compile(struct ebpf_vm *prog)
 	 * being successful in the second pass, so just fall back
 	 * to the interpreter.
 	 */
-	// if (build_body(&ctx)) {
-	// 	prog = orig_prog;
-	// 	goto out_off;
-	// }
+	if (build_body(&ctx)) {
+		prog = orig_prog;
+		goto out_off;
+	}
 
 	tmp_idx = ctx.idx;
 	build_prologue(&ctx);
@@ -2097,10 +2099,12 @@ struct ebpf_vm *linux_bpf_int_jit_compile(struct ebpf_vm *prog)
 	prog->bpf_func = (void *)ctx.target;
 	prog->jited = 1;
 	prog->jited_len = image_size;
+	goto out;
 
 out_imms:
 out_off:
-	 free(ctx.offsets);
+	free(ctx.offsets);
+	return NULL;
 out:
 	return prog;
 }
@@ -2112,6 +2116,11 @@ ebpf_translate_arm32(struct ebpf_vm* vm, uint8_t* buffer, size_t* size, char** e
 	struct ebpf_vm * new_vm;
 	
 	new_vm = linux_bpf_int_jit_compile(vm);
+	if (new_vm) {
+		result = 0;
+	}
+	// TODO: fix the function pointer
+	vm->jitted_function = (ebpf_jit_fn)new_vm->bpf_func;
     return result;
 }
 

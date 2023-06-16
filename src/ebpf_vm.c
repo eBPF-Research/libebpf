@@ -292,7 +292,7 @@ ebpf_exec(const struct ebpf_vm* vm, void* mem, size_t mem_len, uint64_t* bpf_ret
         const uint16_t cur_pc = pc;
         struct bpf_insn inst = ebpf_fetch_instruction(vm, pc++);
 
-        printf("op: %d %d\n", EBPF_OP_CALL, inst.code);
+        // printf("op: %d %d\n", EBPF_OP_CALL, inst.code);
 
         switch (inst.code) {
         case EBPF_OP_ADD_IMM:
@@ -815,7 +815,7 @@ validate(const struct ebpf_vm* vm, const struct bpf_insn* insts, uint32_t num_in
         struct bpf_insn inst = insts[i];
         bool store = false;
 
-        printf("op: %d %d imm: %d\n", EBPF_OP_CALL, inst.code, inst.imm);
+        // printf("op: %d %d imm: %d\n", EBPF_OP_CALL, inst.code, inst.imm);
 
         switch (inst.code) {
         case EBPF_OP_ADD_IMM:
