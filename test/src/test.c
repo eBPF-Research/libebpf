@@ -85,7 +85,9 @@ main(int argc, char** argv)
             jit = true;
             break;
         case 'r':
+#if defined(__x86_64__) || defined(_M_X64)
             ebpf_set_register_offset(atoi(optarg));
+#endif
             break;
         case 'h':
             usage(argv[0]);
