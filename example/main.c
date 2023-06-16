@@ -21,9 +21,12 @@ struct mem {
 
 const char *ffi_func = "ffi_call";
 
-typedef uint64_t (*ffi_call)(uint64_t r1, uint64_t r2, uint64_t r3, uint64_t r4, uint64_t r5);
+typedef uint64_t (*ffi_call)(uint64_t r1, uint64_t r2, uint64_t r3, uint64_t r4,
+			     uint64_t r5);
 
-uint64_t test_func(uint64_t func_addr, uint64_t arg0, uint64_t arg1, uint64_t arg2, uint64_t arg3) {
+uint64_t test_func(uint64_t func_addr, uint64_t arg0, uint64_t arg1,
+		   uint64_t arg2, uint64_t arg3)
+{
 	char *str = (char *)arg0;
 	// func_addr(arg0, arg1, arg2, arg3);
 	printf("helper-1: \n");
@@ -35,39 +38,32 @@ int main()
 	struct mem m = { 1, 2 };
 	uint64_t res = 0;
 #if JIT_TEST_UBPF
+	printf("Use JIT Mode\n");
 	// using ubpf jit for x86_64 and arm64
 	struct ebpf_vm *vm = ebpf_create();
-	
+
 	// ffi_call my_test_func = test_func;
 	ebpf_register(vm, 2, ffi_func, test_func);
 
 	ebpf_toggle_bounds_check(vm, false);
 
 	// remove 0, in the end
-	CHECK_EXIT(
-		ebpf_load(vm, TEST_BPF_CODE, sizeof(TEST_BPF_CODE) - 1, &errmsg));
+	CHECK_EXIT(ebpf_load(vm, TEST_BPF_CODE, sizeof(TEST_BPF_CODE) - 1,
+			     &errmsg));
 
 	// EBPF_OP_CALL
 	printf("code len: %d\n", sizeof(TEST_BPF_CODE));
 
 	int mem_len = 1024 * 1024;
-	char* mem = malloc(mem_len);
+	char *mem = malloc(mem_len);
 
-	bool use_jit = false;
-
-	if (use_jit) {
-		printf("Use JIT Mode\n");
-		ebpf_jit_fn fn = ebpf_compile(vm, &errmsg);
-		if (fn == NULL) {
-			fprintf(stderr, "Failed to compile: %s\n", errmsg);
-			free(mem);
-			return 1;
-		}
-		res = fn(mem, mem_len);
-	} else {
-		printf("Use Interpreter Mode\n");
-		ebpf_exec(vm, mem, mem_len, &res);
+	ebpf_jit_fn fn = ebpf_compile(vm, &errmsg);
+	if (fn == NULL) {
+		fprintf(stderr, "Failed to compile: %s\n", errmsg);
+		free(mem);
+		return 1;
 	}
+	res = fn(mem, mem_len);
 
 	printf("%d + %d = %ld\n", m.a, m.b, res);
 #else

@@ -83,10 +83,13 @@ ebpf_create(void)
     vm->error_printf = fprintf;
 
 #if defined(__x86_64__) || defined(_M_X64)
+    printf("ebpf_create: x86_64\n");
     vm->translate = ebpf_translate_x86_64;
 #elif defined(__aarch64__) || defined(_M_ARM64)
+    printf("ebpf_create: arm64\n");
     vm->translate = ebpf_translate_arm64;
 #else
+    printf("ebpf_create: null\n");
     vm->translate = ebpf_translate_null;
 #endif
     vm->unwind_stack_extension_index = -1;

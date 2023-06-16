@@ -7,7 +7,6 @@ ebpf_code.h
 
 
 ### VisualStudioCode ###
-.vscode/*
 .vscode/settings.json
 .vscode/extensions.json
 

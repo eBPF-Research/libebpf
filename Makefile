@@ -63,7 +63,7 @@ build-arm32: ## build the package on arm32
 	cmake -Bbuild -DCMAKE_TOOLCHAIN_FILE=cmake/arm-toolchain.cmake -DARCH=arm
 	cmake --build build --config Debug
 
-run-arm32: build-arm32 ## run the binary on arm32 qemu
+run-arm32:## run the binary on arm32 qemu
 	qemu-arm -L /usr/arm-linux-gnueabihf/  build/bin/Debug/libebpf
 
 build-arm64: ## build the package on arm64
