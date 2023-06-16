@@ -464,4 +464,6 @@ static void* find_bpf_helper_func(uint32_t helper_id) {
 	return NULL;
 }
 
+struct ebpf_vm *linux_bpf_int_jit_compile(struct ebpf_vm *prog);
+
 #endif /* _LINUX_BPF_H */

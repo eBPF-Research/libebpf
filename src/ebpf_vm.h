@@ -20,7 +20,8 @@
 
 #include <libebpf/libebpf.h>
 #include "ebpf_inst.h"
-#include "linux_jit_bpf.h"
+
+#define DEBUG 1
 
 typedef uint64_t (*ext_func)(uint64_t arg0, uint64_t arg1, uint64_t arg2, uint64_t arg3, uint64_t arg4);
 

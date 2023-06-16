@@ -785,9 +785,9 @@ static int emit_bpf_tail_call(int insn, struct rv_jit_context *ctx)
 		ctx->offset[0];
 
 	/* max_entries = array->map.max_entries; */
-	off = offsetof(struct bpf_array, map.max_entries);
-	if (is_12b_check(off, insn))
-		return -1;
+	// off = offsetof(struct bpf_array, map.max_entries);
+	// if (is_12b_check(off, insn))
+	// 	return -1;
 	emit(rv_lw(RV_REG_T1, off, lo(arr_reg)), ctx);
 
 	/*
@@ -813,9 +813,9 @@ static int emit_bpf_tail_call(int insn, struct rv_jit_context *ctx)
 	 */
 	emit(rv_slli(RV_REG_T0, lo(idx_reg), 2), ctx);
 	emit(rv_add(RV_REG_T0, RV_REG_T0, lo(arr_reg)), ctx);
-	off = offsetof(struct bpf_array, ptrs);
-	if (is_12b_check(off, insn))
-		return -1;
+	// off = offsetof(struct bpf_array, ptrs);
+	// if (is_12b_check(off, insn))
+	// 	return -1;
 	emit(rv_lw(RV_REG_T0, off, RV_REG_T0), ctx);
 	off = ninsns_rvoff(tc_ninsn - (ctx->ninsns - start_insn));
 	emit_bcc(BPF_JEQ, RV_REG_T0, RV_REG_ZERO, off, ctx);

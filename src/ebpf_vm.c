@@ -275,7 +275,7 @@ ebpf_exec(const struct ebpf_vm* vm, void* mem, size_t mem_len, uint64_t* bpf_ret
         return -1;
     }
 
-#ifdef DEBUG
+#if DEBUG
     if (vm->regs)
         reg = vm->regs;
     else
@@ -1052,7 +1052,7 @@ ebpf_error(const char* fmt, ...)
     return msg;
 }
 
-#ifdef DEBUG
+#if DEBUG
 void
 ebpf_set_registers(struct ebpf_vm* vm, uint64_t* regs)
 {
@@ -1099,8 +1099,8 @@ ebpf_fetch_instruction(const struct ebpf_vm* vm, uint16_t pc)
     // This makes ROP attack more difficult.
     ebpf_encoded_inst encode_inst;
     encode_inst.inst = vm->insnsi[pc];
-    encode_inst.value ^= (uint64_t)vm->insnsi;
-    encode_inst.value ^= vm->pointer_secret;
+    // encode_inst.value ^= (uint64_t)vm->insnsi;
+    // encode_inst.value ^= vm->pointer_secret;
     return encode_inst.inst;
 }
 
@@ -1111,8 +1111,8 @@ ebpf_store_instruction(const struct ebpf_vm* vm, uint16_t pc, struct bpf_insn in
     // This makes ROP attack more difficult.
     ebpf_encoded_inst encode_inst;
     encode_inst.inst = inst;
-    encode_inst.value ^= (uint64_t)vm->insnsi;
-    encode_inst.value ^= vm->pointer_secret;
+    // encode_inst.value ^= (uint64_t)vm->insnsi;
+    // encode_inst.value ^= vm->pointer_secret;
     vm->insnsi[pc] = encode_inst.inst;
 }
 

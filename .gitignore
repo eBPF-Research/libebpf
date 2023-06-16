@@ -18,3 +18,5 @@ ebpf_code.h
 *.core
 core.*
 *.cache
+
+example/libffi/test

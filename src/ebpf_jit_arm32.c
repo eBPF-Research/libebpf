@@ -1476,11 +1476,11 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
 	const s8 *rd, *rs;
 	s8 rd_lo, rt, rm, rn;
 	s32 jmp_offset;
-
+#if DEBUG
 	u64 insn64 = *((u64 *)insn);
 	printf("%08llx, [%2d] %d %d %d %d\n", insn64, i, 
 	       insn->dst_reg, insn->src_reg, insn->off, insn->imm);
-
+#endif
 #define check_imm(bits, imm) do {				\
 	if ((imm) >= (1 << ((bits) - 1)) ||			\
 	    (imm) < -(1 << ((bits) - 1))) {			\
@@ -2123,43 +2123,6 @@ ebpf_translate_arm32(struct ebpf_vm* vm, uint8_t* buffer, size_t* size, char** e
 	vm->jitted_function = (ebpf_jit_fn)new_vm->bpf_func;
     return result;
 }
-
-// int ebpf_translate_arm32(struct ebpf_vm *vm, uint8_t *buffer, size_t *size,char **errmsg)
-// {
-// 	struct jit_state state;
-// 	int result = -1;
-
-// 	state.offset = 0;
-// 	state.size = *size;
-// 	state.buf = buffer;
-// 	state.pc_locs = calloc(EBPF_MAX_INSTS + 1, sizeof(state.pc_locs[0]));
-// 	state.jumps = calloc(EBPF_MAX_INSTS, sizeof(state.jumps[0]));
-// 	state.num_jumps = 0;
-
-// 	if (translate(vm, &state, errmsg) < 0) {
-// 		goto out;
-// 	}
-
-// 	if (state.num_jumps == EBPF_MAX_INSTS) {
-// 		*errmsg = ebpf_error("Excessive number of jump targets");
-// 		goto out;
-// 	}
-
-// 	if (state.offset == state.size) {
-// 		*errmsg = ebpf_error("Target buffer too small");
-// 		goto out;
-// 	}
-
-// 	resolve_jumps(&state);
-// 	result = 0;
-
-// 	*size = state.offset;
-
-// out:
-// 	free(state.pc_locs);
-// 	free(state.jumps);
-// 	return result;
-// }
 
 // static int
 // translate(struct ebpf_vm* vm, struct jit_state* state, char** errmsg)
