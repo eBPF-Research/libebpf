@@ -22,7 +22,7 @@ def main():
     parser.add_argument('path')
     args = parser.parse_args()
 
-    data = testdata.read(args.name + '.data')
+    data = testdata.read(_test_data_dir, args.name + '.data')
     assert data
 
     if not os.path.isdir(args.path):

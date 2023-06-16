@@ -30,12 +30,11 @@ INSTALL_LOCATION := ~/.local
 help:
 	@python -c "$$PRINT_HELP_PYSCRIPT" < $(MAKEFILE_LIST)
 
-test: ## run tests quickly with nosetests, please build first
-
-	# rm -rf build/
-	# cmake -Bbuild -DCMAKE_INSTALL_PREFIX=$(INSTALL_LOCATION) -Dlibebpf_ENABLE_UNIT_TESTING=1 -DCMAKE_BUILD_TYPE="Release"
-	# cmake --build build --config Release
-	# cd build/ && ctest -C Release -VV
+test: ## run tests quickly with pytest, please build first
+	rm -rf build/
+	cmake -Bbuild -Dlibebpf_ENABLE_UNIT_TESTING=1
+	cmake --build build --config Debug
+	pytest -v --lf test
 
 coverage: ## check code coverage quickly GCC
 	rm -rf build/

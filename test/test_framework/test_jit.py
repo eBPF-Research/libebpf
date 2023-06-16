@@ -7,7 +7,10 @@ from subprocess import Popen, PIPE
 from nose.plugins.skip import Skip, SkipTest
 import ubpf.assembler
 import testdata
-VM = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "vm", "test")
+import pytest
+import os
+_test_data_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../test-cases")
+VM = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "libebpf", "test")
 try:
     xrange
 except NameError:
@@ -25,7 +28,7 @@ def check_datafile(filename):
     if not jit_supported_platform():
         raise SkipTest("JIT is not supported on the current platform")
 
-    data = testdata.read(filename)
+    data = testdata.read(_test_data_dir, filename)
     if 'asm' not in data and 'raw' not in data:
         raise SkipTest("no asm or raw section in datafile")
     if 'result' not in data and 'error' not in data and 'error pattern' not in data:
@@ -94,8 +97,8 @@ def check_datafile(filename):
         if memfile:
             memfile.close()
 
-def test_datafiles():
-    # Nose test generator
-    # Creates a testcase for each datafile
-    for filename in testdata.list_files():
-        yield check_datafile, filename
+@pytest.mark.parametrize("filename", testdata.list_files(_test_data_dir))
+def test_datafiles(filename):
+    # This is now a regular test function that will be called once for each filename
+    check_datafile(filename)
+

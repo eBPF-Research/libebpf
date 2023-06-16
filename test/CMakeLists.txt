@@ -6,7 +6,7 @@ cmake_minimum_required(VERSION 3.15)
 
 project(
   ${CMAKE_PROJECT_NAME}Tests
-  LANGUAGES CXX
+  LANGUAGES C
 )
 
 verbose_message("Adding tests under ${CMAKE_PROJECT_NAME}Tests...")
@@ -66,7 +66,12 @@ foreach(file ${test_sources})
         ${${CMAKE_PROJECT_NAME}_TEST_LIB}
     )
   else()
-    message(FATAL_ERROR "Unknown testing library. Please setup your desired unit testing library by using `target_link_libraries`.")  
+    target_link_libraries(
+      ${test_name}_Tests
+      PUBLIC
+        ${${CMAKE_PROJECT_NAME}_TEST_LIB}
+    )
+    message("Unknown testing library. Please setup your desired unit testing library by using `target_link_libraries`.")  
   endif()
 
   #

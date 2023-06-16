@@ -3,6 +3,10 @@ from nose.plugins.skip import Skip, SkipTest
 import ubpf.assembler
 import ubpf.disassembler
 import testdata
+import pytest
+import os
+_test_data_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../test-cases")
+
 try:
     xrange
 except NameError:
@@ -21,7 +25,7 @@ def check_datafile(filename):
     Verify that the result of assembling the 'asm' section matches the
     'raw' section.
     """
-    data = testdata.read(filename)
+    data = testdata.read(_test_data_dir, filename)
     if 'asm' not in data:
         raise SkipTest("no asm section in datafile")
     if 'raw' not in data:
@@ -39,8 +43,8 @@ def check_datafile(filename):
             raise AssertionError("Expected instruction %d to be %#x (%s), but was %#x (%s)" %
                 (j, exp, try_disassemble(exp), inst, try_disassemble(inst)))
 
-def test_datafiles():
-    # Nose test generator
-    # Creates a testcase for each datafile
-    for filename in testdata.list_files():
-        yield check_datafile, filename
+@pytest.mark.parametrize("filename", testdata.list_files(_test_data_dir))
+def test_datafiles(filename):
+    # This is now a regular test function that will be called once for each filename
+    check_datafile(filename)
+

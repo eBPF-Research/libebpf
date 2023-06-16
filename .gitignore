@@ -24,3 +24,4 @@ test/man
 test/lib
 test/bin
 test/lib64
+.log

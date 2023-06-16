@@ -3,13 +3,16 @@ import difflib
 from nose.plugins.skip import Skip, SkipTest
 import ubpf.disassembler
 import testdata
+import pytest
+import os
+_test_data_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../test-cases")
 
 def check_datafile(filename):
     """
     Verify that the result of disassembling the 'raw' section matches the
     'asm' section.
     """
-    data = testdata.read(filename)
+    data = testdata.read(_test_data_dir, filename)
     if 'asm' not in data:
         raise SkipTest("no asm section in datafile")
     if 'raw' not in data:
@@ -24,8 +27,7 @@ def check_datafile(filename):
         formatted = ''.join('  %s\n' % x for x in diff)
         raise AssertionError("Assembly differs:\n%s" % formatted)
 
-def test_datafiles():
-    # Nose test generator
-    # Creates a testcase for each datafile
-    for filename in testdata.list_files():
-        yield check_datafile, filename
+@pytest.mark.parametrize("filename", testdata.list_files(_test_data_dir))
+def test_datafiles(filename):
+    # This is now a regular test function that will be called once for each filename
+    check_datafile(filename)

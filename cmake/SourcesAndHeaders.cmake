@@ -68,5 +68,5 @@ set(headers
 message(STATUS ${headers})
 
 set(test_sources
-  src/tmp_test.cpp
+  src/test.c
 )

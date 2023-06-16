@@ -4,6 +4,9 @@ from nose.plugins.skip import Skip, SkipTest
 import ubpf.assembler
 import ubpf.disassembler
 import testdata
+import pytest
+import os
+_test_data_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../test-cases")
 
 # Just for assertion messages
 def try_disassemble(inst):
@@ -19,7 +22,7 @@ def check_datafile(filename):
     the same binary, and that disassembling the output of the assembler
     produces the same text.
     """
-    data = testdata.read(filename)
+    data = testdata.read(_test_data_dir, filename)
 
     if 'asm' not in data:
         raise SkipTest("no asm section in datafile")
@@ -37,8 +40,7 @@ def check_datafile(filename):
     if assembled != reassembled:
         raise AssertionError("binary differs")
 
-def test_datafiles():
-    # Nose test generator
-    # Creates a testcase for each datafile
-    for filename in testdata.list_files():
-        yield check_datafile, filename
+@pytest.mark.parametrize("filename", testdata.list_files(_test_data_dir))
+def test_datafiles(filename):
+    # This is now a regular test function that will be called once for each filename
+    check_datafile(filename)

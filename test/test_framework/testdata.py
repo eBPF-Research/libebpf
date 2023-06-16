@@ -1,9 +1,7 @@
 import os
 import re
 
-_test_data_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../test-cases")
-
-def list_files():
+def list_files(test_data_dir):
     """
     Return a list of data files under tests/data
 
@@ -11,14 +9,14 @@ def list_files():
     """
 
     result = []
-    for dirname, dirnames, filenames in os.walk(_test_data_dir):
-        dirname = (os.path.relpath(dirname, _test_data_dir) + '/').replace('./', '')
+    for dirname, dirnames, filenames in os.walk(test_data_dir):
+        dirname = (os.path.relpath(dirname, test_data_dir) + '/').replace('./', '')
         for filename in filenames:
             if filename.endswith('.data') and not filename.startswith('.'):
                 result.append(dirname + filename)
     return sorted(result)
 
-def read(name):
+def read(_test_data_dir, name):
     """
     Read, parse, and return a test data file
 
