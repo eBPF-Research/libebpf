@@ -12,18 +12,10 @@
 #include <time.h>
 #endif
 
-int bpf_jit_enable = true;
-// const int bpf_jit_harden;
-// const int bpf_jit_kallsyms;
-// const long bpf_jit_limit;
-
-static inline struct bpf_binary_header *
-bpf_jit_binary_hdr(const struct ebpf_vm *fp)
+static inline __attribute__((const))
+bool is_power_of_2(unsigned long n)
 {
-	unsigned long real_start = (unsigned long)fp->bpf_func;
-	unsigned long addr = real_start & PAGE_MASK;
-
-	return (void *)addr;
+	return (n != 0 && ((n & (n - 1)) == 0));
 }
 
 void *bpf_jit_alloc_exec(unsigned long size)
@@ -97,39 +89,6 @@ typedef unsigned int (*bpf_dispatcher_fn)(const void *ctx,
 					  unsigned int (*bpf_func)(const void *,
 								   const struct bpf_insn *));
 
-struct ebpf_vm *bpf_prog_alloc_no_stats(unsigned int size)
-{
-	struct bpf_prog_aux *aux;
-	struct ebpf_vm *fp;
-
-	size = round_up(size, PAGE_SIZE);
-	fp = calloc(size, 1);
-	if (fp == NULL)
-		return NULL;
-
-	aux = calloc(1, sizeof(*aux));
-	if (aux == NULL) {
-		free(fp);
-		return NULL;
-	}
-	fp->pages = size / PAGE_SIZE;
-	fp->aux = aux;
-	fp->aux->prog = fp;
-
-	return fp;
-}
-
-struct ebpf_vm *bpf_prog_alloc(unsigned int size)
-{
-	struct ebpf_vm *prog;
-
-	prog = bpf_prog_alloc_no_stats(size);
-	if (!prog)
-		return NULL;
-
-	return prog;
-}
-
 void __bpf_prog_free(struct ebpf_vm *fp)
 {
 	if (fp->aux) {
@@ -137,43 +96,6 @@ void __bpf_prog_free(struct ebpf_vm *fp)
 		free(fp->aux);
 	}
 	free(fp);
-}
-
-struct ebpf_vm *linux_bpf_prog_load(const void* code, uint32_t code_len)
-{
-	struct ebpf_vm *prog = NULL;
-
-	/* plain bpf_prog allocation */
-	prog = bpf_prog_alloc(code_len);
-	if (!prog) {
-		return NULL;
-	}
-
-	prog->num_insts = code_len;
-
-	memcpy(prog->insnsi,
-			     (void*)code,
-			     prog->num_insts * sizeof(struct bpf_insn));
-
-	prog->orig_prog = NULL;
-
-	/* run eBPF verifier */
-	// err = bpf_check(&prog, attr, uattr);
-	return prog;
-}
-
-/* Free internal BPF program */
-void linux_bpf_prog_free(struct ebpf_vm *fp)
-{
-	struct bpf_prog_aux *aux = fp->aux;
-
-	for (int i = 0; i < aux->func_cnt; i++)
-		__bpf_prog_free(aux->func[i]);
-	if (aux->func_cnt) {
-		free(aux->func);
-	} else {
-		__bpf_prog_free(aux->prog);
-	}
 }
 
 /* Base function for offset calculation. Needs to go into .text section,
@@ -227,9 +149,6 @@ int bpf_jit_get_func_addr(const struct ebpf_vm *prog,
 		 */
 		if (!extra_pass)
 			addr = NULL;
-		else if (prog->aux->func &&
-			 off >= 0 && off < prog->aux->func_cnt)
-			addr = (u8 *)prog->aux->func[off]->bpf_func;
 		else
 			return -EINVAL;
 	} else {

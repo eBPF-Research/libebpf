@@ -26,6 +26,7 @@
 #include "ebpf_inst.h"
 #include "ebpf_vm.h"
 #include <unistd.h>
+#include "linux_bpf.h"
 
 #define MAX_EXT_FUNCS 64
 
@@ -67,6 +68,17 @@ ebpf_create(void)
         return NULL;
     }
 
+    /* linux aux alloc */
+    struct bpf_prog_aux *aux;
+    aux = calloc(1, sizeof(*aux));
+	if (aux == NULL) {
+		free(vm);
+		return NULL;
+	}
+	vm->aux = aux;
+	vm->aux->prog = vm;
+    /* end linux bpf_prog_aux */
+
     vm->ext_funcs = calloc(MAX_EXT_FUNCS, sizeof(*vm->ext_funcs));
     if (vm->ext_funcs == NULL) {
         ebpf_destroy(vm);
@@ -88,6 +100,9 @@ ebpf_create(void)
 #elif defined(__aarch64__) || defined(_M_ARM64)
     printf("ebpf_create: arm64\n");
     vm->translate = ebpf_translate_arm64;
+#elif defined(__arm__) || defined(_M_ARM)
+    printf("ebpf_create: arm32\n");
+    vm->translate = ebpf_translate_arm32;
 #else
     printf("ebpf_create: null\n");
     vm->translate = ebpf_translate_null;
@@ -170,7 +185,7 @@ ebpf_load(struct ebpf_vm* vm, const void* code, uint32_t code_len, char** errmsg
     }
 
     vm->num_insts = code_len / sizeof(vm->insnsi[0]);
-
+	vm->orig_prog = NULL;
     // Store instructions in the vm.
     for (uint32_t i = 0; i < vm->num_insts; i++) {
         ebpf_store_instruction(vm, i, source_inst[i]);

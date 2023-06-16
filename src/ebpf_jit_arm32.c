@@ -2105,6 +2105,16 @@ out:
 	return prog;
 }
 
+int
+ebpf_translate_arm32(struct ebpf_vm* vm, uint8_t* buffer, size_t* size, char** errmsg)
+{
+    int result = -1;
+	struct ebpf_vm * new_vm;
+	
+	new_vm = linux_bpf_int_jit_compile(vm);
+    return result;
+}
+
 // int ebpf_translate_arm32(struct ebpf_vm *vm, uint8_t *buffer, size_t *size,char **errmsg)
 // {
 // 	struct jit_state state;

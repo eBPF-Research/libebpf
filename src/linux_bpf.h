@@ -370,9 +370,7 @@ void __bpf_prog_exit(struct ebpf_vm *prog, u64 start);
 
 struct bpf_prog_aux {
 	u32 stack_depth;
-	u32 func_cnt; /* used by non-func prog as the number of func progs */
 	bool verifier_zext; /* Zero extensions has been inserted by verifier. */
-	struct ebpf_vm **func;
 	void *jit_data; /* JIT specific data. arch dependent */
 	struct bpf_jit_poke_descriptor *poke_tab;
 	struct ebpf_vm *prog;

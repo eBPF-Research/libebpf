@@ -6,8 +6,6 @@
 
 struct ebpf_vm;
 
-struct ebpf_vm *linux_bpf_prog_load(const void* code, uint32_t code_len);
-
 struct ebpf_vm *linux_bpf_int_jit_compile(struct ebpf_vm *prog);
 
 void linux_bpf_prog_free(struct ebpf_vm *prog);

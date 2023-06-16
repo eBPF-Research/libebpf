@@ -43,7 +43,6 @@ struct ebpf_vm
     uint64_t* regs;
 #endif
     /* linux defs: TODO: merge them together*/
-	u16			pages;		/* Number of allocated pages */
 	u16			jited:1	/* Is our filter JIT'ed? */
                 ;
 	u32			jited_len;	/* Size of jited insns in bytes */
@@ -60,6 +59,8 @@ int
 ebpf_translate_x86_64(struct ebpf_vm* vm, uint8_t* buffer, size_t* size, char** errmsg);
 int
 ebpf_translate_null(struct ebpf_vm* vm, uint8_t* buffer, size_t* size, char** errmsg);
+int
+ebpf_translate_arm32(struct ebpf_vm* vm, uint8_t* buffer, size_t* size, char** errmsg);
 
 char*
 ebpf_error(const char* fmt, ...);

@@ -80,12 +80,6 @@ typedef int64_t s64;
    _max1 > _max2 ? _max1 : _max2; })
 #endif
 
-static inline __attribute__((const))
-bool is_power_of_2(unsigned long n)
-{
-	return (n != 0 && ((n & (n - 1)) == 0));
-}
-
 /**
  * container_of - cast a member of a structure out to the containing structure
  * @ptr:	the pointer to the member.
