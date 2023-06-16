@@ -54,14 +54,12 @@ python3 tools/compile_code.py -s example/bpf/test1.bpf.c
 ### test for pytest
 
 ```sh
-python3.8 -m venv test
+python -m venv test
 source test/bin/activate
 sudo apt install python3-pytest
-pip install -r requirements.txt
+pip install -r test/requirements.txt
 make build-x86 # or arm32 arm64
 make test
-# you can see the log in .test_log
-cat .test_log
 ```
 
 ## more source code are from

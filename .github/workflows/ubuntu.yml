@@ -29,13 +29,17 @@ jobs:
     - name: install test deps
       run: |
         sudo apt update
-        sudo apt install python3.8
+        sudo apt install python3
         sudo apt install python3-pytest
 
-    - name: run tests
+    - name: run tests x86
       run: |
-        python3.8 -m venv test
+        python3 -m venv test
         source test/bin/activate
-        pip install -r requirements.txt
+        pip install -r test/requirements.txt
         make build-x86
+        make test
+    - name: run tests arm64
+      run: |
+        make build-arm64
         make test
