@@ -21,7 +21,9 @@
 #include <libebpf/libebpf.h>
 #include "ebpf_inst.h"
 
-#define DEBUG 1
+#define DEBUG 0
+// Add a log function using DEBUG and printf
+#define LOG_DEBUG(...) do { if (DEBUG) printf(__VA_ARGS__); } while (0)
 
 typedef uint64_t (*ext_func)(uint64_t arg0, uint64_t arg1, uint64_t arg2, uint64_t arg3, uint64_t arg4);
 

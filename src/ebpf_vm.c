@@ -95,13 +95,13 @@ ebpf_create(void)
     vm->error_printf = fprintf;
 
 #if defined(__x86_64__) || defined(_M_X64)
-    printf("ebpf_create: x86_64\n");
+    LOG_DEBUG("ebpf_create: x86_64\n");
     vm->translate = ebpf_translate_x86_64;
 #elif defined(__aarch64__) || defined(_M_ARM64)
-    printf("ebpf_create: arm64\n");
+    LOG_DEBUG("ebpf_create: arm64\n");
     vm->translate = ebpf_translate_arm64;
 #elif defined(__arm__) || defined(_M_ARM)
-    printf("ebpf_create: arm32\n");
+    LOG_DEBUG("ebpf_create: arm32\n");
     vm->translate = ebpf_translate_arm32;
 #else
     printf("ebpf_create: null\n");
@@ -129,7 +129,7 @@ ebpf_register(struct ebpf_vm* vm, unsigned int idx, const char* name, void* fn)
 
     vm->ext_funcs[idx] = (ext_func)fn;
     vm->ext_func_names[idx] = name;
-    printf("ebpf_register: %s idx: %d func: %ld\n", name, idx, (long)fn);
+    LOG_DEBUG("ebpf_register: %s idx: %d func: %ld\n", name, idx, (long)fn);
     return 0;
 }
 

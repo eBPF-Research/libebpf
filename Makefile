@@ -30,11 +30,9 @@ INSTALL_LOCATION := ~/.local
 help:
 	@python -c "$$PRINT_HELP_PYSCRIPT" < $(MAKEFILE_LIST)
 
-test: ## run tests quickly with pytest, please build first
-	rm -rf build/
-	cmake -Bbuild -Dlibebpf_ENABLE_UNIT_TESTING=1
-	cmake --build build --config Debug
-	pytest -v --lf test
+test: ## run tests quickly with pytest on x86, you need to build first
+	pytest -v -s  test > .test_log
+	cat .test_log
 
 coverage: ## check code coverage quickly GCC
 	rm -rf build/
@@ -55,12 +53,12 @@ build: build-x86 build-arm32 build-arm64
 
 build-x86: ## build the package
 	rm -rf build/
-	cmake -Bbuild
+	cmake -Bbuild  -Dlibebpf_ENABLE_UNIT_TESTING=1
 	cmake --build build --config Debug
 
 build-arm32: ## build the package on arm32
 	rm -rf build/
-	cmake -Bbuild -DCMAKE_TOOLCHAIN_FILE=cmake/arm-toolchain.cmake -DARCH=arm
+	cmake -Bbuild -DCMAKE_TOOLCHAIN_FILE=cmake/arm-toolchain.cmake -DARCH=arm -Dlibebpf_ENABLE_UNIT_TESTING=1
 	cmake --build build --config Debug
 
 run-arm32:## run the binary on arm32 qemu
@@ -68,7 +66,7 @@ run-arm32:## run the binary on arm32 qemu
 
 build-arm64: ## build the package on arm64
 	rm -rf build/
-	cmake -Bbuild -DCMAKE_TOOLCHAIN_FILE=cmake/aarch64-toolchain.cmake -DARCH=aarch64
+	cmake -Bbuild -DCMAKE_TOOLCHAIN_FILE=cmake/aarch64-toolchain.cmake -DARCH=aarch64 -Dlibebpf_ENABLE_UNIT_TESTING=1
 	cmake --build build --config Debug
 
 run-arm64: build-arm64 ## run the binary on arm32 qemu

@@ -10,7 +10,7 @@ import pytest
 import os
 _test_data_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../test-cases")
 
-VM = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../..", "build/bin/Debug", "libebpf")
+VM = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../..", "build/test/test_Tests")
 
 def check_datafile(filename):
     """

@@ -11,7 +11,7 @@ from elftools.construct import Container
 from elftools.elf.constants import SH_FLAGS
 import testdata
 import ubpf.assembler
-VM = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "libebpf", "test")
+VM = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../..", "build/test/test_Tests")
 
 def template():
     parts = {}

@@ -58,7 +58,10 @@ python3.8 -m venv test
 source test/bin/activate
 sudo apt install python3-pytest
 pip install -r requirements.txt
-pytest -v --lf test
+makke build-x86 # or arm32 arm64
+make test
+# you can see the log in .test_log
+cat .test_log
 ```
 
 ## more source code are from
