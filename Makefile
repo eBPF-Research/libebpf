@@ -31,7 +31,7 @@ help:
 	@python -c "$$PRINT_HELP_PYSCRIPT" < $(MAKEFILE_LIST)
 
 test: ## run tests quickly with pytest on x86, you need to build first
-	pytest -v -s test
+	pytest -v -s test/test_framework
 
 coverage: ## check code coverage quickly GCC
 	rm -rf build/

@@ -53,8 +53,10 @@ python3 tools/compile_code.py -s example/bpf/test1.bpf.c
 
 ### test for pytest
 
+Use python3.8 and pytest
+
 ```sh
-python -m venv test
+python3.8 -m venv test
 source test/bin/activate
 sudo apt install python3-pytest
 pip install -r test/requirements.txt
