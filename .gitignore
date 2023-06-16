@@ -20,3 +20,7 @@ core.*
 *.cache
 
 example/libffi/test
+test/man
+test/lib
+test/bin
+test/lib64

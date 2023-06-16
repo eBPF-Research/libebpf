@@ -1478,7 +1478,7 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
 	s32 jmp_offset;
 #if DEBUG
 	u64 insn64 = *((u64 *)insn);
-	printf("%08llx, [%2d] %d %d %d %d\n", insn64, i, 
+	printf("%08llx, [%d] %d %d %d %d\n", insn64, i, 
 	       insn->dst_reg, insn->src_reg, insn->off, insn->imm);
 #endif
 #define check_imm(bits, imm) do {				\

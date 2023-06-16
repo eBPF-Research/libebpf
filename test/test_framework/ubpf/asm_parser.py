@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 from __future__ import print_function
+from parcon import *
 from collections import namedtuple
 
 hexchars = '0123456789abcdefABCDEF'
