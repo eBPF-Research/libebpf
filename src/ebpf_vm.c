@@ -790,7 +790,7 @@ ebpf_exec(const struct ebpf_vm* vm, void* mem, size_t mem_len, uint64_t* bpf_ret
             *bpf_return_value = reg[0];
             return 0;
         case EBPF_OP_CALL:
-            printf("call: %ld", vm->ext_funcs[inst.imm]);
+            LOG_DEBUG("call: %ld", vm->ext_funcs[inst.imm]);
             reg[0] = vm->ext_funcs[inst.imm](reg[1], reg[2], reg[3], reg[4], reg[5]);
             // Unwind the stack if unwind extension returns success.
             if (inst.imm == vm->unwind_stack_extension_index && reg[0] == 0) {
