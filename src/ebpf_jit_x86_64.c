@@ -122,7 +122,6 @@ static int
 translate(struct ebpf_vm* vm, struct jit_state* state, char** errmsg)
 {
     int i;
-
     /* Save platform non-volatile registers */
     for (i = 0; i < _countof(platform_nonvolatile_registers); i++) {
         emit_push(state, platform_nonvolatile_registers[i]);
@@ -140,8 +139,11 @@ translate(struct ebpf_vm* vm, struct jit_state* state, char** errmsg)
     emit_alu64_imm32(state, 0x81, 5, RSP, EBPF_STACK_SIZE);
 
     for (i = 0; i < vm->num_insts; i++) {
+        
         struct bpf_insn inst = ebpf_fetch_instruction(vm, i);
         state->pc_locs[i] = state->offset;
+	    LOG_DEBUG("%08lx, [%d] %d %d %d %d\n", *(uint64_t*)&inst, i, 
+	       inst.dst_reg, inst.src_reg, inst.off, inst.imm);
 
         int dst = map_register(inst.dst_reg);
         int src = map_register(inst.src_reg);

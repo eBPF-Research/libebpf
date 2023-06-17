@@ -2,7 +2,12 @@
 typedef unsigned long long uint64_t;
 typedef long long int64_t;
 typedef int int32_t;
-uint64_t global_context;
+// global context not support
+// uint64_t context;
+
+struct data {
+	uint64_t context;
+};
 
 union arg_val {
 	uint64_t uint64;
@@ -12,25 +17,35 @@ union arg_val {
 	void *ptr;
 };
 
-int _start(uint64_t context)
+static inline int add_func(uint64_t context, int a, int b);
+static inline uint64_t print_func(uint64_t context, char *str);
+
+int _start(struct data *d, int sz)
 {
-	global_context = context;
-	return 0;
+	// not support global value
+	char str[] = "hello";
+	// print_func("hello") not support
+	uint64_t n = print_func(d->context, str);
+	int x = (int)n;
+	return add_func(d->context, x, 1);
 }
 
-uint64_t (*__ebpf_call_ffi_dispatcher)(uint64_t context, uint64_t id,
-					   uint64_t r1, uint64_t r2,
-					   uint64_t r3) = (void *)0x1;
+static const uint64_t (*__ebpf_call_ffi_dispatcher)(uint64_t context,
+						    uint64_t id, uint64_t r1,
+						    uint64_t r2,
+						    uint64_t r3) = (void *)0x1;
 
-uint64_t print_func(char *str)
+static inline uint64_t print_func(uint64_t context, char *str)
 {
 	union arg_val ret;
-	ret.uint64 = __ebpf_call_ffi_dispatcher(global_context, 0, (uint64_t)str, 0, 0);
+	ret.uint64 =
+		__ebpf_call_ffi_dispatcher(context, 2, (uint64_t)str, 0, 0);
 	return ret.uint64;
 }
 
-int add_func(int a, int b) {
+static inline int add_func(uint64_t context, int a, int b)
+{
 	union arg_val ret;
-	ret.uint64 = __ebpf_call_ffi_dispatcher(global_context, 3, a, b, 0);
+	ret.uint64 = __ebpf_call_ffi_dispatcher(context, 3, a, b, 0);
 	return ret.int32;
 }

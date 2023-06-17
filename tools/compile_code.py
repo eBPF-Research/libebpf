@@ -74,8 +74,7 @@ def write_binary(ops):
 	print("disassemble: ")
 	data = ubpf.disassembler.disassemble(ops)
 	for pc, li in enumerate(data.split("\n")):
-		# print(pc, li)
-		print(li)
+		print(pc, li)
 
 def compile_code(src):
 	cmd = f"clang -O2 -emit-llvm -c {src} -o - | llc -march=bpf -filetype=obj -o code.o"

@@ -2,6 +2,10 @@ const int i = 0;
 static int j = 1;
 int k = 1;
 void (*print_bpf)(char *str) = (void *)0x5;
+struct data {
+	uint64_t context;
+};
+
 
 int print_and_add1(struct data *d, int sz) {
     // call 0x2 or *(u64 *)(r1 + 0), why?
