@@ -1,6 +1,6 @@
 #include <string.h>
-#include "minimal.h"
-#include "libebpf/libebpf.h"
+#include "bpf_progs.h"
+#include "bpf_host_ffi.h"
 #include <stdlib.h>
 
 #define JIT_TEST_UBPF 1
@@ -19,12 +19,7 @@ struct mem {
 	int b;
 };
 
-const char *ffi_func = "ffi_call";
-
-typedef uint64_t (*ffi_call)(uint64_t r1, uint64_t r2, uint64_t r3, uint64_t r4,
-			     uint64_t r5);
-
-uint64_t test_func(char *str)
+uint64_t print_func(char *str)
 {
 	printf("helper-1: %s\n", str);
 	return 0;
@@ -41,16 +36,26 @@ int main()
 #if JIT_TEST_UBPF
 	printf("Use JIT Mode\n");
 	// using ubpf jit for x86_64 and arm64
-	struct ebpf_vm *vm = ebpf_create();
+	struct ebpf_context *context = ebpf_create_context();
+	struct ebpf_ffi_func_info func1 = { 
+		FFI_FN(print_func),
+		FFI_TYPE_ULONG,
+		{ FFI_TYPE_POINTER },
+		1
+	 };
+	ebpf_register_ffi(context, 2, func1);
+	struct ebpf_ffi_func_info func2 = { 
+		FFI_FN(add_func),
+		FFI_TYPE_INT,
+		{ FFI_TYPE_INT, FFI_TYPE_INT },
+		2
+	 };
+	ebpf_register_ffi(context, 3, func2);
 
-	// ffi_call my_test_func = test_func;
-	ebpf_register(vm, 2, ffi_func, test_func);
-	ebpf_register(vm, 3, ffi_func, add_func);
-
-	ebpf_toggle_bounds_check(vm, false);
+	ebpf_toggle_bounds_check(context->vm, false);
 
 	// remove 0, in the end
-	CHECK_EXIT(ebpf_load(vm, TEST_BPF_CODE, TEST_BPF_SIZE,
+	CHECK_EXIT(ebpf_load(context->vm, TEST_BPF_CODE, TEST_BPF_SIZE,
 			     &errmsg));
 
 	// EBPF_OP_CALL
@@ -59,7 +64,7 @@ int main()
 	int mem_len = 1024 * 1024;
 	char *mem = malloc(mem_len);
 
-	ebpf_jit_fn fn = ebpf_compile(vm, &errmsg);
+	ebpf_jit_fn fn = ebpf_compile(context->vm, &errmsg);
 	if (fn == NULL) {
 		fprintf(stderr, "Failed to compile: %s\n", errmsg);
 		free(mem);

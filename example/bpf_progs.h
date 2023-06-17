@@ -1,6 +1,6 @@
 
-#ifndef EBPF_CODE_H_
-#define EBPF_CODE_H_
+#ifndef EBPF_TEST_CODE_H_
+#define EBPF_TEST_CODE_H_
 
 // original code from libebpf repo
 const unsigned char bpf_add_mem_64_bit_minimal[] = ""
