@@ -51,6 +51,7 @@ int main()
 		2
 	 };
 	ebpf_register_ffi(context, 3, func2);
+	ebpf_register(context->vm, 3, "add_func", add_func);
 
 	ebpf_toggle_bounds_check(context->vm, false);
 
