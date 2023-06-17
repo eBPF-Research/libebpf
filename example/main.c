@@ -10,8 +10,8 @@
 		fprintf(stderr, "Failed to load code: %s\n", errmsg);          \
 	}
 
-#define TEST_BPF_CODE ebpf_code
-#define TEST_BPF_SIZE sizeof(ebpf_code) - 1
+#define TEST_BPF_CODE bpf_function_call_add
+#define TEST_BPF_SIZE sizeof(bpf_function_call_add) - 1
 
 char *errmsg;
 struct mem {
@@ -24,13 +24,14 @@ const char *ffi_func = "ffi_call";
 typedef uint64_t (*ffi_call)(uint64_t r1, uint64_t r2, uint64_t r3, uint64_t r4,
 			     uint64_t r5);
 
-uint64_t test_func(uint64_t func_addr, uint64_t arg0, uint64_t arg1,
-		   uint64_t arg2, uint64_t arg3)
+uint64_t test_func(char *str)
 {
-	char *str = (char *)arg0;
-	// func_addr(arg0, arg1, arg2, arg3);
-	printf("helper-1: \n");
+	printf("helper-1: %s\n", str);
 	return 0;
+}
+
+int add_func(int a, int b) {
+	return a + b;
 }
 
 int main()
@@ -44,6 +45,7 @@ int main()
 
 	// ffi_call my_test_func = test_func;
 	ebpf_register(vm, 2, ffi_func, test_func);
+	ebpf_register(vm, 3, ffi_func, add_func);
 
 	ebpf_toggle_bounds_check(vm, false);
 

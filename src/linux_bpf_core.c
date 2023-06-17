@@ -20,7 +20,7 @@ bool is_power_of_2(unsigned long n)
 
 void *bpf_jit_alloc_exec(unsigned long size)
 {
-	printf("bpf_jit_alloc_exec for size: %ld\n", size);
+	LOG_DEBUG("bpf_jit_alloc_exec for size: %ld\n", size);
 #ifdef __linux__
 	void *mem = mmap(NULL, size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS ,-1, 0);
     if(mem == MAP_FAILED) {
@@ -34,7 +34,7 @@ void *bpf_jit_alloc_exec(unsigned long size)
 
 void bpf_jit_free_exec(void *addr)
 {
-	printf("bpf_jit_free_exec for addr: %p\n", addr);
+	LOG_DEBUG("bpf_jit_free_exec for addr: %p\n", addr);
 #ifdef __linux__
 	munmap(addr, 0);
 #else

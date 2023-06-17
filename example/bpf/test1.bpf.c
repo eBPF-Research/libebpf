@@ -1,11 +1,22 @@
-struct data {
-	int a;
-	int b;
-};
+// const void (*print_bpf)(char *str) = (void *)0x5; // buggy
+//     // call 0x2 or *(u64 *)(r1 + 0), why?
+// int print_and_add1(struct data *d, int sz) {
+// 	print_bpf("hello bpf\n");
+//  	return 0;
+// }
 
-void (*print_bpf)(char *str) = (void *)1;
+// // correct
+// int print_and_add2(struct data *d, int sz) {
+//     // call 0x5
+// 	((void (*)(char *str))((void*)0x5))("hello bpf\n");
+//  	return 0;
+// }
 
-int add_test(struct data *d, int sz) {
-	print_bpf("hello bpf\n");
- 	return d->a + d->b;
+// works:
+static void (*print_bpf)(char *str) = (void *)0x2;
+
+int print_and_add1(struct data *d, int sz) {
+	char a[] = "hello";
+	print_bpf(a);
+ 	return 0;
 }

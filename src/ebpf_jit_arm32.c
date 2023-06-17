@@ -2122,11 +2122,3 @@ ebpf_translate_arm32(struct ebpf_vm* vm, uint8_t* buffer, size_t* size, char** e
 	vm->jitted_function = (ebpf_jit_fn)new_vm->bpf_func;
     return result;
 }
-
-
-/* For testing, this changes the mapping between x86 and eBPF registers */
-void
-ebpf_set_register_offset(int x)
-{
-    /* TODO */
-}
