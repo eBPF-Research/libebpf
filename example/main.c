@@ -10,8 +10,8 @@
 		fprintf(stderr, "Failed to load code: %s\n", errmsg);          \
 	}
 
-#define TEST_BPF_CODE bpf_ffi_code
-#define TEST_BPF_SIZE sizeof(bpf_ffi_code) - 1
+#define TEST_BPF_CODE bpf_mul_64_bit
+#define TEST_BPF_SIZE sizeof(bpf_mul_64_bit)
 
 char *errmsg;
 struct mem {

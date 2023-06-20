@@ -1994,30 +1994,28 @@ bool bpf_jit_needs_zext(void)
 	return true;
 }
 
-struct ebpf_vm *linux_bpf_int_jit_compile(struct ebpf_vm *prog)
+int
+ebpf_translate_arm32(struct ebpf_vm* vm, uint8_t* buffer, size_t* size, char** errmsg)
 {
-	struct ebpf_vm *tmp, *orig_prog = prog;
+    int result = -1;
+	struct ebpf_vm * new_vm;
+	struct ebpf_vm *tmp, *orig_prog = vm;
 	struct bpf_binary_header *header;
 	struct jit_ctx ctx;
 	unsigned int tmp_idx;
 	unsigned int image_size;
-	u8 *image_ptr;
+	u8 *image_ptr = buffer;
 
 	memset(&ctx, 0, sizeof(ctx));
-	ctx.prog = prog;
-	// pa: prog is altered by ebpf_vm
-	// In kernel: #define CPU_ARCH_UNKNOWN	0
-	// ctx.cpu_architecture = 0;
-	// pa: no longer needed
+	ctx.prog = vm;
 
 	/* Not able to allocate memory for offsets[] , then
 	 * we must fall back to the interpreter
 	 */
 	// ctx.target = (u32* )buffer;
-	ctx.offsets = calloc(prog->num_insts, sizeof(int));
+	ctx.offsets = calloc(vm->num_insts, sizeof(int));
 	// pa: TODO: what's length is needed?
 	if (ctx.offsets == NULL) {
-		prog = orig_prog;
 		goto out;
 	}
 
@@ -2032,7 +2030,7 @@ struct ebpf_vm *linux_bpf_int_jit_compile(struct ebpf_vm *prog)
 	 * to the interpreter.
 	 */
 	if (build_body(&ctx)) {
-		prog = orig_prog;
+		LOG_DEBUG("build_body failed.");
 		goto out_off;
 	}
 
@@ -2054,17 +2052,6 @@ struct ebpf_vm *linux_bpf_int_jit_compile(struct ebpf_vm *prog)
 	 */
 	image_size = sizeof(u32) * ctx.idx;
 
-	/* Now we know the size of the structure to make */
-	header = bpf_jit_binary_alloc(image_size, &image_ptr,
-				      sizeof(u32), jit_fill_hole);
-	/* Not able to allocate memory for the structure then
-	 * we must fall back to the interpretation
-	 */
-	if (header == NULL) {
-		prog = orig_prog;
-		goto out_imms;
-	}
-
 	/* 2.) Actual pass to generate final JIT code */
 	ctx.target = (u32 *) image_ptr;
 	ctx.idx = 0;
@@ -2075,50 +2062,32 @@ struct ebpf_vm *linux_bpf_int_jit_compile(struct ebpf_vm *prog)
 	 * we fall back to the interpretation.
 	 */
 	if (build_body(&ctx) < 0) {
-		image_ptr = NULL;
-		bpf_jit_free_exec(header);
-		prog = orig_prog;
+		LOG_DEBUG("build_body failed.");
 		goto out_imms;
 	}
 	build_epilogue(&ctx);
 
 	/* 3.) Extra pass to validate JITed Code */
 	if (validate_code(&ctx)) {
-		image_ptr = NULL;
-		bpf_jit_free_exec(header);
-		prog = orig_prog;
+		LOG_DEBUG("validate_code failed.");
 		goto out_imms;
 	}
-	// flush_icache_range((u32)header, (u32)(ctx.target + ctx.idx));
 
 	/* there are 2 passes here */
-	bpf_jit_dump(prog->num_insts, image_size, 2, ctx.target);
+	bpf_jit_dump(vm->num_insts, image_size, 2, ctx.target);
 
 	// bpf_jit_binary_lock_ro(header);
-	prog->bpf_func = (void *)ctx.target;
-	prog->jited = 1;
-	prog->jited_len = image_size;
+	vm->bpf_func = (void *)ctx.target;
+	vm->jitted_function = (void *)ctx.target;
+	vm->jited = 1;
+	vm->jited_len = image_size;
+	*size = image_size;
 	goto out;
 
 out_imms:
 out_off:
 	free(ctx.offsets);
-	return NULL;
+	return -EINVAL;
 out:
-	return prog;
-}
-
-int
-ebpf_translate_arm32(struct ebpf_vm* vm, uint8_t* buffer, size_t* size, char** errmsg)
-{
-    int result = -1;
-	struct ebpf_vm * new_vm;
-	
-	new_vm = linux_bpf_int_jit_compile(vm);
-	if (new_vm) {
-		result = 0;
-	}
-	// TODO: fix the function pointer
-	vm->jitted_function = (ebpf_jit_fn)new_vm->bpf_func;
     return result;
 }
