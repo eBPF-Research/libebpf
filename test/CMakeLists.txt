@@ -22,7 +22,7 @@ set_target_properties(${test_name}_Tests PROPERTIES LINK_FLAGS "-static")
   # Set the compiler standard
   #
 
-  target_compile_features(${test_name}_Tests PUBLIC cxx_std_17)
+  # target_compile_features(${test_name}_Tests PUBLIC cxx_std_17)
 
   #
   # Setup code coverage if enabled
