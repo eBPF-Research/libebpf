@@ -970,7 +970,7 @@ validate(const struct ebpf_vm* vm, const struct bpf_insn* insts, uint32_t num_in
                 *errmsg = ebpf_error("invalid call immediate at PC %d", i);
                 return false;
             }
-            // printf("func: %ld\n", vm->ext_funcs[inst.imm]);
+            LOG_DEBUG("func: %lld\n", vm->ext_funcs[inst.imm]);
             if (!vm->ext_funcs[inst.imm]) {
                 *errmsg = ebpf_error("call to nonexistent function %u at PC %d", inst.imm, i);
                 return false;

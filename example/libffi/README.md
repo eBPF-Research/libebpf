@@ -30,7 +30,7 @@ int main()
         args[0] = &arg1;
         args[1] = &arg2;
         ffi_call(&cif, FFI_FN(add), &result, args);  // call the function
-        printf("result: %ld\n", result);
+        printf("result: %lld\n", result);
     }
     return 0;
 }

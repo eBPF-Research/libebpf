@@ -2,17 +2,17 @@
 #include "bpf_progs.h"
 #include "bpf_host_ffi.h"
 #include <stdlib.h>
-#include "../src/ebpf_vm.h"
+// #include "../src/ebpf_vm.h"
 
-#define JIT_TEST_UBPF 1
+#define JIT_TEST_UBPF 0
 
 #define CHECK_EXIT(ret)                                                        \
 	if (ret != 0) {                                                        \
 		fprintf(stderr, "Failed to load code: %s\n", errmsg);          \
 	}
 
-#define TEST_BPF_CODE bpf_mul_64_bit
-#define TEST_BPF_SIZE sizeof(bpf_mul_64_bit)
+#define TEST_BPF_CODE bpf_mul_optimized
+#define TEST_BPF_SIZE sizeof(bpf_mul_optimized)
 
 typedef unsigned int (*kernel_fn)(const void *ctx,
 					    const struct bpf_insn *insn);
@@ -71,14 +71,13 @@ int main()
 		free(mem);
 		return 1;
 	}
-	// res = fn(mem, mem_len);
-	kernel_fn bpf_fn = (kernel_fn)(fn);
-	res = bpf_fn(NULL, context->vm->insnsi);
+	res = fn(mem, mem_len);
+	// res = context->vm->bpf_func(NULL, context->vm->insnsi);
 
-	printf("res = %ld\n", res);
+	printf("res = %lld\n", res);
 #else
 	CHECK_EXIT(ebpf_exec(context->vm, &m, sizeof(m), &res));
-	printf("res = %ld\n", res);
+	printf("res = %lld\n", res);
 #endif
 	return 0;
 }

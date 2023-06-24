@@ -72,7 +72,7 @@ const unsigned char bpf_mul_64_bit[] = {
 a * b / 2 for 32 bit
 clang -O2 -target bpf -m32 -c example/bpf/mul.bpf.c -o prog.o
 */
-const unsigned char bpf_mul_32_bit[] = {
+const unsigned char bpf_mul_optimized[] = {
   0xb7, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00,
   0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };

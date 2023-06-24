@@ -64,6 +64,21 @@ make build-x86 # or arm32 arm64
 make test
 ```
 
+## Debug with qemu-user
+
+```sh
+qemu-arm -g 1234 build/bin/Debug/libebpf
+```
+
+in another shell
+
+```sh
+gdb-multiarch build/bin/Debug/libebpf
+target remote :1234
+```
+
+start debug.
+
 ## more source code are from
 
 - https://elixir.bootlin.com/linux/v5.7
