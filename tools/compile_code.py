@@ -77,7 +77,8 @@ def write_binary(ops):
 		print(pc, li)
 
 def compile_code(src):
-	cmd = f"clang -O2 -emit-llvm -c {src} -o - | llc -march=bpf -filetype=obj -o code.o"
+	cmd = f"clang -g -emit-llvm -c {src} -o - | llc -march=bpf -filetype=obj -o code.o"
+	# cmd = f"clang -O2 -emit-llvm -c {src} -o - | llc -march=bpf -filetype=obj -o code.o"
 	# cmd = f"clang -O2 -target bpf -c {src} -o {CODEO} "
 	exec_command(cmd, os.getcwd())
 	if os.path.exists(CODEO):

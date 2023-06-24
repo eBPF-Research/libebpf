@@ -503,28 +503,37 @@ struct jit_ctx {
  */
 static u32 jit_udiv32(u32 dividend, u32 divisor)
 {
+	if (divisor == 0)
+		return 0;
 	return dividend / divisor;
 }
 
 static u32 jit_mod32(u32 dividend, u32 divisor)
 {
+	if (divisor == 0)
+		return dividend;
 	return dividend % divisor;
 }
 
 static u64 jit_udiv64(u64 dividend, u64 divisor)
 {
+	if (divisor == 0)
+		return 0;
 	return dividend / divisor;
 }
 
 static u64 jit_mod64(u64 dividend, u64 divisor)
 {
+	if (divisor == 0)
+		return dividend;
 	return dividend % divisor;
 }
 
 
 static inline void _emit(int cond, u32 inst, struct jit_ctx *ctx)
-{	
-	LOG_DEBUG("_emit: %lx [%d] %lx cond %x\n", ctx->target + ctx->idx, ctx->idx, inst, cond);
+{
+	LOG_DEBUG("_emit: %lx [%d] %lx cond %x\n", ctx->target + ctx->idx,
+		  ctx->idx, inst, cond);
 	// TODO: Core Function
 	inst |= (cond << 28);
 	inst = __opcode_to_mem_arm(inst);
@@ -833,7 +842,7 @@ static inline void emit_udivmod(u8 rd, u8 rm, u8 rn, struct jit_ctx *ctx, u8 op,
 	} else {
 		emit_mov_i(ARM_IP, op == BPF_DIV ? (u32)jit_udiv32 : (u32)jit_mod32,
 			ctx);
-	}
+	}	
 	emit_blx_r(ARM_IP, ctx);
 
 	/* Save return value */
@@ -1099,12 +1108,12 @@ static inline void emit_a32_mov_r64(const bool is64, const s8 dst[],
 		if (!ctx->prog->aux->verifier_zext)
 			/* Zero out high 4 bytes */
 			emit_a32_mov_i(dst_hi, 0, ctx);
-	}
+	} 
 	else if (__LINUX_ARM_ARCH__ < 6) {
 		/* complete 8 byte move */
 		emit_a32_mov_r(dst_lo, src_lo, ctx);
 		emit_a32_mov_r(dst_hi, src_hi, ctx);
-	}
+	} 
 	else if (is_stacked(src_lo) && is_stacked(dst_lo)) {
 		const u8 *tmp = bpf2a32[TMP_REG_1];
 
@@ -1637,8 +1646,8 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
 	s8 rd_lo, rt, rm, rn;
 	s32 jmp_offset;
 	u64 insn64 = *((u64 *)insn);
-	LOG_DEBUG("%08llx, [%d] %d %d %d %d\n", insn64, i, 
-	       insn->dst_reg, insn->src_reg, insn->off, insn->imm);
+	LOG_DEBUG("%08llx, [%d] %d %d %d %d\n", insn64, i, insn->dst_reg,
+		  insn->src_reg, insn->off, insn->imm);
 
 #define check_imm(bits, imm)                                                   \
 	do {                                                                   \

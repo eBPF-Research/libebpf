@@ -1,4 +1,4 @@
-from .asm_parser import parse, Reg, Imm, MemRef
+from asm_parser import parse, Reg, Imm, MemRef
 import struct
 try:
     from StringIO import StringIO as io
