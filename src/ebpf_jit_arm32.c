@@ -511,6 +511,17 @@ static u32 jit_mod32(u32 dividend, u32 divisor)
 	return dividend % divisor;
 }
 
+static u64 jit_udiv64(u64 dividend, u64 divisor)
+{
+	return dividend / divisor;
+}
+
+static u64 jit_mod64(u64 dividend, u64 divisor)
+{
+	return dividend % divisor;
+}
+
+
 static inline void _emit(int cond, u32 inst, struct jit_ctx *ctx)
 {	
 	LOG_DEBUG("_emit: %lx [%d] %lx cond %x\n", ctx->target + ctx->idx, ctx->idx, inst, cond);
@@ -782,7 +793,7 @@ static inline int epilogue_offset(const struct jit_ctx *ctx)
 	return to - from - 2;
 }
 
-static inline void emit_udivmod(u8 rd, u8 rm, u8 rn, struct jit_ctx *ctx, u8 op)
+static inline void emit_udivmod(u8 rd, u8 rm, u8 rn, struct jit_ctx *ctx, u8 op, bool is64)
 {
 	const s8 *tmp = bpf2a32[TMP_REG_1];
 
@@ -816,8 +827,13 @@ static inline void emit_udivmod(u8 rd, u8 rm, u8 rn, struct jit_ctx *ctx, u8 op)
 	}
 
 	/* Call appropriate function */
-	emit_mov_i(ARM_IP, op == BPF_DIV ? (u32)jit_udiv32 : (u32)jit_mod32,
+	if (is64) {
+		emit_mov_i(ARM_IP, op == BPF_DIV ? (u32)jit_udiv64 : (u32)jit_mod64,
 		   ctx);
+	} else {
+		emit_mov_i(ARM_IP, op == BPF_DIV ? (u32)jit_udiv32 : (u32)jit_mod32,
+			ctx);
+	}
 	emit_blx_r(ARM_IP, ctx);
 
 	/* Save return value */
@@ -1726,7 +1742,7 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
 			rt = src_lo;
 			break;
 		}
-		emit_udivmod(rd_lo, rd_lo, rt, ctx, BPF_OP(code));
+		emit_udivmod(rd_lo, rd_lo, rt, ctx, BPF_OP(code), false);
 		arm_bpf_put_reg32(dst_lo, rd_lo, ctx);
 		if (!ctx->prog->aux->verifier_zext)
 			emit_a32_mov_i(dst_hi, 0, ctx);
@@ -1735,7 +1751,24 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
 	case BPF_ALU64 | BPF_DIV | BPF_X:
 	case BPF_ALU64 | BPF_MOD | BPF_K:
 	case BPF_ALU64 | BPF_MOD | BPF_X:
-		goto notyet;
+		rd_lo = arm_bpf_get_reg64(dst_lo, tmp2[1], ctx);
+		switch (BPF_SRC(code)) {
+		case BPF_X:
+			rt = arm_bpf_get_reg64(src_lo, tmp2[0], ctx);
+			break;
+		case BPF_K:
+			rt = tmp2[0];
+			emit_a32_mov_i64(rt, imm, ctx);
+			break;
+		default:
+			rt = src_lo;
+			break;
+		}
+		emit_udivmod(rd_lo, rd_lo, rt, ctx, BPF_OP(code), true);
+		arm_bpf_put_reg64(dst_lo, rd_lo, ctx);
+		if (!ctx->prog->aux->verifier_zext)
+			emit_a32_mov_i64(dst_hi, 0, ctx);
+		break;
 	/* dst = dst << imm */
 	/* dst = dst >> imm */
 	/* dst = dst >> imm (signed) */
@@ -2042,7 +2075,7 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
 		const s8 *r3 = bpf2a32[BPF_REG_3];
 		const s8 *r4 = bpf2a32[BPF_REG_4];
 		const s8 *r5 = bpf2a32[BPF_REG_5];
-		const u32 func = (u32)__bpf_call_base + (u32)imm;
+		const u32 func = ctx->prog->ext_funcs[imm];
 
 		emit_a32_mov_r64(true, r0, r1, ctx);
 		emit_a32_mov_r64(true, r1, r2, ctx);
