@@ -48,9 +48,9 @@ docs: ## generate Doxygen HTML documentation, including API docs
 	cmake --build build --target doxygen-docs
 	$(BROWSER) docs/html/index.html
 
-build: build-x86 build-arm32 build-arm64
+build-all: build-all build-arm32 build-arm64
 
-build-x86: ## build the package
+build: ## build the package
 	rm -rf build/
 	cmake -Bbuild  -Dlibebpf_ENABLE_UNIT_TESTING=1
 	cmake --build build --config Debug

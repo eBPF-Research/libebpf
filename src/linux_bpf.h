@@ -433,7 +433,7 @@ struct bpf_map_ops {
 static inline void bpf_jit_dump(unsigned int flen, unsigned int proglen,
 				u32 pass, void *image)
 {
-	printf("flen=%u proglen=%u pass=%u image=%pK\n", flen,
+	printf("flen=%u proglen=%u pass=%u image=%p\n", flen,
 	       proglen, pass, image);
 }
 

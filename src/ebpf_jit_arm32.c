@@ -1084,12 +1084,11 @@ static inline void emit_a32_mov_r64(const bool is64, const s8 dst[],
 			/* Zero out high 4 bytes */
 			emit_a32_mov_i(dst_hi, 0, ctx);
 	}
-	// else if (__LINUX_ARM_ARCH__ < 6 &&
-	// 	   ctx->cpu_architecture < CPU_ARCH_ARMv5TE) {
-	// 	/* complete 8 byte move */
-	// 	emit_a32_mov_r(dst_lo, src_lo, ctx);
-	// 	emit_a32_mov_r(dst_hi, src_hi, ctx);
-	// }
+	else if (__LINUX_ARM_ARCH__ < 6) {
+		/* complete 8 byte move */
+		emit_a32_mov_r(dst_lo, src_lo, ctx);
+		emit_a32_mov_r(dst_hi, src_hi, ctx);
+	}
 	else if (is_stacked(src_lo) && is_stacked(dst_lo)) {
 		const u8 *tmp = bpf2a32[TMP_REG_1];
 
