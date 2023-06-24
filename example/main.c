@@ -71,10 +71,10 @@ int main()
 		free(mem);
 		return 1;
 	}
-	printf("jitted_function: %lx", context->vm->jitted_function);
-	res = ((kernel_fn)(context->vm->jitted_function))(NULL, context->vm->insnsi);
 
-	printf("res = %ld\n", res);
+	// res = ((kernel_fn)(fn))(NULL, context->vm->insnsi);
+	res = fn(&m, sizeof(m));
+	printf("res = %lld\n", res);
 #else
 	CHECK_EXIT(ebpf_exec(context->vm, &m, sizeof(m), &res));
 	printf("res = %lld\n", res);

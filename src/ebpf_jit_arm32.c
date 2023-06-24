@@ -2134,7 +2134,7 @@ bool bpf_jit_needs_zext(void)
 int ebpf_translate_arm32(struct ebpf_vm *vm, uint8_t *buffer, size_t *size,
 			 char **errmsg)
 {
-	int result = -1;
+	int result = 0;
 	struct ebpf_vm *new_vm;
 	struct ebpf_vm *tmp, *orig_prog = vm;
 	struct bpf_binary_header *header;
@@ -2231,7 +2231,6 @@ int ebpf_translate_arm32(struct ebpf_vm *vm, uint8_t *buffer, size_t *size,
 
 	// bpf_jit_binary_lock_ro(header);
 	vm->bpf_func = (void *)ctx.target;
-	vm->jitted_function = (void *)ctx.target;
 	vm->jited = 1;
 	vm->jited_len = image_size;
 	*size = image_size;
