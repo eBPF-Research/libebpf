@@ -2,8 +2,9 @@
 #include "bpf_progs.h"
 #include "bpf_host_ffi.h"
 #include <stdlib.h>
+#include "../src/ebpf_vm.h"
 
-#define JIT_TEST_UBPF 0
+#define JIT_TEST_UBPF 1
 
 #define CHECK_EXIT(ret)                                                        \
 	if (ret != 0) {                                                        \
@@ -12,6 +13,9 @@
 
 #define TEST_BPF_CODE bpf_mul_64_bit
 #define TEST_BPF_SIZE sizeof(bpf_mul_64_bit)
+
+typedef unsigned int (*kernel_fn)(const void *ctx,
+					    const struct bpf_insn *insn);
 
 char *errmsg;
 struct mem {
@@ -67,7 +71,9 @@ int main()
 		free(mem);
 		return 1;
 	}
-	res = fn(mem, mem_len);
+	// res = fn(mem, mem_len);
+	kernel_fn bpf_fn = (kernel_fn)(fn);
+	res = bpf_fn(NULL, context->vm->insnsi);
 
 	printf("res = %ld\n", res);
 #else

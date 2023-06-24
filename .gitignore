@@ -25,3 +25,4 @@ test/lib
 test/bin
 test/lib64
 .test_log
+test/share

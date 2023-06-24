@@ -1393,11 +1393,6 @@ static inline void emit_push_r64(const s8 src[], struct jit_ctx *ctx)
 	emit(ARM_PUSH(reg_set), ctx);
 }
 
-
-// TODO: 以上内容的ctx的作用均是提供一个emit空间，给谁都可以
-// bpf_insn = ebpf_inst
-// jited_len = jitted_size
-
 static void build_prologue(struct jit_ctx *ctx)
 {
 	const s8 arm_r0 = bpf2a32[BPF_REG_0][1];
@@ -2074,7 +2069,8 @@ ebpf_translate_arm32(struct ebpf_vm* vm, uint8_t* buffer, size_t* size, char** e
 	}
 
 	/* there are 2 passes here */
-	bpf_jit_dump(vm->num_insts, image_size, 2, ctx.target);
+	if (DEBUG)
+		bpf_jit_dump(vm->num_insts, image_size, 2, ctx.target);
 
 	// bpf_jit_binary_lock_ro(header);
 	vm->bpf_func = (void *)ctx.target;
