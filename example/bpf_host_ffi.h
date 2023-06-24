@@ -40,6 +40,8 @@ enum ffi_types {
 	FFI_TYPE_FUNCTION,
 };
 
+static struct ebpf_ffi_func_info* ebpf_resovle_ffi_func(uint64_t func_id);
+
 typedef uint64_t (*ffi_func)(uint64_t r1, uint64_t r2, uint64_t r3, uint64_t r4,
 			     uint64_t r5);
 
@@ -50,20 +52,15 @@ struct ebpf_ffi_func_info {
 	int num_args;
 };
 
-/** ebpf_context structure.
- *  Contains the eBPF virtual machine (vm) and the Foreign Function Interface
- * (FFI) functions array.
- */
-struct ebpf_context {
-	struct ebpf_vm *vm;
-	struct ebpf_ffi_func_info ffi_funcs[MAX_FFI_FUNCS];
-};
-
 union arg_val {
 	uint64_t uint64;
 	int64_t int64;
 	double double_val;
 	void *ptr;
+};
+
+struct arg_list {
+	uint64_t args[6];
 };
 
 static inline union arg_val to_arg_val(enum ffi_types type, uint64_t val)
@@ -104,20 +101,20 @@ static inline uint64_t from_arg_val(enum ffi_types type, union arg_val val)
 	return 0;
 }
 
-static uint64_t __ebpf_call_ffi_dispatcher(struct ebpf_context *context,
-					   uint64_t id, uint64_t r1,
-					   uint64_t r2, uint64_t r3,
-					   uint64_t r4, uint64_t r5)
+static uint64_t __ebpf_call_ffi_dispatcher(uint64_t id, uint64_t num, uint64_t arg_list)
 {
 	assert(id < MAX_FFI_FUNCS);
-	struct ebpf_ffi_func_info *func_info = &context->ffi_funcs[id];
+	struct ebpf_ffi_func_info *func_info = ebpf_resovle_ffi_func(id);
 	assert(func_info->func != NULL);
 
 	// Prepare arguments
-	uint64_t raw_args[5] = { r1, r2, r3, r4, r5 };
+	//uint64_t raw_args[5] = { r1, r2, r3, r4, r5 };
+	struct arg_list *raw_args = (struct arg_list *)arg_list;
+	printf("raw_args: %p %ld %ld %ld %ld %ld\n", raw_args, raw_args->args[0], raw_args->args[1], 
+		raw_args->args[2], raw_args->args[3], raw_args->args[4]);
 	union arg_val args[5];
 	for (int i = 0; i < func_info->num_args; i++) {
-		args[i] = to_arg_val(func_info->arg_types[i], raw_args[i]);
+		args[i] = to_arg_val(func_info->arg_types[i], raw_args->args[i]);
 	}
 
 	// Call the function
@@ -151,25 +148,58 @@ static uint64_t __ebpf_call_ffi_dispatcher(struct ebpf_context *context,
 		break;
 	}
 
+	printf("return: %ld\n", ret);
+
 	// Convert the return value to the correct type
 	return from_arg_val(func_info->ret_type, ret);
 }
 
-static void ebpf_register_ffi(struct ebpf_context *context, uint64_t id,
-			      struct ebpf_ffi_func_info func_info)
+
+static uint64_t print_func(char *str)
 {
-	context->ffi_funcs[id] = func_info;
+	printf("helper-1: %s\n", str);
+	return strlen(str);
 }
 
-static struct ebpf_context *ebpf_create_context(void)
+static int add_func(int a, int b)
 {
-	struct ebpf_context *context =
-		(struct ebpf_context *)malloc(sizeof(struct ebpf_context));
-	struct ebpf_vm *vm = ebpf_create();
-	context->vm = vm;
-	ebpf_register(context->vm, 1, "__ebpf_call_ffi_dispatcher",
-		      __ebpf_call_ffi_dispatcher);
-	return context;
+	return a + b;
 }
+
+/* temperially used for test.
+Should be implemented via resolvering the function via function name from BTF symbols
+*/
+struct ebpf_ffi_func_info func_list[] = {
+	{NULL, FFI_TYPE_INT, { FFI_TYPE_POINTER }, 1},
+	{FFI_FN(print_func), FFI_TYPE_ULONG, { FFI_TYPE_POINTER }, 1},
+	{FFI_FN(add_func), FFI_TYPE_INT, { FFI_TYPE_INT, FFI_TYPE_INT }, 2},
+};
+
+static struct ebpf_ffi_func_info* ebpf_resovle_ffi_func(uint64_t func_id) 
+{
+	const int N_FUNC = sizeof(func_list)/sizeof(struct ebpf_ffi_func_info);
+	if (func_id < N_FUNC) {
+		return &func_list[func_id];
+	}
+	assert(0);
+	return NULL;
+}
+
+static void register_ffi_handler(struct ebpf_vm *vm) 
+{
+	ebpf_register(vm, 1, "__ebpf_call_ffi_dispatcher",
+		__ebpf_call_ffi_dispatcher);
+}
+
+// static struct ebpf_context *ebpf_create_context(void)
+// {
+// 	struct ebpf_context *context =
+// 		(struct ebpf_context *)malloc(sizeof(struct ebpf_context));
+// 	struct ebpf_vm *vm = ebpf_create();
+// 	context->vm = vm;
+// 	ebpf_register(context->vm, 1, "__ebpf_call_ffi_dispatcher",
+// 		      __ebpf_call_ffi_dispatcher);
+// 	return context;
+// }
 
 #endif
