@@ -71,6 +71,7 @@ int main()
 		free(mem);
 		return 1;
 	}
+	printf("%lx\n", ((0x01a00000) | (11) << 12 | (0) << 16 | (13)));
 #ifdef __LINUX_ARM_ARCH__
 	printf("__LINUX_ARM_ARCH__ %d\n", __LINUX_ARM_ARCH__);
 #endif

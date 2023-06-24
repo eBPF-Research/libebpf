@@ -787,15 +787,15 @@ static inline void emit_udivmod(u8 rd, u8 rm, u8 rn, struct jit_ctx *ctx, u8 op)
 	const s8 *tmp = bpf2a32[TMP_REG_1];
 
 #if __LINUX_ARM_ARCH__ == 7
-	if (elf_hwcap & HWCAP_IDIVA) {
-		if (op == BPF_DIV)
-			emit(ARM_UDIV(rd, rm, rn), ctx);
-		else {
-			emit(ARM_UDIV(ARM_IP, rm, rn), ctx);
-			emit(ARM_MLS(rd, rn, ARM_IP, rm), ctx);
-		}
-		return;
-	}
+	// if (elf_hwcap & HWCAP_IDIVA) {
+	// 	if (op == BPF_DIV)
+	// 		emit(ARM_UDIV(rd, rm, rn), ctx);
+	// 	else {
+	// 		emit(ARM_UDIV(ARM_IP, rm, rn), ctx);
+	// 		emit(ARM_MLS(rd, rn, ARM_IP, rm), ctx);
+	// 	}
+	// 	return;
+	// }
 #endif
 
 	/*
