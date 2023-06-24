@@ -71,7 +71,8 @@ int main()
 		free(mem);
 		return 1;
 	}
-	res = context->vm->bpf_func(NULL, context->vm->insnsi);
+	printf("jitted_function: %lx", context->vm->jitted_function);
+	res = ((kernel_fn)(context->vm->jitted_function))(NULL, context->vm->insnsi);
 
 	printf("res = %ld\n", res);
 #else
