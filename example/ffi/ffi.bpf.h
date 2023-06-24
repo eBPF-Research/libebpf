@@ -15,24 +15,17 @@ union arg_val {
 	void *ptr;
 };
 
-struct arg_list {
-	uint64_t args[6];
-};
 
 // static const uint64_t (*bpf_ffi_call_helper)(uint64_t context,
 // 						    uint64_t id, uint64_t r1,
 // 						    uint64_t r2,
 // 						    uint64_t r3) = (void *)0x1;
 
+struct arg_list {
+	uint64_t args[6];
+};
 
 static const uint64_t (*ffi_call)(uint64_t id, uint64_t arg_list) = (void *)0x1;
-
-
-
-// #define FFI_CALL_N(FUNC_MARCO, ...) \
-// 	struct arg_list argn; \
-// 	FUNC_MARCO(argn, __VA_ARGS__); \
-// 	bpf_ffi_call_helper(func, &argn)
 
 #define FFI_CALL_1(func, arg1) \
 	struct arg_list argn; \

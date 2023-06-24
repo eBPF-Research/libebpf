@@ -19,12 +19,12 @@ typedef unsigned int (*kernel_fn)(const void *ctx,
 
 char *errmsg;
 struct mem {
-	uint64_t context;
+	uint64_t val;
 };
 
 int main()
 {
-	struct mem m = { 0 };
+	struct mem m = { __LINE__ };
 	uint64_t res = 0;
 	// using ubpf jit for x86_64 and arm64
 	struct ebpf_vm *vm = ebpf_create();
