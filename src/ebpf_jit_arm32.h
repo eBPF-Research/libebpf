@@ -14,5 +14,6 @@
 #define PAGE_MASK		(~((1 << PAGE_SHIFT) - 1))
 
 // #define CONFIG_FRAME_POINTER 1
+#define __LINUX_ARM_ARCH__ 7
 
 #endif /* PFILTER_OPCODES_ARM_H */

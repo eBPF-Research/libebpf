@@ -2,9 +2,9 @@
 #include "bpf_progs.h"
 #include "bpf_host_ffi.h"
 #include <stdlib.h>
-// #include "../src/ebpf_vm.h"
+#include "../src/ebpf_vm.h"
 
-#define JIT_TEST_UBPF 0
+#define JIT_TEST_UBPF 1
 
 #define CHECK_EXIT(ret)                                                        \
 	if (ret != 0) {                                                        \
@@ -71,10 +71,13 @@ int main()
 		free(mem);
 		return 1;
 	}
-	res = fn(mem, mem_len);
-	// res = context->vm->bpf_func(NULL, context->vm->insnsi);
+#ifdef __LINUX_ARM_ARCH__
+	printf("__LINUX_ARM_ARCH__ %d\n", __LINUX_ARM_ARCH__);
+#endif
+	// res = fn(mem, mem_len);
+	res = context->vm->bpf_func(NULL, context->vm->insnsi);
 
-	printf("res = %lld\n", res);
+	printf("res = %ld\n", res);
 #else
 	CHECK_EXIT(ebpf_exec(context->vm, &m, sizeof(m), &res));
 	printf("res = %lld\n", res);

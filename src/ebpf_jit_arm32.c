@@ -4,7 +4,7 @@
  *
  * Copyright (c) 2017 Shubham Bansal <illusionist.neo@gmail.com>
  * Copyright (c) 2011 Mircea Gherzan <mgherzan@gmail.com>
- * 
+ *
  * Supports (__LINUX_ARM_ARCH__ >= 6
  *  || ctx->cpu_architecture >= CPU_ARCH_ARMv5TE)
  */
@@ -13,6 +13,7 @@
 #include "linux-errno.h"
 #include "ebpf_jit_arm32.h"
 #include "ebpf_vm.h"
+#include "debug.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -26,140 +27,140 @@ unsigned int hweight16(unsigned int w)
 }
 
 /* ARM 32bit Registers */
-#define ARM_R0	0
-#define ARM_R1	1
-#define ARM_R2	2
-#define ARM_R3	3
-#define ARM_R4	4
-#define ARM_R5	5
-#define ARM_R6	6
-#define ARM_R7	7
-#define ARM_R8	8
-#define ARM_R9	9
-#define ARM_R10	10
-#define ARM_FP	11	/* Frame Pointer */
-#define ARM_IP	12	/* Intra-procedure scratch register */
-#define ARM_SP	13	/* Stack pointer: as load/store base reg */
-#define ARM_LR	14	/* Link Register */
-#define ARM_PC	15	/* Program counter */
+#define ARM_R0 0
+#define ARM_R1 1
+#define ARM_R2 2
+#define ARM_R3 3
+#define ARM_R4 4
+#define ARM_R5 5
+#define ARM_R6 6
+#define ARM_R7 7
+#define ARM_R8 8
+#define ARM_R9 9
+#define ARM_R10 10
+#define ARM_FP 11 /* Frame Pointer */
+#define ARM_IP 12 /* Intra-procedure scratch register */
+#define ARM_SP 13 /* Stack pointer: as load/store base reg */
+#define ARM_LR 14 /* Link Register */
+#define ARM_PC 15 /* Program counter */
 
-#define ARM_COND_EQ		0x0	/* == */
-#define ARM_COND_NE		0x1	/* != */
-#define ARM_COND_CS		0x2	/* unsigned >= */
-#define ARM_COND_HS		ARM_COND_CS
-#define ARM_COND_CC		0x3	/* unsigned < */
-#define ARM_COND_LO		ARM_COND_CC
-#define ARM_COND_MI		0x4	/* < 0 */
-#define ARM_COND_PL		0x5	/* >= 0 */
-#define ARM_COND_VS		0x6	/* Signed Overflow */
-#define ARM_COND_VC		0x7	/* No Signed Overflow */
-#define ARM_COND_HI		0x8	/* unsigned > */
-#define ARM_COND_LS		0x9	/* unsigned <= */
-#define ARM_COND_GE		0xa	/* Signed >= */
-#define ARM_COND_LT		0xb	/* Signed < */
-#define ARM_COND_GT		0xc	/* Signed > */
-#define ARM_COND_LE		0xd	/* Signed <= */
-#define ARM_COND_AL		0xe	/* None */
+#define ARM_COND_EQ 0x0 /* == */
+#define ARM_COND_NE 0x1 /* != */
+#define ARM_COND_CS 0x2 /* unsigned >= */
+#define ARM_COND_HS ARM_COND_CS
+#define ARM_COND_CC 0x3 /* unsigned < */
+#define ARM_COND_LO ARM_COND_CC
+#define ARM_COND_MI 0x4 /* < 0 */
+#define ARM_COND_PL 0x5 /* >= 0 */
+#define ARM_COND_VS 0x6 /* Signed Overflow */
+#define ARM_COND_VC 0x7 /* No Signed Overflow */
+#define ARM_COND_HI 0x8 /* unsigned > */
+#define ARM_COND_LS 0x9 /* unsigned <= */
+#define ARM_COND_GE 0xa /* Signed >= */
+#define ARM_COND_LT 0xb /* Signed < */
+#define ARM_COND_GT 0xc /* Signed > */
+#define ARM_COND_LE 0xd /* Signed <= */
+#define ARM_COND_AL 0xe /* None */
 
 /* register shift types */
-#define SRTYPE_LSL		0
-#define SRTYPE_LSR		1
-#define SRTYPE_ASR		2
-#define SRTYPE_ROR		3
-#define SRTYPE_ASL		(SRTYPE_LSL)
+#define SRTYPE_LSL 0
+#define SRTYPE_LSR 1
+#define SRTYPE_ASR 2
+#define SRTYPE_ROR 3
+#define SRTYPE_ASL (SRTYPE_LSL)
 
-#define ARM_INST_ADD_R		0x00800000
-#define ARM_INST_ADDS_R		0x00900000
-#define ARM_INST_ADC_R		0x00a00000
-#define ARM_INST_ADC_I		0x02a00000
-#define ARM_INST_ADD_I		0x02800000
-#define ARM_INST_ADDS_I		0x02900000
+#define ARM_INST_ADD_R 0x00800000
+#define ARM_INST_ADDS_R 0x00900000
+#define ARM_INST_ADC_R 0x00a00000
+#define ARM_INST_ADC_I 0x02a00000
+#define ARM_INST_ADD_I 0x02800000
+#define ARM_INST_ADDS_I 0x02900000
 
-#define ARM_INST_AND_R		0x00000000
-#define ARM_INST_ANDS_R		0x00100000
-#define ARM_INST_AND_I		0x02000000
+#define ARM_INST_AND_R 0x00000000
+#define ARM_INST_ANDS_R 0x00100000
+#define ARM_INST_AND_I 0x02000000
 
-#define ARM_INST_BIC_R		0x01c00000
-#define ARM_INST_BIC_I		0x03c00000
+#define ARM_INST_BIC_R 0x01c00000
+#define ARM_INST_BIC_I 0x03c00000
 
-#define ARM_INST_B		0x0a000000
-#define ARM_INST_BX		0x012FFF10
-#define ARM_INST_BLX_R		0x012fff30
+#define ARM_INST_B 0x0a000000
+#define ARM_INST_BX 0x012FFF10
+#define ARM_INST_BLX_R 0x012fff30
 
-#define ARM_INST_CMP_R		0x01500000
-#define ARM_INST_CMP_I		0x03500000
+#define ARM_INST_CMP_R 0x01500000
+#define ARM_INST_CMP_I 0x03500000
 
-#define ARM_INST_EOR_R		0x00200000
-#define ARM_INST_EOR_I		0x02200000
+#define ARM_INST_EOR_R 0x00200000
+#define ARM_INST_EOR_I 0x02200000
 
-#define ARM_INST_LDST__U	0x00800000
-#define ARM_INST_LDST__IMM12	0x00000fff
-#define ARM_INST_LDRB_I		0x05500000
-#define ARM_INST_LDRB_R		0x07d00000
-#define ARM_INST_LDRD_I		0x014000d0
-#define ARM_INST_LDRH_I		0x015000b0
-#define ARM_INST_LDRH_R		0x019000b0
-#define ARM_INST_LDR_I		0x05100000
-#define ARM_INST_LDR_R		0x07900000
+#define ARM_INST_LDST__U 0x00800000
+#define ARM_INST_LDST__IMM12 0x00000fff
+#define ARM_INST_LDRB_I 0x05500000
+#define ARM_INST_LDRB_R 0x07d00000
+#define ARM_INST_LDRD_I 0x014000d0
+#define ARM_INST_LDRH_I 0x015000b0
+#define ARM_INST_LDRH_R 0x019000b0
+#define ARM_INST_LDR_I 0x05100000
+#define ARM_INST_LDR_R 0x07900000
 
-#define ARM_INST_LDM		0x08900000
-#define ARM_INST_LDM_IA		0x08b00000
+#define ARM_INST_LDM 0x08900000
+#define ARM_INST_LDM_IA 0x08b00000
 
-#define ARM_INST_LSL_I		0x01a00000
-#define ARM_INST_LSL_R		0x01a00010
+#define ARM_INST_LSL_I 0x01a00000
+#define ARM_INST_LSL_R 0x01a00010
 
-#define ARM_INST_LSR_I		0x01a00020
-#define ARM_INST_LSR_R		0x01a00030
+#define ARM_INST_LSR_I 0x01a00020
+#define ARM_INST_LSR_R 0x01a00030
 
-#define ARM_INST_ASR_I		0x01a00040
-#define ARM_INST_ASR_R		0x01a00050
+#define ARM_INST_ASR_I 0x01a00040
+#define ARM_INST_ASR_R 0x01a00050
 
-#define ARM_INST_MOV_R		0x01a00000
-#define ARM_INST_MOVS_R		0x01b00000
-#define ARM_INST_MOV_I		0x03a00000
-#define ARM_INST_MOVW		0x03000000
-#define ARM_INST_MOVT		0x03400000
+#define ARM_INST_MOV_R 0x01a00000
+#define ARM_INST_MOVS_R 0x01b00000
+#define ARM_INST_MOV_I 0x03a00000
+#define ARM_INST_MOVW 0x03000000
+#define ARM_INST_MOVT 0x03400000
 
-#define ARM_INST_MUL		0x00000090
+#define ARM_INST_MUL 0x00000090
 
-#define ARM_INST_POP		0x08bd0000
-#define ARM_INST_PUSH		0x092d0000
+#define ARM_INST_POP 0x08bd0000
+#define ARM_INST_PUSH 0x092d0000
 
-#define ARM_INST_ORR_R		0x01800000
-#define ARM_INST_ORRS_R		0x01900000
-#define ARM_INST_ORR_I		0x03800000
+#define ARM_INST_ORR_R 0x01800000
+#define ARM_INST_ORRS_R 0x01900000
+#define ARM_INST_ORR_I 0x03800000
 
-#define ARM_INST_REV		0x06bf0f30
-#define ARM_INST_REV16		0x06bf0fb0
+#define ARM_INST_REV 0x06bf0f30
+#define ARM_INST_REV16 0x06bf0fb0
 
-#define ARM_INST_RSB_I		0x02600000
-#define ARM_INST_RSBS_I		0x02700000
-#define ARM_INST_RSC_I		0x02e00000
+#define ARM_INST_RSB_I 0x02600000
+#define ARM_INST_RSBS_I 0x02700000
+#define ARM_INST_RSC_I 0x02e00000
 
-#define ARM_INST_SUB_R		0x00400000
-#define ARM_INST_SUBS_R		0x00500000
-#define ARM_INST_RSB_R		0x00600000
-#define ARM_INST_SUB_I		0x02400000
-#define ARM_INST_SUBS_I		0x02500000
-#define ARM_INST_SBC_I		0x02c00000
-#define ARM_INST_SBC_R		0x00c00000
-#define ARM_INST_SBCS_R		0x00d00000
+#define ARM_INST_SUB_R 0x00400000
+#define ARM_INST_SUBS_R 0x00500000
+#define ARM_INST_RSB_R 0x00600000
+#define ARM_INST_SUB_I 0x02400000
+#define ARM_INST_SUBS_I 0x02500000
+#define ARM_INST_SBC_I 0x02c00000
+#define ARM_INST_SBC_R 0x00c00000
+#define ARM_INST_SBCS_R 0x00d00000
 
-#define ARM_INST_STR_I		0x05000000
-#define ARM_INST_STRB_I		0x05400000
-#define ARM_INST_STRD_I		0x014000f0
-#define ARM_INST_STRH_I		0x014000b0
+#define ARM_INST_STR_I 0x05000000
+#define ARM_INST_STRB_I 0x05400000
+#define ARM_INST_STRD_I 0x014000f0
+#define ARM_INST_STRH_I 0x014000b0
 
-#define ARM_INST_TST_R		0x01100000
-#define ARM_INST_TST_I		0x03100000
+#define ARM_INST_TST_R 0x01100000
+#define ARM_INST_TST_I 0x03100000
 
-#define ARM_INST_UDIV		0x0730f010
+#define ARM_INST_UDIV 0x0730f010
 
-#define ARM_INST_UMULL		0x00800090
+#define ARM_INST_UMULL 0x00800090
 
-#define ARM_INST_MLS		0x00600090
+#define ARM_INST_MLS 0x00600090
 
-#define ARM_INST_UXTH		0x06ff0070
+#define ARM_INST_UXTH 0x06ff0070
 
 /*
  * Use a suitable undefined instruction to use for ARM/Thumb2 faulting.
@@ -173,143 +174,137 @@ unsigned int hweight16(unsigned int w)
  * ARM:   xxxx 0111 1111 xxxx xxxx xxxx 1111 xxxx	ARMv7-AR, section A5.4
  * Thumb: 1101 1110 xxxx xxxx				ARMv7-M, section A5.2.6
  */
-#define ARM_INST_UDF		0xe7fddef1
+#define ARM_INST_UDF 0xe7fddef1
 
 /* register */
-#define _AL3_R(op, rd, rn, rm)	((op ## _R) | (rd) << 12 | (rn) << 16 | (rm))
+#define _AL3_R(op, rd, rn, rm) ((op##_R) | (rd) << 12 | (rn) << 16 | (rm))
 /* immediate */
-#define _AL3_I(op, rd, rn, imm)	((op ## _I) | (rd) << 12 | (rn) << 16 | (imm))
+#define _AL3_I(op, rd, rn, imm) ((op##_I) | (rd) << 12 | (rn) << 16 | (imm))
 /* register with register-shift */
-#define _AL3_SR(inst)	(inst | (1 << 4))
+#define _AL3_SR(inst) (inst | (1 << 4))
 
-#define ARM_ADD_R(rd, rn, rm)	_AL3_R(ARM_INST_ADD, rd, rn, rm)
-#define ARM_ADDS_R(rd, rn, rm)	_AL3_R(ARM_INST_ADDS, rd, rn, rm)
-#define ARM_ADD_I(rd, rn, imm)	_AL3_I(ARM_INST_ADD, rd, rn, imm)
-#define ARM_ADDS_I(rd, rn, imm)	_AL3_I(ARM_INST_ADDS, rd, rn, imm)
-#define ARM_ADC_R(rd, rn, rm)	_AL3_R(ARM_INST_ADC, rd, rn, rm)
-#define ARM_ADC_I(rd, rn, imm)	_AL3_I(ARM_INST_ADC, rd, rn, imm)
+#define ARM_ADD_R(rd, rn, rm) _AL3_R(ARM_INST_ADD, rd, rn, rm)
+#define ARM_ADDS_R(rd, rn, rm) _AL3_R(ARM_INST_ADDS, rd, rn, rm)
+#define ARM_ADD_I(rd, rn, imm) _AL3_I(ARM_INST_ADD, rd, rn, imm)
+#define ARM_ADDS_I(rd, rn, imm) _AL3_I(ARM_INST_ADDS, rd, rn, imm)
+#define ARM_ADC_R(rd, rn, rm) _AL3_R(ARM_INST_ADC, rd, rn, rm)
+#define ARM_ADC_I(rd, rn, imm) _AL3_I(ARM_INST_ADC, rd, rn, imm)
 
-#define ARM_AND_R(rd, rn, rm)	_AL3_R(ARM_INST_AND, rd, rn, rm)
-#define ARM_ANDS_R(rd, rn, rm)	_AL3_R(ARM_INST_ANDS, rd, rn, rm)
-#define ARM_AND_I(rd, rn, imm)	_AL3_I(ARM_INST_AND, rd, rn, imm)
+#define ARM_AND_R(rd, rn, rm) _AL3_R(ARM_INST_AND, rd, rn, rm)
+#define ARM_ANDS_R(rd, rn, rm) _AL3_R(ARM_INST_ANDS, rd, rn, rm)
+#define ARM_AND_I(rd, rn, imm) _AL3_I(ARM_INST_AND, rd, rn, imm)
 
-#define ARM_BIC_R(rd, rn, rm)	_AL3_R(ARM_INST_BIC, rd, rn, rm)
-#define ARM_BIC_I(rd, rn, imm)	_AL3_I(ARM_INST_BIC, rd, rn, imm)
+#define ARM_BIC_R(rd, rn, rm) _AL3_R(ARM_INST_BIC, rd, rn, rm)
+#define ARM_BIC_I(rd, rn, imm) _AL3_I(ARM_INST_BIC, rd, rn, imm)
 
-#define ARM_B(imm24)		(ARM_INST_B | ((imm24) & 0xffffff))
-#define ARM_BX(rm)		(ARM_INST_BX | (rm))
-#define ARM_BLX_R(rm)		(ARM_INST_BLX_R | (rm))
+#define ARM_B(imm24) (ARM_INST_B | ((imm24)&0xffffff))
+#define ARM_BX(rm) (ARM_INST_BX | (rm))
+#define ARM_BLX_R(rm) (ARM_INST_BLX_R | (rm))
 
-#define ARM_CMP_R(rn, rm)	_AL3_R(ARM_INST_CMP, 0, rn, rm)
-#define ARM_CMP_I(rn, imm)	_AL3_I(ARM_INST_CMP, 0, rn, imm)
+#define ARM_CMP_R(rn, rm) _AL3_R(ARM_INST_CMP, 0, rn, rm)
+#define ARM_CMP_I(rn, imm) _AL3_I(ARM_INST_CMP, 0, rn, imm)
 
-#define ARM_EOR_R(rd, rn, rm)	_AL3_R(ARM_INST_EOR, rd, rn, rm)
-#define ARM_EOR_I(rd, rn, imm)	_AL3_I(ARM_INST_EOR, rd, rn, imm)
+#define ARM_EOR_R(rd, rn, rm) _AL3_R(ARM_INST_EOR, rd, rn, rm)
+#define ARM_EOR_I(rd, rn, imm) _AL3_I(ARM_INST_EOR, rd, rn, imm)
 
-#define ARM_LDR_R(rt, rn, rm)	(ARM_INST_LDR_R | ARM_INST_LDST__U \
-				 | (rt) << 12 | (rn) << 16 \
-				 | (rm))
-#define ARM_LDR_R_SI(rt, rn, rm, type, imm) \
-				(ARM_INST_LDR_R | ARM_INST_LDST__U \
-				 | (rt) << 12 | (rn) << 16 \
-				 | (imm) << 7 | (type) << 5 | (rm))
-#define ARM_LDRB_R(rt, rn, rm)	(ARM_INST_LDRB_R | ARM_INST_LDST__U \
-				 | (rt) << 12 | (rn) << 16 \
-				 | (rm))
-#define ARM_LDRH_R(rt, rn, rm)	(ARM_INST_LDRH_R | ARM_INST_LDST__U \
-				 | (rt) << 12 | (rn) << 16 \
-				 | (rm))
+#define ARM_LDR_R(rt, rn, rm)                                                  \
+	(ARM_INST_LDR_R | ARM_INST_LDST__U | (rt) << 12 | (rn) << 16 | (rm))
+#define ARM_LDR_R_SI(rt, rn, rm, type, imm)                                    \
+	(ARM_INST_LDR_R | ARM_INST_LDST__U | (rt) << 12 | (rn) << 16 |         \
+	 (imm) << 7 | (type) << 5 | (rm))
+#define ARM_LDRB_R(rt, rn, rm)                                                 \
+	(ARM_INST_LDRB_R | ARM_INST_LDST__U | (rt) << 12 | (rn) << 16 | (rm))
+#define ARM_LDRH_R(rt, rn, rm)                                                 \
+	(ARM_INST_LDRH_R | ARM_INST_LDST__U | (rt) << 12 | (rn) << 16 | (rm))
 
-#define ARM_LDM(rn, regs)	(ARM_INST_LDM | (rn) << 16 | (regs))
-#define ARM_LDM_IA(rn, regs)	(ARM_INST_LDM_IA | (rn) << 16 | (regs))
+#define ARM_LDM(rn, regs) (ARM_INST_LDM | (rn) << 16 | (regs))
+#define ARM_LDM_IA(rn, regs) (ARM_INST_LDM_IA | (rn) << 16 | (regs))
 
-#define ARM_LSL_R(rd, rn, rm)	(_AL3_R(ARM_INST_LSL, rd, 0, rn) | (rm) << 8)
-#define ARM_LSL_I(rd, rn, imm)	(_AL3_I(ARM_INST_LSL, rd, 0, rn) | (imm) << 7)
+#define ARM_LSL_R(rd, rn, rm) (_AL3_R(ARM_INST_LSL, rd, 0, rn) | (rm) << 8)
+#define ARM_LSL_I(rd, rn, imm) (_AL3_I(ARM_INST_LSL, rd, 0, rn) | (imm) << 7)
 
-#define ARM_LSR_R(rd, rn, rm)	(_AL3_R(ARM_INST_LSR, rd, 0, rn) | (rm) << 8)
-#define ARM_LSR_I(rd, rn, imm)	(_AL3_I(ARM_INST_LSR, rd, 0, rn) | (imm) << 7)
-#define ARM_ASR_R(rd, rn, rm)   (_AL3_R(ARM_INST_ASR, rd, 0, rn) | (rm) << 8)
-#define ARM_ASR_I(rd, rn, imm)  (_AL3_I(ARM_INST_ASR, rd, 0, rn) | (imm) << 7)
+#define ARM_LSR_R(rd, rn, rm) (_AL3_R(ARM_INST_LSR, rd, 0, rn) | (rm) << 8)
+#define ARM_LSR_I(rd, rn, imm) (_AL3_I(ARM_INST_LSR, rd, 0, rn) | (imm) << 7)
+#define ARM_ASR_R(rd, rn, rm) (_AL3_R(ARM_INST_ASR, rd, 0, rn) | (rm) << 8)
+#define ARM_ASR_I(rd, rn, imm) (_AL3_I(ARM_INST_ASR, rd, 0, rn) | (imm) << 7)
 
-#define ARM_MOV_R(rd, rm)	_AL3_R(ARM_INST_MOV, rd, 0, rm)
-#define ARM_MOVS_R(rd, rm)	_AL3_R(ARM_INST_MOVS, rd, 0, rm)
-#define ARM_MOV_I(rd, imm)	_AL3_I(ARM_INST_MOV, rd, 0, imm)
-#define ARM_MOV_SR(rd, rm, type, rs)	\
+#define ARM_MOV_R(rd, rm) _AL3_R(ARM_INST_MOV, rd, 0, rm)
+#define ARM_MOVS_R(rd, rm) _AL3_R(ARM_INST_MOVS, rd, 0, rm)
+#define ARM_MOV_I(rd, imm) _AL3_I(ARM_INST_MOV, rd, 0, imm)
+#define ARM_MOV_SR(rd, rm, type, rs)                                           \
 	(_AL3_SR(ARM_MOV_R(rd, rm)) | (type) << 5 | (rs) << 8)
-#define ARM_MOV_SI(rd, rm, type, imm6)	\
+#define ARM_MOV_SI(rd, rm, type, imm6)                                         \
 	(ARM_MOV_R(rd, rm) | (type) << 5 | (imm6) << 7)
 
-#define ARM_MOVW(rd, imm)	\
-	(ARM_INST_MOVW | ((imm) >> 12) << 16 | (rd) << 12 | ((imm) & 0x0fff))
+#define ARM_MOVW(rd, imm)                                                      \
+	(ARM_INST_MOVW | ((imm) >> 12) << 16 | (rd) << 12 | ((imm)&0x0fff))
 
-#define ARM_MOVT(rd, imm)	\
-	(ARM_INST_MOVT | ((imm) >> 12) << 16 | (rd) << 12 | ((imm) & 0x0fff))
+#define ARM_MOVT(rd, imm)                                                      \
+	(ARM_INST_MOVT | ((imm) >> 12) << 16 | (rd) << 12 | ((imm)&0x0fff))
 
-#define ARM_MUL(rd, rm, rn)	(ARM_INST_MUL | (rd) << 16 | (rm) << 8 | (rn))
+#define ARM_MUL(rd, rm, rn) (ARM_INST_MUL | (rd) << 16 | (rm) << 8 | (rn))
 
-#define ARM_POP(regs)		(ARM_INST_POP | (regs))
-#define ARM_PUSH(regs)		(ARM_INST_PUSH | (regs))
+#define ARM_POP(regs) (ARM_INST_POP | (regs))
+#define ARM_PUSH(regs) (ARM_INST_PUSH | (regs))
 
-#define ARM_ORR_R(rd, rn, rm)	_AL3_R(ARM_INST_ORR, rd, rn, rm)
-#define ARM_ORR_I(rd, rn, imm)	_AL3_I(ARM_INST_ORR, rd, rn, imm)
-#define ARM_ORR_SR(rd, rn, rm, type, rs)	\
+#define ARM_ORR_R(rd, rn, rm) _AL3_R(ARM_INST_ORR, rd, rn, rm)
+#define ARM_ORR_I(rd, rn, imm) _AL3_I(ARM_INST_ORR, rd, rn, imm)
+#define ARM_ORR_SR(rd, rn, rm, type, rs)                                       \
 	(_AL3_SR(ARM_ORR_R(rd, rn, rm)) | (type) << 5 | (rs) << 8)
-#define ARM_ORRS_R(rd, rn, rm)	_AL3_R(ARM_INST_ORRS, rd, rn, rm)
-#define ARM_ORRS_SR(rd, rn, rm, type, rs)	\
+#define ARM_ORRS_R(rd, rn, rm) _AL3_R(ARM_INST_ORRS, rd, rn, rm)
+#define ARM_ORRS_SR(rd, rn, rm, type, rs)                                      \
 	(_AL3_SR(ARM_ORRS_R(rd, rn, rm)) | (type) << 5 | (rs) << 8)
-#define ARM_ORR_SI(rd, rn, rm, type, imm6)	\
+#define ARM_ORR_SI(rd, rn, rm, type, imm6)                                     \
 	(ARM_ORR_R(rd, rn, rm) | (type) << 5 | (imm6) << 7)
-#define ARM_ORRS_SI(rd, rn, rm, type, imm6)	\
+#define ARM_ORRS_SI(rd, rn, rm, type, imm6)                                    \
 	(ARM_ORRS_R(rd, rn, rm) | (type) << 5 | (imm6) << 7)
 
-#define ARM_REV(rd, rm)		(ARM_INST_REV | (rd) << 12 | (rm))
-#define ARM_REV16(rd, rm)	(ARM_INST_REV16 | (rd) << 12 | (rm))
+#define ARM_REV(rd, rm) (ARM_INST_REV | (rd) << 12 | (rm))
+#define ARM_REV16(rd, rm) (ARM_INST_REV16 | (rd) << 12 | (rm))
 
-#define ARM_RSB_I(rd, rn, imm)	_AL3_I(ARM_INST_RSB, rd, rn, imm)
-#define ARM_RSBS_I(rd, rn, imm)	_AL3_I(ARM_INST_RSBS, rd, rn, imm)
-#define ARM_RSC_I(rd, rn, imm)	_AL3_I(ARM_INST_RSC, rd, rn, imm)
+#define ARM_RSB_I(rd, rn, imm) _AL3_I(ARM_INST_RSB, rd, rn, imm)
+#define ARM_RSBS_I(rd, rn, imm) _AL3_I(ARM_INST_RSBS, rd, rn, imm)
+#define ARM_RSC_I(rd, rn, imm) _AL3_I(ARM_INST_RSC, rd, rn, imm)
 
-#define ARM_SUB_R(rd, rn, rm)	_AL3_R(ARM_INST_SUB, rd, rn, rm)
-#define ARM_SUBS_R(rd, rn, rm)	_AL3_R(ARM_INST_SUBS, rd, rn, rm)
-#define ARM_RSB_R(rd, rn, rm)	_AL3_R(ARM_INST_RSB, rd, rn, rm)
-#define ARM_SBC_R(rd, rn, rm)	_AL3_R(ARM_INST_SBC, rd, rn, rm)
-#define ARM_SBCS_R(rd, rn, rm)	_AL3_R(ARM_INST_SBCS, rd, rn, rm)
-#define ARM_SUB_I(rd, rn, imm)	_AL3_I(ARM_INST_SUB, rd, rn, imm)
-#define ARM_SUBS_I(rd, rn, imm)	_AL3_I(ARM_INST_SUBS, rd, rn, imm)
-#define ARM_SBC_I(rd, rn, imm)	_AL3_I(ARM_INST_SBC, rd, rn, imm)
+#define ARM_SUB_R(rd, rn, rm) _AL3_R(ARM_INST_SUB, rd, rn, rm)
+#define ARM_SUBS_R(rd, rn, rm) _AL3_R(ARM_INST_SUBS, rd, rn, rm)
+#define ARM_RSB_R(rd, rn, rm) _AL3_R(ARM_INST_RSB, rd, rn, rm)
+#define ARM_SBC_R(rd, rn, rm) _AL3_R(ARM_INST_SBC, rd, rn, rm)
+#define ARM_SBCS_R(rd, rn, rm) _AL3_R(ARM_INST_SBCS, rd, rn, rm)
+#define ARM_SUB_I(rd, rn, imm) _AL3_I(ARM_INST_SUB, rd, rn, imm)
+#define ARM_SUBS_I(rd, rn, imm) _AL3_I(ARM_INST_SUBS, rd, rn, imm)
+#define ARM_SBC_I(rd, rn, imm) _AL3_I(ARM_INST_SBC, rd, rn, imm)
 
-#define ARM_TST_R(rn, rm)	_AL3_R(ARM_INST_TST, 0, rn, rm)
-#define ARM_TST_I(rn, imm)	_AL3_I(ARM_INST_TST, 0, rn, imm)
+#define ARM_TST_R(rn, rm) _AL3_R(ARM_INST_TST, 0, rn, rm)
+#define ARM_TST_I(rn, imm) _AL3_I(ARM_INST_TST, 0, rn, imm)
 
-#define ARM_UDIV(rd, rn, rm)	(ARM_INST_UDIV | (rd) << 16 | (rn) | (rm) << 8)
+#define ARM_UDIV(rd, rn, rm) (ARM_INST_UDIV | (rd) << 16 | (rn) | (rm) << 8)
 
-#define ARM_UMULL(rd_lo, rd_hi, rn, rm)	(ARM_INST_UMULL | (rd_hi) << 16 \
-					 | (rd_lo) << 12 | (rm) << 8 | rn)
+#define ARM_UMULL(rd_lo, rd_hi, rn, rm)                                        \
+	(ARM_INST_UMULL | (rd_hi) << 16 | (rd_lo) << 12 | (rm) << 8 | rn)
 
-#define ARM_MLS(rd, rn, rm, ra)	(ARM_INST_MLS | (rd) << 16 | (rn) | (rm) << 8 \
-				 | (ra) << 12)
-#define ARM_UXTH(rd, rm)	(ARM_INST_UXTH | (rd) << 12 | (rm))
+#define ARM_MLS(rd, rn, rm, ra)                                                \
+	(ARM_INST_MLS | (rd) << 16 | (rn) | (rm) << 8 | (ra) << 12)
+#define ARM_UXTH(rd, rm) (ARM_INST_UXTH | (rd) << 12 | (rm))
 
-struct jump
-{
-    uint32_t offset_loc;
-    uint32_t target_pc;
+struct jump {
+	uint32_t offset_loc;
+	uint32_t target_pc;
 };
 
-struct jit_state
-{
-    uint8_t* buf;
-    uint32_t offset;
-    uint32_t size;
-    uint32_t* pc_locs;
-    uint32_t exit_loc;
-    uint32_t unwind_loc;
-    struct jump* jumps;
-    int num_jumps;
-    uint32_t stack_size;
+struct jit_state {
+	uint8_t *buf;
+	uint32_t offset;
+	uint32_t size;
+	uint32_t *pc_locs;
+	uint32_t exit_loc;
+	uint32_t unwind_loc;
+	struct jump *jumps;
+	int num_jumps;
+	uint32_t stack_size;
 };
 
-#define ___asm_opcode_identity32(x) ((x) & 0xFFFFFFFF)
+#define ___asm_opcode_identity32(x) ((x)&0xFFFFFFFF)
 
 #define ___opcode_identity32(x) ___asm_opcode_identity32(x)
 #define __opcode_to_mem_arm(x) ___opcode_identity32(x)
@@ -319,10 +314,9 @@ struct jit_state
 /* Operations specific to Thumb opcodes */
 
 /* Instruction size checks: */
-#define __opcode_is_thumb16(x) (					\
-	   ((x) & 0xFFFF0000) == 0					\
-	&& !(((x) & 0xF800) == 0xE800 || ((x) & 0xF000) == 0xF000)	\
-)
+#define __opcode_is_thumb16(x)                                                 \
+	(((x)&0xFFFF0000) == 0 &&                                              \
+	 !(((x)&0xF800) == 0xE800 || ((x)&0xF000) == 0xF000))
 
 /*
  * eBPF prog stack layout:
@@ -365,11 +359,11 @@ struct jit_state
  * When popping registers off the stack at the end of a BPF function, we
  * reference them via the current ARM_FP register.
  */
-#define CALLEE_MASK	(1 << ARM_R4 | 1 << ARM_R5 | 1 << ARM_R6 | \
-			 1 << ARM_R7 | 1 << ARM_R8 | 1 << ARM_R9 | \
-			 1 << ARM_FP)
+#define CALLEE_MASK                                                            \
+	(1 << ARM_R4 | 1 << ARM_R5 | 1 << ARM_R6 | 1 << ARM_R7 | 1 << ARM_R8 | \
+	 1 << ARM_R9 | 1 << ARM_FP)
 #define CALLEE_PUSH_MASK (CALLEE_MASK | 1 << ARM_LR)
-#define CALLEE_POP_MASK  (CALLEE_MASK | 1 << ARM_PC)
+#define CALLEE_POP_MASK (CALLEE_MASK | 1 << ARM_PC)
 
 enum {
 	/* Stack layout - these are offsets from (top of stack - 4) */
@@ -404,20 +398,20 @@ enum {
  * Negative "register" values indicate the register is stored on the stack
  * and are the offset from the top of the eBPF JIT scratch space.
  */
-#define STACK_OFFSET(k)	(-4 - (k) * 4)
-#define SCRATCH_SIZE	(BPF_JIT_SCRATCH_REGS * 4)
+#define STACK_OFFSET(k) (-4 - (k)*4)
+#define SCRATCH_SIZE (BPF_JIT_SCRATCH_REGS * 4)
 
 #ifdef CONFIG_FRAME_POINTER
-#define EBPF_SCRATCH_TO_ARM_FP(x) ((x) - 4 * hweight16(CALLEE_PUSH_MASK) - 4)
+#define EBPF_SCRATCH_TO_ARM_FP(x) ((x)-4 * hweight16(CALLEE_PUSH_MASK) - 4)
 #else
 #define EBPF_SCRATCH_TO_ARM_FP(x) (x)
 #endif
 
-#define TMP_REG_1	(MAX_BPF_JIT_REG + 0)	/* TEMP Register 1 */
-#define TMP_REG_2	(MAX_BPF_JIT_REG + 1)	/* TEMP Register 2 */
-#define TCALL_CNT	(MAX_BPF_JIT_REG + 2)	/* Tail Call Count */
+#define TMP_REG_1 (MAX_BPF_JIT_REG + 0) /* TEMP Register 1 */
+#define TMP_REG_2 (MAX_BPF_JIT_REG + 1) /* TEMP Register 2 */
+#define TCALL_CNT (MAX_BPF_JIT_REG + 2) /* Tail Call Count */
 
-#define FLAG_IMM_OVERFLOW	(1 << 0)
+#define FLAG_IMM_OVERFLOW (1 << 0)
 
 /*
  * Map eBPF registers to ARM 32bit registers or stack scratch space.
@@ -436,39 +430,39 @@ enum {
  */
 static const s8 bpf2a32[][2] = {
 	/* return value from in-kernel function, and exit value from eBPF */
-	[BPF_REG_0] = {ARM_R1, ARM_R0},
+	[BPF_REG_0] = { ARM_R1, ARM_R0 },
 	/* arguments from eBPF program to in-kernel function */
-	[BPF_REG_1] = {ARM_R3, ARM_R2},
+	[BPF_REG_1] = { ARM_R3, ARM_R2 },
 	/* Stored on stack scratch space */
-	[BPF_REG_2] = {STACK_OFFSET(BPF_R2_HI), STACK_OFFSET(BPF_R2_LO)},
-	[BPF_REG_3] = {STACK_OFFSET(BPF_R3_HI), STACK_OFFSET(BPF_R3_LO)},
-	[BPF_REG_4] = {STACK_OFFSET(BPF_R4_HI), STACK_OFFSET(BPF_R4_LO)},
-	[BPF_REG_5] = {STACK_OFFSET(BPF_R5_HI), STACK_OFFSET(BPF_R5_LO)},
+	[BPF_REG_2] = { STACK_OFFSET(BPF_R2_HI), STACK_OFFSET(BPF_R2_LO) },
+	[BPF_REG_3] = { STACK_OFFSET(BPF_R3_HI), STACK_OFFSET(BPF_R3_LO) },
+	[BPF_REG_4] = { STACK_OFFSET(BPF_R4_HI), STACK_OFFSET(BPF_R4_LO) },
+	[BPF_REG_5] = { STACK_OFFSET(BPF_R5_HI), STACK_OFFSET(BPF_R5_LO) },
 	/* callee saved registers that in-kernel function will preserve */
-	[BPF_REG_6] = {ARM_R5, ARM_R4},
+	[BPF_REG_6] = { ARM_R5, ARM_R4 },
 	/* Stored on stack scratch space */
-	[BPF_REG_7] = {STACK_OFFSET(BPF_R7_HI), STACK_OFFSET(BPF_R7_LO)},
-	[BPF_REG_8] = {STACK_OFFSET(BPF_R8_HI), STACK_OFFSET(BPF_R8_LO)},
-	[BPF_REG_9] = {STACK_OFFSET(BPF_R9_HI), STACK_OFFSET(BPF_R9_LO)},
+	[BPF_REG_7] = { STACK_OFFSET(BPF_R7_HI), STACK_OFFSET(BPF_R7_LO) },
+	[BPF_REG_8] = { STACK_OFFSET(BPF_R8_HI), STACK_OFFSET(BPF_R8_LO) },
+	[BPF_REG_9] = { STACK_OFFSET(BPF_R9_HI), STACK_OFFSET(BPF_R9_LO) },
 	/* Read only Frame Pointer to access Stack */
-	[BPF_REG_FP] = {STACK_OFFSET(BPF_FP_HI), STACK_OFFSET(BPF_FP_LO)},
+	[BPF_REG_FP] = { STACK_OFFSET(BPF_FP_HI), STACK_OFFSET(BPF_FP_LO) },
 	/* Temporary Register for internal BPF JIT, can be used
 	 * for constant blindings and others.
 	 */
-	[TMP_REG_1] = {ARM_R7, ARM_R6},
-	[TMP_REG_2] = {ARM_R9, ARM_R8},
+	[TMP_REG_1] = { ARM_R7, ARM_R6 },
+	[TMP_REG_2] = { ARM_R9, ARM_R8 },
 	/* Tail call count. Stored on stack scratch space. */
-	[TCALL_CNT] = {STACK_OFFSET(BPF_TC_HI), STACK_OFFSET(BPF_TC_LO)},
+	[TCALL_CNT] = { STACK_OFFSET(BPF_TC_HI), STACK_OFFSET(BPF_TC_LO) },
 	/* temporary register for blinding constants.
 	 * Stored on stack scratch space.
 	 */
-	[BPF_REG_AX] = {STACK_OFFSET(BPF_AX_HI), STACK_OFFSET(BPF_AX_LO)},
+	[BPF_REG_AX] = { STACK_OFFSET(BPF_AX_HI), STACK_OFFSET(BPF_AX_LO) },
 };
 
-#define	dst_lo	dst[1]
-#define dst_hi	dst[0]
-#define src_lo	src[1]
-#define src_hi	src[0]
+#define dst_lo dst[1]
+#define dst_hi dst[0]
+#define src_lo src[1]
+#define src_hi src[0]
 
 /*
  * JIT Context:
@@ -491,13 +485,16 @@ struct jit_ctx {
 	unsigned int idx;
 	unsigned int prologue_bytes;
 	unsigned int epilogue_offset;
-	// no meaning
+	unsigned int cpu_architecture;
 	u32 flags;
 	u32 *offsets;
 	u32 *target;
-	// buf in 
 	u32 stack_size;
-	// stack_size in jit_state
+#if __LINUX_ARM_ARCH__ < 7
+	u16 epilogue_bytes;
+	u16 imm_count;
+	u32 *imms;
+#endif
 };
 
 /*
@@ -515,7 +512,8 @@ static u32 jit_mod32(u32 dividend, u32 divisor)
 }
 
 static inline void _emit(int cond, u32 inst, struct jit_ctx *ctx)
-{
+{	
+	LOG_DEBUG("_emit: %lx [%d] %lx cond %x\n", ctx->target + ctx->idx, ctx->idx, inst, cond);
 	// TODO: Core Function
 	inst |= (cond << 28);
 	inst = __opcode_to_mem_arm(inst);
@@ -558,47 +556,49 @@ static inline u32 ror32(u32 word, unsigned int shift)
  * This is rather horrid, but necessary to convert an integer constant
  * to an immediate operand for the opcodes, and be able to detect at
  * build time whether the constant can't be converted (iow, usable in
- * static_assert()).
+ * BUILD_BUG_ON()).
  */
 #define imm12val(v, s) (rol32(v, (s)) | (s) << 7)
-#define const_imm8m(x)					\
-	({ int r;					\
-	   u32 v = (x);					\
-	   if (!(v & ~0x000000ff))			\
-		r = imm12val(v, 0);			\
-	   else if (!(v & ~0xc000003f))			\
-		r = imm12val(v, 2);			\
-	   else if (!(v & ~0xf000000f))			\
-		r = imm12val(v, 4);			\
-	   else if (!(v & ~0xfc000003))			\
-		r = imm12val(v, 6);			\
-	   else if (!(v & ~0xff000000))			\
-		r = imm12val(v, 8);			\
-	   else if (!(v & ~0x3fc00000))			\
-		r = imm12val(v, 10);			\
-	   else if (!(v & ~0x0ff00000))			\
-		r = imm12val(v, 12);			\
-	   else if (!(v & ~0x03fc0000))			\
-		r = imm12val(v, 14);			\
-	   else if (!(v & ~0x00ff0000))			\
-		r = imm12val(v, 16);			\
-	   else if (!(v & ~0x003fc000))			\
-		r = imm12val(v, 18);			\
-	   else if (!(v & ~0x000ff000))			\
-		r = imm12val(v, 20);			\
-	   else if (!(v & ~0x0003fc00))			\
-		r = imm12val(v, 22);			\
-	   else if (!(v & ~0x0000ff00))			\
-		r = imm12val(v, 24);			\
-	   else if (!(v & ~0x00003fc0))			\
-		r = imm12val(v, 26);			\
-	   else if (!(v & ~0x00000ff0))			\
-		r = imm12val(v, 28);			\
-	   else if (!(v & ~0x000003fc))			\
-		r = imm12val(v, 30);			\
-	   else						\
-		r = -1;					\
-	   r; })
+#define const_imm8m(x)                                                         \
+	({                                                                     \
+		int r;                                                         \
+		u32 v = (x);                                                   \
+		if (!(v & ~0x000000ff))                                        \
+			r = imm12val(v, 0);                                    \
+		else if (!(v & ~0xc000003f))                                   \
+			r = imm12val(v, 2);                                    \
+		else if (!(v & ~0xf000000f))                                   \
+			r = imm12val(v, 4);                                    \
+		else if (!(v & ~0xfc000003))                                   \
+			r = imm12val(v, 6);                                    \
+		else if (!(v & ~0xff000000))                                   \
+			r = imm12val(v, 8);                                    \
+		else if (!(v & ~0x3fc00000))                                   \
+			r = imm12val(v, 10);                                   \
+		else if (!(v & ~0x0ff00000))                                   \
+			r = imm12val(v, 12);                                   \
+		else if (!(v & ~0x03fc0000))                                   \
+			r = imm12val(v, 14);                                   \
+		else if (!(v & ~0x00ff0000))                                   \
+			r = imm12val(v, 16);                                   \
+		else if (!(v & ~0x003fc000))                                   \
+			r = imm12val(v, 18);                                   \
+		else if (!(v & ~0x000ff000))                                   \
+			r = imm12val(v, 20);                                   \
+		else if (!(v & ~0x0003fc00))                                   \
+			r = imm12val(v, 22);                                   \
+		else if (!(v & ~0x0000ff00))                                   \
+			r = imm12val(v, 24);                                   \
+		else if (!(v & ~0x00003fc0))                                   \
+			r = imm12val(v, 26);                                   \
+		else if (!(v & ~0x00000ff0))                                   \
+			r = imm12val(v, 28);                                   \
+		else if (!(v & ~0x000003fc))                                   \
+			r = imm12val(v, 30);                                   \
+		else                                                           \
+			r = -1;                                                \
+		r;                                                             \
+	})
 
 /*
  * Checks if immediate value can be converted to imm12(12 bits) value.
@@ -635,15 +635,15 @@ static u32 arm_bpf_ldst_imm8(u32 op, u8 rt, u8 rn, s16 imm8)
 	return op | (imm8 & 0xf0) << 4 | (imm8 & 0x0f);
 }
 
-#define ARM_LDR_I(rt, rn, off)	arm_bpf_ldst_imm12(ARM_INST_LDR_I, rt, rn, off)
-#define ARM_LDRB_I(rt, rn, off)	arm_bpf_ldst_imm12(ARM_INST_LDRB_I, rt, rn, off)
-#define ARM_LDRD_I(rt, rn, off)	arm_bpf_ldst_imm8(ARM_INST_LDRD_I, rt, rn, off)
-#define ARM_LDRH_I(rt, rn, off)	arm_bpf_ldst_imm8(ARM_INST_LDRH_I, rt, rn, off)
+#define ARM_LDR_I(rt, rn, off) arm_bpf_ldst_imm12(ARM_INST_LDR_I, rt, rn, off)
+#define ARM_LDRB_I(rt, rn, off) arm_bpf_ldst_imm12(ARM_INST_LDRB_I, rt, rn, off)
+#define ARM_LDRD_I(rt, rn, off) arm_bpf_ldst_imm8(ARM_INST_LDRD_I, rt, rn, off)
+#define ARM_LDRH_I(rt, rn, off) arm_bpf_ldst_imm8(ARM_INST_LDRH_I, rt, rn, off)
 
-#define ARM_STR_I(rt, rn, off)	arm_bpf_ldst_imm12(ARM_INST_STR_I, rt, rn, off)
-#define ARM_STRB_I(rt, rn, off)	arm_bpf_ldst_imm12(ARM_INST_STRB_I, rt, rn, off)
-#define ARM_STRD_I(rt, rn, off)	arm_bpf_ldst_imm8(ARM_INST_STRD_I, rt, rn, off)
-#define ARM_STRH_I(rt, rn, off)	arm_bpf_ldst_imm8(ARM_INST_STRH_I, rt, rn, off)
+#define ARM_STR_I(rt, rn, off) arm_bpf_ldst_imm12(ARM_INST_STR_I, rt, rn, off)
+#define ARM_STRB_I(rt, rn, off) arm_bpf_ldst_imm12(ARM_INST_STRB_I, rt, rn, off)
+#define ARM_STRD_I(rt, rn, off) arm_bpf_ldst_imm8(ARM_INST_STRD_I, rt, rn, off)
+#define ARM_STRH_I(rt, rn, off) arm_bpf_ldst_imm8(ARM_INST_STRH_I, rt, rn, off)
 
 /*
  * Initializes the JIT space with undefined instructions.
@@ -656,16 +656,68 @@ static void jit_fill_hole(void *area, unsigned int size)
 		*ptr++ = __opcode_to_mem_arm(ARM_INST_UDF);
 }
 
+#if defined(CONFIG_AEABI) && (__LINUX_ARM_ARCH__ >= 5)
 /* EABI requires the stack to be aligned to 64-bit boundaries */
-#define STACK_ALIGNMENT	8
-/* total stack size used in JITed code */
-#define _STACK_SIZE	(EBPF_STACK_SIZE + SCRATCH_SIZE)
-/* total stack size used in JITed code */
-#define STACK_SIZE	ALIGN(_STACK_SIZE, STACK_ALIGNMENT)
+#define STACK_ALIGNMENT 8
+#else
+/* Stack must be aligned to 32-bit boundaries */
+#define STACK_ALIGNMENT 4
+#endif
 
+/* total stack size used in JITed code */
+#define _STACK_SIZE (ctx->prog->aux->stack_depth + SCRATCH_SIZE)
+#define STACK_SIZE ALIGN(_STACK_SIZE, STACK_ALIGNMENT)
+
+#if __LINUX_ARM_ARCH__ < 7
+
+static u16 imm_offset(u32 k, struct jit_ctx *ctx)
+{
+	unsigned int i = 0, offset;
+	u16 imm;
+
+	/* on the "fake" run we just count them (duplicates included) */
+	if (ctx->target == NULL) {
+		ctx->imm_count++;
+		return 0;
+	}
+
+	while ((i < ctx->imm_count) && ctx->imms[i]) {
+		if (ctx->imms[i] == k)
+			break;
+		i++;
+	}
+
+	if (ctx->imms[i] == 0)
+		ctx->imms[i] = k;
+
+	/* constants go just after the epilogue */
+	offset = ctx->offsets[ctx->prog->num_insts - 1] * 4;
+	offset += ctx->prologue_bytes;
+	offset += ctx->epilogue_bytes;
+	offset += i * 4;
+
+	ctx->target[offset / 4] = k;
+
+	/* PC in ARM mode == address of the instruction + 8 */
+	imm = offset - (8 + ctx->idx * 4);
+
+	if (imm & ~0xfff) {
+		/*
+		 * literal pool is too far, signal it into flags. we
+		 * can only detect it on the second pass unfortunately.
+		 */
+		ctx->flags |= FLAG_IMM_OVERFLOW;
+		return 0;
+	}
+
+	return imm;
+}
+
+#endif /* __LINUX_ARM_ARCH__ */
 
 static inline int bpf2a32_offset(int bpf_to, int bpf_from,
-				 const struct jit_ctx *ctx) {
+				 const struct jit_ctx *ctx)
+{
 	int to, from;
 
 	if (ctx->target == NULL)
@@ -681,11 +733,13 @@ static inline int bpf2a32_offset(int bpf_to, int bpf_from,
  */
 static inline void emit_mov_i_no8m(const u8 rd, u32 val, struct jit_ctx *ctx)
 {
-
+#if __LINUX_ARM_ARCH__ < 7
+	emit(ARM_LDR_I(rd, ARM_PC, imm_offset(val, ctx)), ctx);
+#else
 	emit(ARM_MOVW(rd, val & 0xffff), ctx);
 	if (val > 0xffff)
 		emit(ARM_MOVT(rd, val >> 16), ctx);
-
+#endif
 }
 
 static inline void emit_mov_i(const u8 rd, u32 val, struct jit_ctx *ctx)
@@ -708,7 +762,12 @@ static void emit_bx_r(u8 tgt_reg, struct jit_ctx *ctx)
 
 static inline void emit_blx_r(u8 tgt_reg, struct jit_ctx *ctx)
 {
+#if __LINUX_ARM_ARCH__ < 5
+	emit(ARM_MOV_R(ARM_LR, ARM_PC), ctx);
+	emit_bx_r(tgt_reg, ctx);
+#else
 	emit(ARM_BLX_R(tgt_reg), ctx);
+#endif
 }
 
 static inline int epilogue_offset(const struct jit_ctx *ctx)
@@ -726,6 +785,18 @@ static inline int epilogue_offset(const struct jit_ctx *ctx)
 static inline void emit_udivmod(u8 rd, u8 rm, u8 rn, struct jit_ctx *ctx, u8 op)
 {
 	const s8 *tmp = bpf2a32[TMP_REG_1];
+
+#if __LINUX_ARM_ARCH__ == 7
+	if (elf_hwcap & HWCAP_IDIVA) {
+		if (op == BPF_DIV)
+			emit(ARM_UDIV(rd, rm, rn), ctx);
+		else {
+			emit(ARM_UDIV(ARM_IP, rm, rn), ctx);
+			emit(ARM_MLS(rd, rn, ARM_IP, rm), ctx);
+		}
+		return;
+	}
+#endif
 
 	/*
 	 * For BPF_ALU | BPF_DIV | BPF_K instructions
@@ -745,8 +816,8 @@ static inline void emit_udivmod(u8 rd, u8 rm, u8 rn, struct jit_ctx *ctx, u8 op)
 	}
 
 	/* Call appropriate function */
-	emit_mov_i(ARM_IP, op == BPF_DIV ?
-		   (u32)jit_udiv32 : (u32)jit_mod32, ctx);
+	emit_mov_i(ARM_IP, op == BPF_DIV ? (u32)jit_udiv32 : (u32)jit_mod32,
+		   ctx);
 	emit_blx_r(ARM_IP, ctx);
 
 	/* Save return value */
@@ -783,8 +854,16 @@ static const s8 *arm_bpf_get_reg64(const s8 *reg, const s8 *tmp,
 				   struct jit_ctx *ctx)
 {
 	if (is_stacked(reg[1])) {
-			emit(ARM_LDRD_I(tmp[1], ARM_FP,
-					EBPF_SCRATCH_TO_ARM_FP(reg[1])), ctx);
+		// if (__LINUX_ARM_ARCH__ >= 6 ||
+		//     ctx->cpu_architecture >= CPU_ARCH_ARMv5TE) {
+		emit(ARM_LDRD_I(tmp[1], ARM_FP, EBPF_SCRATCH_TO_ARM_FP(reg[1])),
+		     ctx);
+		// } else {
+		// 	emit(ARM_LDR_I(tmp[1], ARM_FP,
+		// 		       EBPF_SCRATCH_TO_ARM_FP(reg[1])), ctx);
+		// 	emit(ARM_LDR_I(tmp[0], ARM_FP,
+		// 		       EBPF_SCRATCH_TO_ARM_FP(reg[0])), ctx);
+		// }
 		reg = tmp;
 	}
 	return reg;
@@ -802,12 +881,19 @@ static void arm_bpf_put_reg32(s8 reg, s8 src, struct jit_ctx *ctx)
 		emit(ARM_MOV_R(reg, src), ctx);
 }
 
-static void arm_bpf_put_reg64(const s8 *reg, const s8 *src,
-			      struct jit_ctx *ctx)
+static void arm_bpf_put_reg64(const s8 *reg, const s8 *src, struct jit_ctx *ctx)
 {
 	if (is_stacked(reg[1])) {
-			emit(ARM_STRD_I(src[1], ARM_FP,
-				       EBPF_SCRATCH_TO_ARM_FP(reg[1])), ctx);
+		// if (__LINUX_ARM_ARCH__ >= 6 ||
+		//     ctx->cpu_architecture >= CPU_ARCH_ARMv5TE) {
+		emit(ARM_STRD_I(src[1], ARM_FP, EBPF_SCRATCH_TO_ARM_FP(reg[1])),
+		     ctx);
+		// } else {
+		// 	emit(ARM_STR_I(src[1], ARM_FP,
+		// 		       EBPF_SCRATCH_TO_ARM_FP(reg[1])), ctx);
+		// 	emit(ARM_STR_I(src[0], ARM_FP,
+		// 		       EBPF_SCRATCH_TO_ARM_FP(reg[0])), ctx);
+		// }
 	} else {
 		if (reg[1] != src[1])
 			emit(ARM_MOV_R(reg[1], src[1]), ctx);
@@ -842,17 +928,18 @@ static void emit_a32_mov_i64(const s8 dst[], u64 val, struct jit_ctx *ctx)
 
 /* Sign extended move */
 static inline void emit_a32_mov_se_i64(const bool is64, const s8 dst[],
-				       const u32 val, struct jit_ctx *ctx) {
+				       const u32 val, struct jit_ctx *ctx)
+{
 	u64 val64 = val;
 
-	if (is64 && (val & (1<<31)))
+	if (is64 && (val & (1 << 31)))
 		val64 |= 0xffffffff00000000ULL;
 	emit_a32_mov_i64(dst, val64, ctx);
 }
 
-static inline void emit_a32_add_r(const u8 dst, const u8 src,
-			      const bool is64, const bool hi,
-			      struct jit_ctx *ctx) {
+static inline void emit_a32_add_r(const u8 dst, const u8 src, const bool is64,
+				  const bool hi, struct jit_ctx *ctx)
+{
 	/* 64 bit :
 	 *	adds dst_lo, dst_lo, src_lo
 	 *	adc dst_hi, dst_hi, src_hi
@@ -867,9 +954,9 @@ static inline void emit_a32_add_r(const u8 dst, const u8 src,
 		emit(ARM_ADD_R(dst, dst, src), ctx);
 }
 
-static inline void emit_a32_sub_r(const u8 dst, const u8 src,
-				  const bool is64, const bool hi,
-				  struct jit_ctx *ctx) {
+static inline void emit_a32_sub_r(const u8 dst, const u8 src, const bool is64,
+				  const bool hi, struct jit_ctx *ctx)
+{
 	/* 64 bit :
 	 *	subs dst_lo, dst_lo, src_lo
 	 *	sbc dst_hi, dst_hi, src_hi
@@ -885,7 +972,8 @@ static inline void emit_a32_sub_r(const u8 dst, const u8 src,
 }
 
 static inline void emit_alu_r(const u8 dst, const u8 src, const bool is64,
-			      const bool hi, const u8 op, struct jit_ctx *ctx){
+			      const bool hi, const u8 op, struct jit_ctx *ctx)
+{
 	switch (BPF_OP(op)) {
 	/* dst = dst + src */
 	case BPF_ADD:
@@ -931,7 +1019,8 @@ static inline void emit_alu_r(const u8 dst, const u8 src, const bool is64,
  */
 static inline void emit_a32_alu_r(const s8 dst, const s8 src,
 				  struct jit_ctx *ctx, const bool is64,
-				  const bool hi, const u8 op) {
+				  const bool hi, const u8 op)
+{
 	const s8 *tmp = bpf2a32[TMP_REG_1];
 	s8 rn, rd;
 
@@ -944,8 +1033,9 @@ static inline void emit_a32_alu_r(const s8 dst, const s8 src,
 
 /* ALU operation (64 bit) */
 static inline void emit_a32_alu_r64(const bool is64, const s8 dst[],
-				  const s8 src[], struct jit_ctx *ctx,
-				  const u8 op) {
+				    const s8 src[], struct jit_ctx *ctx,
+				    const u8 op)
+{
 	const s8 *tmp = bpf2a32[TMP_REG_1];
 	const s8 *tmp2 = bpf2a32[TMP_REG_2];
 	const s8 *rd;
@@ -975,7 +1065,8 @@ static inline void emit_a32_alu_r64(const bool is64, const s8 dst[],
 
 /* dst = src (4 bytes)*/
 static inline void emit_a32_mov_r(const s8 dst, const s8 src,
-				  struct jit_ctx *ctx) {
+				  struct jit_ctx *ctx)
+{
 	const s8 *tmp = bpf2a32[TMP_REG_1];
 	s8 rt;
 
@@ -985,23 +1076,33 @@ static inline void emit_a32_mov_r(const s8 dst, const s8 src,
 
 /* dst = src */
 static inline void emit_a32_mov_r64(const bool is64, const s8 dst[],
-				  const s8 src[],
-				  struct jit_ctx *ctx) {
+				    const s8 src[], struct jit_ctx *ctx)
+{
 	if (!is64) {
 		emit_a32_mov_r(dst_lo, src_lo, ctx);
 		if (!ctx->prog->aux->verifier_zext)
 			/* Zero out high 4 bytes */
 			emit_a32_mov_i(dst_hi, 0, ctx);
-	} 
+	}
+	// else if (__LINUX_ARM_ARCH__ < 6 &&
+	// 	   ctx->cpu_architecture < CPU_ARCH_ARMv5TE) {
+	// 	/* complete 8 byte move */
+	// 	emit_a32_mov_r(dst_lo, src_lo, ctx);
+	// 	emit_a32_mov_r(dst_hi, src_hi, ctx);
+	// }
 	else if (is_stacked(src_lo) && is_stacked(dst_lo)) {
 		const u8 *tmp = bpf2a32[TMP_REG_1];
 
-		emit(ARM_LDRD_I(tmp[1], ARM_FP, EBPF_SCRATCH_TO_ARM_FP(src_lo)), ctx);
-		emit(ARM_STRD_I(tmp[1], ARM_FP, EBPF_SCRATCH_TO_ARM_FP(dst_lo)), ctx);
+		emit(ARM_LDRD_I(tmp[1], ARM_FP, EBPF_SCRATCH_TO_ARM_FP(src_lo)),
+		     ctx);
+		emit(ARM_STRD_I(tmp[1], ARM_FP, EBPF_SCRATCH_TO_ARM_FP(dst_lo)),
+		     ctx);
 	} else if (is_stacked(src_lo)) {
-		emit(ARM_LDRD_I(dst[1], ARM_FP, EBPF_SCRATCH_TO_ARM_FP(src_lo)), ctx);
+		emit(ARM_LDRD_I(dst[1], ARM_FP, EBPF_SCRATCH_TO_ARM_FP(src_lo)),
+		     ctx);
 	} else if (is_stacked(dst_lo)) {
-		emit(ARM_STRD_I(src[1], ARM_FP, EBPF_SCRATCH_TO_ARM_FP(dst_lo)), ctx);
+		emit(ARM_STRD_I(src[1], ARM_FP, EBPF_SCRATCH_TO_ARM_FP(dst_lo)),
+		     ctx);
 	} else {
 		emit(ARM_MOV_R(dst[0], src[0]), ctx);
 		emit(ARM_MOV_R(dst[1], src[1]), ctx);
@@ -1010,7 +1111,8 @@ static inline void emit_a32_mov_r64(const bool is64, const s8 dst[],
 
 /* Shift operations */
 static inline void emit_a32_alu_i(const s8 dst, const u32 val,
-				struct jit_ctx *ctx, const u8 op) {
+				  struct jit_ctx *ctx, const u8 op)
+{
 	const s8 *tmp = bpf2a32[TMP_REG_1];
 	s8 rd;
 
@@ -1036,8 +1138,8 @@ static inline void emit_a32_alu_i(const s8 dst, const u32 val,
 }
 
 /* dst = ~dst (64 bit) */
-static inline void emit_a32_neg64(const s8 dst[],
-				struct jit_ctx *ctx){
+static inline void emit_a32_neg64(const s8 dst[], struct jit_ctx *ctx)
+{
 	const s8 *tmp = bpf2a32[TMP_REG_1];
 	const s8 *rd;
 
@@ -1053,7 +1155,8 @@ static inline void emit_a32_neg64(const s8 dst[],
 
 /* dst = dst << src */
 static inline void emit_a32_lsh_r64(const s8 dst[], const s8 src[],
-				    struct jit_ctx *ctx) {
+				    struct jit_ctx *ctx)
+{
 	const s8 *tmp = bpf2a32[TMP_REG_1];
 	const s8 *tmp2 = bpf2a32[TMP_REG_2];
 	const s8 *rd;
@@ -1077,7 +1180,8 @@ static inline void emit_a32_lsh_r64(const s8 dst[], const s8 src[],
 
 /* dst = dst >> src (signed)*/
 static inline void emit_a32_arsh_r64(const s8 dst[], const s8 src[],
-				     struct jit_ctx *ctx) {
+				     struct jit_ctx *ctx)
+{
 	const s8 *tmp = bpf2a32[TMP_REG_1];
 	const s8 *tmp2 = bpf2a32[TMP_REG_2];
 	const s8 *rd;
@@ -1102,7 +1206,8 @@ static inline void emit_a32_arsh_r64(const s8 dst[], const s8 src[],
 
 /* dst = dst >> src */
 static inline void emit_a32_rsh_r64(const s8 dst[], const s8 src[],
-				    struct jit_ctx *ctx) {
+				    struct jit_ctx *ctx)
+{
 	const s8 *tmp = bpf2a32[TMP_REG_1];
 	const s8 *tmp2 = bpf2a32[TMP_REG_2];
 	const s8 *rd;
@@ -1125,8 +1230,9 @@ static inline void emit_a32_rsh_r64(const s8 dst[], const s8 src[],
 }
 
 /* dst = dst << val */
-static inline void emit_a32_lsh_i64(const s8 dst[],
-				    const u32 val, struct jit_ctx *ctx){
+static inline void emit_a32_lsh_i64(const s8 dst[], const u32 val,
+				    struct jit_ctx *ctx)
+{
 	const s8 *tmp = bpf2a32[TMP_REG_1];
 	const s8 *tmp2 = bpf2a32[TMP_REG_2];
 	const s8 *rd;
@@ -1137,13 +1243,15 @@ static inline void emit_a32_lsh_i64(const s8 dst[],
 	/* Do LSH operation */
 	if (val < 32) {
 		emit(ARM_MOV_SI(tmp2[0], rd[0], SRTYPE_ASL, val), ctx);
-		emit(ARM_ORR_SI(rd[0], tmp2[0], rd[1], SRTYPE_LSR, 32 - val), ctx);
+		emit(ARM_ORR_SI(rd[0], tmp2[0], rd[1], SRTYPE_LSR, 32 - val),
+		     ctx);
 		emit(ARM_MOV_SI(rd[1], rd[1], SRTYPE_ASL, val), ctx);
 	} else {
 		if (val == 32)
 			emit(ARM_MOV_R(rd[0], rd[1]), ctx);
 		else
-			emit(ARM_MOV_SI(rd[0], rd[1], SRTYPE_ASL, val - 32), ctx);
+			emit(ARM_MOV_SI(rd[0], rd[1], SRTYPE_ASL, val - 32),
+			     ctx);
 		emit(ARM_EOR_R(rd[1], rd[1], rd[1]), ctx);
 	}
 
@@ -1151,8 +1259,9 @@ static inline void emit_a32_lsh_i64(const s8 dst[],
 }
 
 /* dst = dst >> val */
-static inline void emit_a32_rsh_i64(const s8 dst[],
-				    const u32 val, struct jit_ctx *ctx) {
+static inline void emit_a32_rsh_i64(const s8 dst[], const u32 val,
+				    struct jit_ctx *ctx)
+{
 	const s8 *tmp = bpf2a32[TMP_REG_1];
 	const s8 *tmp2 = bpf2a32[TMP_REG_2];
 	const s8 *rd;
@@ -1167,7 +1276,8 @@ static inline void emit_a32_rsh_i64(const s8 dst[],
 		 */
 	} else if (val < 32) {
 		emit(ARM_MOV_SI(tmp2[1], rd[1], SRTYPE_LSR, val), ctx);
-		emit(ARM_ORR_SI(rd[1], tmp2[1], rd[0], SRTYPE_ASL, 32 - val), ctx);
+		emit(ARM_ORR_SI(rd[1], tmp2[1], rd[0], SRTYPE_ASL, 32 - val),
+		     ctx);
 		emit(ARM_MOV_SI(rd[0], rd[0], SRTYPE_LSR, val), ctx);
 	} else if (val == 32) {
 		emit(ARM_MOV_R(rd[1], rd[0]), ctx);
@@ -1181,8 +1291,9 @@ static inline void emit_a32_rsh_i64(const s8 dst[],
 }
 
 /* dst = dst >> val (signed) */
-static inline void emit_a32_arsh_i64(const s8 dst[],
-				     const u32 val, struct jit_ctx *ctx){
+static inline void emit_a32_arsh_i64(const s8 dst[], const u32 val,
+				     struct jit_ctx *ctx)
+{
 	const s8 *tmp = bpf2a32[TMP_REG_1];
 	const s8 *tmp2 = bpf2a32[TMP_REG_2];
 	const s8 *rd;
@@ -1197,7 +1308,8 @@ static inline void emit_a32_arsh_i64(const s8 dst[],
 		 */
 	} else if (val < 32) {
 		emit(ARM_MOV_SI(tmp2[1], rd[1], SRTYPE_LSR, val), ctx);
-		emit(ARM_ORR_SI(rd[1], tmp2[1], rd[0], SRTYPE_ASL, 32 - val), ctx);
+		emit(ARM_ORR_SI(rd[1], tmp2[1], rd[0], SRTYPE_ASL, 32 - val),
+		     ctx);
 		emit(ARM_MOV_SI(rd[0], rd[0], SRTYPE_ASR, val), ctx);
 	} else if (val == 32) {
 		emit(ARM_MOV_R(rd[1], rd[0]), ctx);
@@ -1211,7 +1323,8 @@ static inline void emit_a32_arsh_i64(const s8 dst[],
 }
 
 static inline void emit_a32_mul_r64(const s8 dst[], const s8 src[],
-				    struct jit_ctx *ctx) {
+				    struct jit_ctx *ctx)
+{
 	const s8 *tmp = bpf2a32[TMP_REG_1];
 	const s8 *tmp2 = bpf2a32[TMP_REG_2];
 	const s8 *rd, *rt;
@@ -1253,8 +1366,9 @@ static bool is_ldst_imm(s16 off, const u8 size)
 }
 
 /* *(size *)(dst + off) = src */
-static inline void emit_str_r(const s8 dst, const s8 src[],
-			      s16 off, struct jit_ctx *ctx, const u8 sz){
+static inline void emit_str_r(const s8 dst, const s8 src[], s16 off,
+			      struct jit_ctx *ctx, const u8 sz)
+{
 	const s8 *tmp = bpf2a32[TMP_REG_1];
 	s8 rd;
 
@@ -1288,8 +1402,9 @@ static inline void emit_str_r(const s8 dst, const s8 src[],
 }
 
 /* dst = *(size*)(src + off) */
-static inline void emit_ldx_r(const s8 dst[], const s8 src,
-			      s16 off, struct jit_ctx *ctx, const u8 sz){
+static inline void emit_ldx_r(const s8 dst[], const s8 src, s16 off,
+			      struct jit_ctx *ctx, const u8 sz)
+{
 	const s8 *tmp = bpf2a32[TMP_REG_1];
 	const s8 *rd = is_stacked(dst_lo) ? tmp : dst;
 	s8 rm = src;
@@ -1332,9 +1447,9 @@ static inline void emit_ldx_r(const s8 dst[], const s8 src,
 }
 
 /* Arithmatic Operation */
-static inline void emit_ar_r(const u8 rd, const u8 rt, const u8 rm,
-			     const u8 rn, struct jit_ctx *ctx, u8 op,
-			     bool is_jmp64) {
+static inline void emit_ar_r(const u8 rd, const u8 rt, const u8 rm, const u8 rn,
+			     struct jit_ctx *ctx, u8 op, bool is_jmp64)
+{
 	switch (op) {
 	case BPF_JSET:
 		if (is_jmp64) {
@@ -1377,15 +1492,39 @@ static inline void emit_ar_r(const u8 rd, const u8 rt, const u8 rm,
 /* 0xabcd => 0xcdab */
 static inline void emit_rev16(const u8 rd, const u8 rn, struct jit_ctx *ctx)
 {
+#if __LINUX_ARM_ARCH__ < 6
+	const s8 *tmp2 = bpf2a32[TMP_REG_2];
+
+	emit(ARM_AND_I(tmp2[1], rn, 0xff), ctx);
+	emit(ARM_MOV_SI(tmp2[0], rn, SRTYPE_LSR, 8), ctx);
+	emit(ARM_AND_I(tmp2[0], tmp2[0], 0xff), ctx);
+	emit(ARM_ORR_SI(rd, tmp2[0], tmp2[1], SRTYPE_LSL, 8), ctx);
+#else /* ARMv6+ */
 	emit(ARM_REV16(rd, rn), ctx);
+#endif
 }
 
 /* 0xabcdefgh => 0xghefcdab */
 static inline void emit_rev32(const u8 rd, const u8 rn, struct jit_ctx *ctx)
 {
+#if __LINUX_ARM_ARCH__ < 6
+	const s8 *tmp2 = bpf2a32[TMP_REG_2];
 
+	emit(ARM_AND_I(tmp2[1], rn, 0xff), ctx);
+	emit(ARM_MOV_SI(tmp2[0], rn, SRTYPE_LSR, 24), ctx);
+	emit(ARM_ORR_SI(ARM_IP, tmp2[0], tmp2[1], SRTYPE_LSL, 24), ctx);
+
+	emit(ARM_MOV_SI(tmp2[1], rn, SRTYPE_LSR, 8), ctx);
+	emit(ARM_AND_I(tmp2[1], tmp2[1], 0xff), ctx);
+	emit(ARM_MOV_SI(tmp2[0], rn, SRTYPE_LSR, 16), ctx);
+	emit(ARM_AND_I(tmp2[0], tmp2[0], 0xff), ctx);
+	emit(ARM_MOV_SI(tmp2[0], tmp2[0], SRTYPE_LSL, 8), ctx);
+	emit(ARM_ORR_SI(tmp2[0], tmp2[0], tmp2[1], SRTYPE_LSL, 16), ctx);
+	emit(ARM_ORR_R(rd, ARM_IP, tmp2[0]), ctx);
+
+#else /* ARMv6+ */
 	emit(ARM_REV(rd, rn), ctx);
-
+#endif
 }
 
 // push the scratch stack register on top of the stack
@@ -1407,6 +1546,8 @@ static void build_prologue(struct jit_ctx *ctx)
 	const s8 *bpf_r1 = bpf2a32[BPF_REG_1];
 	const s8 *bpf_fp = bpf2a32[BPF_REG_FP];
 	const s8 *tcc = bpf2a32[TCALL_CNT];
+
+	LOG_DEBUG("build_prologue\n");
 
 	/* Save callee saved registers. */
 #ifdef CONFIG_FRAME_POINTER
@@ -1444,6 +1585,7 @@ static void build_prologue(struct jit_ctx *ctx)
 /* restore callee saved registers. */
 static void build_epilogue(struct jit_ctx *ctx)
 {
+	LOG_DEBUG("build_epilogue\n");
 #ifdef CONFIG_FRAME_POINTER
 	/* When using frame pointers, some additional registers need to
 	 * be loaded. */
@@ -1483,14 +1625,15 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
 	LOG_DEBUG("%08llx, [%d] %d %d %d %d\n", insn64, i, 
 	       insn->dst_reg, insn->src_reg, insn->off, insn->imm);
 
-#define check_imm(bits, imm) do {				\
-	if ((imm) >= (1 << ((bits) - 1)) ||			\
-	    (imm) < -(1 << ((bits) - 1))) {			\
-		printf("[%2d] imm=%d(0x%x) out of range\n",	\
-			i, imm, imm);				\
-		return -EINVAL;					\
-	}							\
-} while (0)
+#define check_imm(bits, imm)                                                   \
+	do {                                                                   \
+		if ((imm) >= (1 << ((bits)-1)) ||                              \
+		    (imm) < -(1 << ((bits)-1))) {                              \
+			printf("[%2d] imm=%d(0x%x) out of range\n", i, imm,    \
+			       imm);                                           \
+			return -EINVAL;                                        \
+		}                                                              \
+	} while (0)
 #define check_imm24(imm) check_imm(24, imm)
 
 	switch (code) {
@@ -1600,7 +1743,7 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
 	case BPF_ALU | BPF_LSH | BPF_K:
 	case BPF_ALU | BPF_RSH | BPF_K:
 	case BPF_ALU | BPF_ARSH | BPF_K:
-		if ( (imm > 31))
+		if ((imm > 31))
 			return -EINVAL;
 		if (imm)
 			emit_a32_alu_i(dst_lo, imm, ctx, BPF_OP(code));
@@ -1609,13 +1752,13 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
 		break;
 	/* dst = dst << imm */
 	case BPF_ALU64 | BPF_LSH | BPF_K:
-		if ( (imm > 63))
+		if ((imm > 63))
 			return -EINVAL;
 		emit_a32_lsh_i64(dst, imm, ctx);
 		break;
 	/* dst = dst >> imm */
 	case BPF_ALU64 | BPF_RSH | BPF_K:
-		if ( (imm > 63))
+		if ((imm > 63))
 			return -EINVAL;
 		emit_a32_rsh_i64(dst, imm, ctx);
 		break;
@@ -1633,7 +1776,7 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
 		break;
 	/* dst = dst >> imm (signed) */
 	case BPF_ALU64 | BPF_ARSH | BPF_K:
-		if ( (imm > 63))
+		if ((imm > 63))
 			return -EINVAL;
 		emit_a32_arsh_i64(dst, imm, ctx);
 		break;
@@ -1687,7 +1830,7 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
 			break;
 		}
 		goto exit;
-emit_bswap_uxt:
+	emit_bswap_uxt:
 		switch (imm) {
 		case 16:
 			/* zero-extend 16 bits into 64 bits */
@@ -1709,12 +1852,11 @@ emit_bswap_uxt:
 			/* nop */
 			break;
 		}
-exit:
+	exit:
 		arm_bpf_put_reg64(dst, rd, ctx);
 		break;
 	/* dst = imm64 */
-	case BPF_LD | BPF_IMM | BPF_DW:
-	{
+	case BPF_LD | BPF_IMM | BPF_DW: {
 		u64 val = (u32)imm | (u64)insn[1].imm << 32;
 
 		emit_a32_mov_i64(dst, val, ctx);
@@ -1836,7 +1978,7 @@ exit:
 		rn = tmp2[1];
 		/* Sign-extend immediate value */
 		emit_a32_mov_se_i64(true, tmp2, imm, ctx);
-go_jmp:
+	go_jmp:
 		/* Setup destination register */
 		rd = arm_bpf_get_reg64(dst, tmp, ctx);
 
@@ -1845,7 +1987,7 @@ go_jmp:
 			  BPF_CLASS(code) == BPF_JMP);
 
 		/* Setup JUMP instruction */
-		jmp_offset = bpf2a32_offset(i+off, i, ctx);
+		jmp_offset = bpf2a32_offset(i + off, i, ctx);
 		switch (BPF_OP(code)) {
 		case BPF_JNE:
 		case BPF_JSET:
@@ -1881,18 +2023,20 @@ go_jmp:
 		}
 		break;
 	/* JMP OFF */
-	case BPF_JMP | BPF_JA:
-	{
+	case BPF_JMP | BPF_JA: {
 		if (off == 0)
 			break;
-		jmp_offset = bpf2a32_offset(i+off, i, ctx);
+		jmp_offset = bpf2a32_offset(i + off, i, ctx);
 		check_imm24(jmp_offset);
 		emit(ARM_B(jmp_offset), ctx);
 		break;
 	}
+	/* tail call */
+	case BPF_JMP | BPF_TAIL_CALL:
+		printf("not supported BPF_TAIL_CALL.\n");
+		break;
 	/* function call */
-	case BPF_JMP | BPF_CALL:
-	{
+	case BPF_JMP | BPF_CALL: {
 		const s8 *r0 = bpf2a32[BPF_REG_0];
 		const s8 *r1 = bpf2a32[BPF_REG_1];
 		const s8 *r2 = bpf2a32[BPF_REG_2];
@@ -1924,11 +2068,7 @@ go_jmp:
 		check_imm24(jmp_offset);
 		emit(ARM_B(jmp_offset), ctx);
 		break;
-		/* tail call */
-	case BPF_JMP | BPF_TAIL_CALL:
-		printf("tail call not supported\n");
-		return -EFAULT;
-notyet:
+	notyet:
 		printf("*** NOT YET: opcode %02x ***\n", code);
 		return -EFAULT;
 	default:
@@ -1987,21 +2127,16 @@ static int validate_code(struct jit_ctx *ctx)
 	return 0;
 }
 
-void bpf_jit_compile(struct ebpf_vm *prog)
-{
-	/* Nothing to do here. We support Internal BPF. */
-}
-
 bool bpf_jit_needs_zext(void)
 {
 	return true;
 }
 
-int
-ebpf_translate_arm32(struct ebpf_vm* vm, uint8_t* buffer, size_t* size, char** errmsg)
+int ebpf_translate_arm32(struct ebpf_vm *vm, uint8_t *buffer, size_t *size,
+			 char **errmsg)
 {
-    int result = -1;
-	struct ebpf_vm * new_vm;
+	int result = -1;
+	struct ebpf_vm *new_vm;
 	struct ebpf_vm *tmp, *orig_prog = vm;
 	struct bpf_binary_header *header;
 	struct jit_ctx ctx;
@@ -2033,7 +2168,7 @@ ebpf_translate_arm32(struct ebpf_vm* vm, uint8_t* buffer, size_t* size, char** e
 	 * to the interpreter.
 	 */
 	if (build_body(&ctx)) {
-		LOG_DEBUG("build_body failed.");
+		vm = orig_prog;
 		goto out_off;
 	}
 
@@ -2043,8 +2178,23 @@ ebpf_translate_arm32(struct ebpf_vm* vm, uint8_t* buffer, size_t* size, char** e
 
 	ctx.epilogue_offset = ctx.idx;
 
+#if __LINUX_ARM_ARCH__ < 7
+	tmp_idx = ctx.idx;
+	build_epilogue(&ctx);
+	ctx.epilogue_bytes = (ctx.idx - tmp_idx) * 4;
+
+	ctx.idx += ctx.imm_count;
+	if (ctx.imm_count) {
+		ctx.imms = calloc(ctx.imm_count, sizeof(u32));
+		if (ctx.imms == NULL) {
+			vm = orig_prog;
+			goto out_off;
+		}
+	}
+#else
 	/* there's nothing about the epilogue on ARMv7 */
 	build_epilogue(&ctx);
+#endif
 	/* Now we can get the actual image size of the JITed arm code.
 	 * Currently, we are not considering the THUMB-2 instructions
 	 * for jit, although it can decrease the size of the image.
@@ -2056,7 +2206,7 @@ ebpf_translate_arm32(struct ebpf_vm* vm, uint8_t* buffer, size_t* size, char** e
 	image_size = sizeof(u32) * ctx.idx;
 
 	/* 2.) Actual pass to generate final JIT code */
-	ctx.target = (u32 *) image_ptr;
+	ctx.target = (u32 *)image_ptr;
 	ctx.idx = 0;
 
 	build_prologue(&ctx);
@@ -2089,9 +2239,13 @@ ebpf_translate_arm32(struct ebpf_vm* vm, uint8_t* buffer, size_t* size, char** e
 	goto out;
 
 out_imms:
+#if __LINUX_ARM_ARCH__ < 7
+	if (ctx.imm_count)
+		free(ctx.imms);
+#endif
 out_off:
 	free(ctx.offsets);
 	return -EINVAL;
 out:
-    return result;
+	return result;
 }
