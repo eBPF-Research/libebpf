@@ -245,21 +245,19 @@ readfile(const char* path, size_t maxlen, size_t* len)
     return (void*)data;
 }
 
-#ifndef __GLIBC__
-void*
-memfrob(void* s, size_t n)
+uint64_t
+memfrob_ext(uint64_t s, uint64_t n)
 {
     for (int i = 0; i < n; i++) {
         ((char*)s)[i] ^= 42;
     }
     return s;
 }
-#endif
 
 static uint64_t
-gather_bytes(uint8_t a, uint8_t b, uint8_t c, uint8_t d, uint8_t e)
+gather_bytes(uint64_t a, uint64_t b, uint64_t c, uint64_t d, uint64_t e)
 {
-    return ((uint64_t)a << 32) | ((uint32_t)b << 24) | ((uint32_t)c << 16) | ((uint16_t)d << 8) | e;
+    return (((uint64_t)a) << (uint64_t)32) | (((uint32_t)b) << (uint64_t)24) | (((uint32_t)c) << (uint64_t)16) | (((uint16_t)d) << (uint64_t)8) | (uint64_t)e;
 }
 
 static void
@@ -294,6 +292,19 @@ trash_registers(void)
         "mov w14, #0xfe;"
         "mov w15, #0xff;" ::
             : "w0", "w1", "w2", "w3", "w4", "w5", "w6", "w7", "w8", "w9", "w10", "w11", "w12", "w13", "w14", "w15");
+#elif __arm__
+    // implementation for arm32 architecture
+    asm("mov r0, #0xf0;"
+        "mov r1, #0xf1;"
+        "mov r2, #0xf2;"
+        "mov r3, #0xf3;"
+        "mov r4, #0xf4;"
+        "mov r5, #0xf5;"
+        "mov r6, #0xf6;"
+        "mov r7, #0xf7;"
+        "mov r8, #0xf8;"
+        "mov r9, #0xf9;"
+    );
 #else
     fprintf(stderr, "trash_registers not implemented for this architecture.\n");
     exit(1);
@@ -312,14 +323,19 @@ unwind(uint64_t i)
     return i;
 }
 
+static uint64_t
+strcmp_ext(uint64_t a, uint64_t b) {
+    return strcmp((const char *)a, (const char *)b);
+}
+
 static void
 register_functions(struct ebpf_vm* vm)
 {
     ebpf_register(vm, 0, "gather_bytes", gather_bytes);
-    ebpf_register(vm, 1, "memfrob", memfrob);
+    ebpf_register(vm, 1, "memfrob", memfrob_ext);
     ebpf_register(vm, 2, "trash_registers", trash_registers);
     ebpf_register(vm, 3, "sqrti", sqrti);
-    ebpf_register(vm, 4, "strcmp_ext", strcmp);
+    ebpf_register(vm, 4, "strcmp_ext", strcmp_ext);
     ebpf_register(vm, 5, "unwind", unwind);
     ebpf_set_unwind_function_index(vm, 5);
 }

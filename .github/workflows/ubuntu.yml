@@ -53,5 +53,5 @@ jobs:
         python3.8 -m venv test
         source test/bin/activate
         pip install -r test/requirements.txt
-        make build-arm64
+        make build-arm32
         make test
