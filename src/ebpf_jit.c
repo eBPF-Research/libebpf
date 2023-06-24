@@ -58,6 +58,7 @@ ebpf_compile(struct ebpf_vm* vm, char** errmsg)
         return vm->jitted_function;
     }
 
+    vm->jitted_function = NULL;
     *errmsg = NULL;
 
     if (!vm->insnsi) {
