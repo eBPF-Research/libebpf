@@ -37,14 +37,14 @@ u64 __bpf_prog_enter(void)
 #elif
 	u64 start = 0;
 #endif
-	printf("__bpf_prog_enter %lu\n", start);
+	printf("__bpf_prog_enter %llu\n", start);
 	return start;
 }
 
 void __bpf_prog_exit(struct ebpf_vm *prog, u64 start)
 {
 	// do nothing
-	printf("__bpf_prog_exit %lu\n", start);
+	printf("__bpf_prog_exit %llu\n", start);
 }
 
 int bpf_jit_get_func_addr(const struct ebpf_vm *prog,

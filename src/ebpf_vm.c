@@ -791,7 +791,7 @@ ebpf_exec(const struct ebpf_vm* vm, void* mem, size_t mem_len, uint64_t* bpf_ret
             *bpf_return_value = reg[0];
             return 0;
         case EBPF_OP_CALL:
-            LOG_DEBUG("call: %ld", vm->ext_funcs[inst.imm]);
+            LOG_DEBUG("call: %p", vm->ext_funcs[inst.imm]);
             reg[0] = vm->ext_funcs[inst.imm](reg[1], reg[2], reg[3], reg[4], reg[5]);
             // Unwind the stack if unwind extension returns success.
             if (inst.imm == vm->unwind_stack_extension_index && reg[0] == 0) {
@@ -816,7 +816,7 @@ validate(const struct ebpf_vm* vm, const struct bpf_insn* insts, uint32_t num_in
         struct bpf_insn inst = insts[i];
         bool store = false;
 
-        LOG_DEBUG("%08lx, [%d] %d %d %d %d\n", *(uint64_t*)&inst, i, 
+        LOG_DEBUG("validate: %08llx, [%d] %d %d %d %d\n", *(uint64_t*)&inst, i, 
 	       inst.dst_reg, inst.src_reg, inst.off, inst.imm);
         switch (inst.code) {
         case EBPF_OP_ADD_IMM:
@@ -970,7 +970,7 @@ validate(const struct ebpf_vm* vm, const struct bpf_insn* insts, uint32_t num_in
                 *errmsg = ebpf_error("invalid call immediate at PC %d", i);
                 return false;
             }
-            LOG_DEBUG("func: %lld\n", vm->ext_funcs[inst.imm]);
+            LOG_DEBUG("func: %p\n", vm->ext_funcs[inst.imm]);
             if (!vm->ext_funcs[inst.imm]) {
                 *errmsg = ebpf_error("call to nonexistent function %u at PC %d", inst.imm, i);
                 return false;

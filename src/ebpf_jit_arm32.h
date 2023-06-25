@@ -15,5 +15,6 @@
 
 // #define CONFIG_FRAME_POINTER 1
 #define __LINUX_ARM_ARCH__ 7
+#define HWCAP_IDIVA 0
 
 #endif /* PFILTER_OPCODES_ARM_H */

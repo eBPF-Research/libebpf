@@ -802,20 +802,57 @@ static inline int epilogue_offset(const struct jit_ctx *ctx)
 	return to - from - 2;
 }
 
-static inline void emit_udivmod(u8 rd, u8 rm, u8 rn, struct jit_ctx *ctx, u8 op, bool is64)
+static inline void emit_udivmod64(u8 rd, u8 rm, u8 rn, struct jit_ctx *ctx, u8 op)
+{
+	const s8 *tmp = bpf2a32[TMP_REG_1];
+	const s8 *tmp2 = bpf2a32[TMP_REG_1];
+	/*
+	 * For BPF_ALU | BPF_DIV | BPF_K instructions
+	 * As ARM_R1 and ARM_R0 contains 1st argument of bpf
+	 * function, we need to save it on caller side to save
+	 * it from getting destroyed within callee.
+	 * After the return from the callee, we restore ARM_R0
+	 * ARM_R1.
+	 */
+	// if (!is64) {
+	// 	if (rn != ARM_R1) {
+	// 		emit(ARM_MOV_R(tmp[0], ARM_R1), ctx);
+	// 		emit(ARM_MOV_R(ARM_R1, rn), ctx);
+	// 	}
+	// 	if (rm != ARM_R0) {
+	// 		emit(ARM_MOV_R(tmp[1], ARM_R0), ctx);
+	// 		emit(ARM_MOV_R(ARM_R0, rm), ctx);
+	// 	}
+	// }
+
+	/* Call appropriate function */
+	emit_mov_i(ARM_IP, op == BPF_DIV ? (u32)jit_udiv64 : (u32)jit_mod64,
+		   ctx);
+	emit_blx_r(ARM_IP, ctx);
+
+	// if (rd != ARM_R0)
+	// 	emit(ARM_MOV_R(rd, ARM_R0), ctx);
+	// /* Restore ARM_R0 and ARM_R1 */
+	// if (rn != ARM_R1)
+	// 	emit(ARM_MOV_R(ARM_R1, tmp[0]), ctx);
+	// if (rm != ARM_R0)
+	// 	emit(ARM_MOV_R(ARM_R0, tmp[1]), ctx);
+}
+
+static inline void emit_udivmod(u8 rd, u8 rm, u8 rn, struct jit_ctx *ctx, u8 op)
 {
 	const s8 *tmp = bpf2a32[TMP_REG_1];
 
 #if __LINUX_ARM_ARCH__ == 7
-	// if (elf_hwcap & HWCAP_IDIVA) {
-	// 	if (op == BPF_DIV)
-	// 		emit(ARM_UDIV(rd, rm, rn), ctx);
-	// 	else {
-	// 		emit(ARM_UDIV(ARM_IP, rm, rn), ctx);
-	// 		emit(ARM_MLS(rd, rn, ARM_IP, rm), ctx);
-	// 	}
-	// 	return;
-	// }
+	if (HWCAP_IDIVA) {
+		if (op == BPF_DIV)
+			emit(ARM_UDIV(rd, rm, rn), ctx);
+		else {
+			emit(ARM_UDIV(ARM_IP, rm, rn), ctx);
+			emit(ARM_MLS(rd, rn, ARM_IP, rm), ctx);
+		}
+		return;
+	}
 #endif
 
 	/*
@@ -826,29 +863,23 @@ static inline void emit_udivmod(u8 rd, u8 rm, u8 rn, struct jit_ctx *ctx, u8 op,
 	 * After the return from the callee, we restore ARM_R0
 	 * ARM_R1.
 	 */
-	if (rn != ARM_R1) {
-		emit(ARM_MOV_R(tmp[0], ARM_R1), ctx);
-		emit(ARM_MOV_R(ARM_R1, rn), ctx);
-	}
-	if (rm != ARM_R0) {
-		emit(ARM_MOV_R(tmp[1], ARM_R0), ctx);
-		emit(ARM_MOV_R(ARM_R0, rm), ctx);
-	}
+		if (rn != ARM_R1) {
+			emit(ARM_MOV_R(tmp[0], ARM_R1), ctx);
+			emit(ARM_MOV_R(ARM_R1, rn), ctx);
+		}
+		if (rm != ARM_R0) {
+			emit(ARM_MOV_R(tmp[1], ARM_R0), ctx);
+			emit(ARM_MOV_R(ARM_R0, rm), ctx);
+		}
 
 	/* Call appropriate function */
-	if (is64) {
-		emit_mov_i(ARM_IP, op == BPF_DIV ? (u32)jit_udiv64 : (u32)jit_mod64,
-		   ctx);
-	} else {
-		emit_mov_i(ARM_IP, op == BPF_DIV ? (u32)jit_udiv32 : (u32)jit_mod32,
+	emit_mov_i(ARM_IP, op == BPF_DIV ? (u32)jit_udiv32 : (u32)jit_mod32,
 			ctx);
-	}	
 	emit_blx_r(ARM_IP, ctx);
 
 	/* Save return value */
 	if (rd != ARM_R0)
 		emit(ARM_MOV_R(rd, ARM_R0), ctx);
-
 	/* Restore ARM_R0 and ARM_R1 */
 	if (rn != ARM_R1)
 		emit(ARM_MOV_R(ARM_R1, tmp[0]), ctx);
@@ -1751,7 +1782,7 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
 			rt = src_lo;
 			break;
 		}
-		emit_udivmod(rd_lo, rd_lo, rt, ctx, BPF_OP(code), false);
+		emit_udivmod(rd_lo, rd_lo, rt, ctx, BPF_OP(code));
 		arm_bpf_put_reg32(dst_lo, rd_lo, ctx);
 		if (!ctx->prog->aux->verifier_zext)
 			emit_a32_mov_i(dst_hi, 0, ctx);
@@ -1760,6 +1791,7 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
 	case BPF_ALU64 | BPF_DIV | BPF_X:
 	case BPF_ALU64 | BPF_MOD | BPF_K:
 	case BPF_ALU64 | BPF_MOD | BPF_X:
+	{
 		rd = arm_bpf_get_reg64(dst, tmp, ctx);
 		switch (BPF_SRC(code)) {
 		case BPF_X:
@@ -1770,11 +1802,48 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
 			emit_a32_mov_i64(rt, imm, ctx);
 			break;
 		}
-		emit_udivmod(rd, rd, rt, ctx, BPF_OP(code), true);
+		// emit_udivmod64(rd, rd, rt, ctx, BPF_OP(code));
+		/*
+		* For BPF_ALU | BPF_DIV | BPF_K instructions
+		* As ARM_R1 and ARM_R0 contains 1st argument of bpf
+		* function, we need to save it on caller side to save
+		* it from getting destroyed within callee.
+		* After the return from the callee, we restore ARM_R0
+		* ARM_R1.
+		*/
+		if (rt != ARM_R1) {
+			emit_a32_mov_r64(true, tmp, bpf2a32[ARM_R1], ctx);
+			emit_a32_mov_r64(true, bpf2a32[ARM_R1], bpf2a32[rt], ctx);
+			// emit(ARM_MOV_R(tmp[0], ARM_R1), ctx);
+			// emit(ARM_MOV_R(ARM_R1, rn), ctx);
+		}
+		if (rd != bpf2a32[ARM_R0]) {
+			emit_a32_mov_r64(true, tmp2, bpf2a32[ARM_R0], ctx);
+			emit_a32_mov_r64(true, bpf2a32[ARM_R1], rd, ctx);
+			// emit(ARM_MOV_R(tmp[1], ARM_R0), ctx);
+			// emit(ARM_MOV_R(ARM_R0, rm), ctx);
+		}
+
+		/* Call appropriate function */
+		emit_mov_i(ARM_IP, BPF_OP(code) == BPF_DIV ? (u32)jit_udiv64 : (u32)jit_mod64,
+			ctx);
+		emit_blx_r(ARM_IP, ctx);
+
+		if (rd != bpf2a32[ARM_R0])
+			emit_a32_mov_r64(true, rd, bpf2a32[ARM_R0], ctx);
+			// emit(ARM_MOV_R(rd, ARM_R0), ctx);
+		/* Restore ARM_R0 and ARM_R1 */
+		if (rt != ARM_R1)
+			emit_a32_mov_r64(true, bpf2a32[ARM_R1], tmp, ctx);
+			// emit(ARM_MOV_R(ARM_R1, tmp[0]), ctx);
+		if (rd != bpf2a32[ARM_R0])
+			emit_a32_mov_r64(true, bpf2a32[ARM_R0], tmp2, ctx);
+			// emit(ARM_MOV_R(ARM_R0, tmp[1]), ctx);
 		arm_bpf_put_reg64(dst, rd, ctx);
 		if (!ctx->prog->aux->verifier_zext)
 			emit_a32_mov_i64(dst, 0, ctx);
 		break;
+	}
 	/* dst = dst << imm */
 	/* dst = dst >> imm */
 	/* dst = dst >> imm (signed) */

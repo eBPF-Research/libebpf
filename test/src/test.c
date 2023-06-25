@@ -248,8 +248,9 @@ readfile(const char* path, size_t maxlen, size_t* len)
 uint64_t
 memfrob_ext(uint64_t s, uint64_t n)
 {
+    size_t p1 = s;
     for (int i = 0; i < n; i++) {
-        ((char*)s)[i] ^= 42;
+        ((char*)p1)[i] ^= 42;
     }
     return s;
 }
@@ -325,7 +326,9 @@ unwind(uint64_t i)
 
 static uint64_t
 strcmp_ext(uint64_t a, uint64_t b) {
-    return strcmp((const char *)a, (const char *)b);
+    size_t p1 = a;
+    size_t p2 = b;
+    return strcmp((const char *)p1, (const char *)p2);
 }
 
 static void

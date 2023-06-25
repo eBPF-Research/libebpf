@@ -71,6 +71,7 @@ function(set_project_warnings project_name)
         -std=gnu99
         # -Wno-gnu
         -Wno-unused-function
+        -Wno-unused-parameter
   )
 
   if (${PROJECT_NAME}_WARNINGS_AS_ERRORS)
