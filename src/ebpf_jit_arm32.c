@@ -1760,23 +1760,20 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
 	case BPF_ALU64 | BPF_DIV | BPF_X:
 	case BPF_ALU64 | BPF_MOD | BPF_K:
 	case BPF_ALU64 | BPF_MOD | BPF_X:
-		rd_lo = arm_bpf_get_reg64(dst_lo, tmp2[1], ctx);
+		rd = arm_bpf_get_reg64(dst, tmp, ctx);
 		switch (BPF_SRC(code)) {
 		case BPF_X:
-			rt = arm_bpf_get_reg64(src_lo, tmp2[0], ctx);
+			rt = arm_bpf_get_reg64(src, tmp2, ctx);
 			break;
 		case BPF_K:
-			rt = tmp2[0];
+			rt = tmp2;
 			emit_a32_mov_i64(rt, imm, ctx);
 			break;
-		default:
-			rt = src_lo;
-			break;
 		}
-		emit_udivmod(rd_lo, rd_lo, rt, ctx, BPF_OP(code), true);
-		arm_bpf_put_reg64(dst_lo, rd_lo, ctx);
+		emit_udivmod(rd, rd, rt, ctx, BPF_OP(code), true);
+		arm_bpf_put_reg64(dst, rd, ctx);
 		if (!ctx->prog->aux->verifier_zext)
-			emit_a32_mov_i64(dst_hi, 0, ctx);
+			emit_a32_mov_i64(dst, 0, ctx);
 		break;
 	/* dst = dst << imm */
 	/* dst = dst >> imm */

@@ -15,7 +15,7 @@ gdb-multiarch -ex "target remote :1234" build/bin/Debug/libebpf
 start debug.
 
 ```
-b /home/yunwei/libebpf/example/main.c:78
+b /home/yunwei/libebpf/example/main.c:76
 layout asm
 
 │  >0x9b7d0     andeq       r7, r9, r4, asr #9                      │
