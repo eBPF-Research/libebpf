@@ -48,7 +48,7 @@ pip3 install pyelftools
 run
 
 ```bash
-python3 tools/compile_code.py -s example/bpf/test1.bpf.c 
+python3 extensions/tools/compile_code.py -s example/bpf/test1.bpf.c 
 ```
 
 ### test for pytest
