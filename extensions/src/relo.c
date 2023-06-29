@@ -71,286 +71,6 @@ err_out:
 	return NULL;
 }
 
-
-static void btfgen_mark_member(struct btfgen_info *info, int type_id, int idx)
-{
-	const struct btf_type *t = btf__type_by_id(info->marked_btf, type_id);
-	struct btf_member *m = btf_members(t) + idx;
-
-	m->name_off = MARKED;
-}
-
-static int
-btfgen_mark_type(struct btfgen_info *info, unsigned int type_id, bool follow_pointers)
-{
-	const struct btf_type *btf_type = btf__type_by_id(info->src_btf, type_id);
-	struct btf_type *cloned_type;
-	struct btf_param *param;
-	struct btf_array *array;
-	int err, i;
-
-	if (type_id == 0)
-		return 0;
-
-	/* mark type on cloned BTF as used */
-	cloned_type = (struct btf_type *) btf__type_by_id(info->marked_btf, type_id);
-	cloned_type->name_off = MARKED;
-
-	/* recursively mark other types needed by it */
-	switch (btf_kind(btf_type)) {
-	case BTF_KIND_UNKN:
-	case BTF_KIND_INT:
-	case BTF_KIND_FLOAT:
-	case BTF_KIND_ENUM:
-	case BTF_KIND_ENUM64:
-	case BTF_KIND_STRUCT:
-	case BTF_KIND_UNION:
-		break;
-	case BTF_KIND_PTR:
-		if (follow_pointers) {
-			err = btfgen_mark_type(info, btf_type->type, follow_pointers);
-			if (err)
-				return err;
-		}
-		break;
-	case BTF_KIND_CONST:
-	case BTF_KIND_RESTRICT:
-	case BTF_KIND_VOLATILE:
-	case BTF_KIND_TYPEDEF:
-		err = btfgen_mark_type(info, btf_type->type, follow_pointers);
-		if (err)
-			return err;
-		break;
-	case BTF_KIND_ARRAY:
-		array = btf_array(btf_type);
-
-		/* mark array type */
-		err = btfgen_mark_type(info, array->type, follow_pointers);
-		/* mark array's index type */
-		err = err ? : btfgen_mark_type(info, array->index_type, follow_pointers);
-		if (err)
-			return err;
-		break;
-	case BTF_KIND_FUNC_PROTO:
-		/* mark ret type */
-		err = btfgen_mark_type(info, btf_type->type, follow_pointers);
-		if (err)
-			return err;
-
-		/* mark parameters types */
-		param = btf_params(btf_type);
-		for (i = 0; i < btf_vlen(btf_type); i++) {
-			err = btfgen_mark_type(info, param->type, follow_pointers);
-			if (err)
-				return err;
-			param++;
-		}
-		break;
-	/* tells if some other type needs to be handled */
-	default:
-		printf("unsupported kind: %s (%d)", btf_kind_str(btf_type), type_id);
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
-static int btfgen_record_field_relo(struct btfgen_info *info, struct bpf_core_spec *targ_spec)
-{
-	struct btf *btf = info->src_btf;
-	const struct btf_type *btf_type;
-	struct btf_member *btf_member;
-	struct btf_array *array;
-	unsigned int type_id = targ_spec->root_type_id;
-	int idx, err;
-
-	/* mark root type */
-	btf_type = btf__type_by_id(btf, type_id);
-	err = btfgen_mark_type(info, type_id, false);
-	if (err)
-		return err;
-
-	/* mark types for complex types (arrays, unions, structures) */
-	for (int i = 1; i < targ_spec->raw_len; i++) {
-		/* skip typedefs and mods */
-		while (btf_is_mod(btf_type) || btf_is_typedef(btf_type)) {
-			type_id = btf_type->type;
-			btf_type = btf__type_by_id(btf, type_id);
-		}
-
-		switch (btf_kind(btf_type)) {
-		case BTF_KIND_STRUCT:
-		case BTF_KIND_UNION:
-			idx = targ_spec->raw_spec[i];
-			btf_member = btf_members(btf_type) + idx;
-
-			/* mark member */
-			btfgen_mark_member(info, type_id, idx);
-
-			/* mark member's type */
-			type_id = btf_member->type;
-			btf_type = btf__type_by_id(btf, type_id);
-			err = btfgen_mark_type(info, type_id, false);
-			if (err)
-				return err;
-			break;
-		case BTF_KIND_ARRAY:
-			array = btf_array(btf_type);
-			type_id = array->type;
-			btf_type = btf__type_by_id(btf, type_id);
-			break;
-		default:
-			printf("unsupported kind: %s (%d)",
-			      btf_kind_str(btf_type), btf_type->type);
-			return -EINVAL;
-		}
-	}
-
-	return 0;
-}
-
-/* Mark types, members, and member types. Compared to btfgen_record_field_relo,
- * this function does not rely on the target spec for inferring members, but
- * uses the associated BTF.
- *
- * The `behind_ptr` argument is used to stop marking of composite types reached
- * through a pointer. This way, we can keep BTF size in check while providing
- * reasonable match semantics.
- */
-static int btfgen_mark_type_match(struct btfgen_info *info, __u32 type_id, bool behind_ptr)
-{
-	const struct btf_type *btf_type;
-	struct btf *btf = info->src_btf;
-	struct btf_type *cloned_type;
-	int i, err;
-
-	if (type_id == 0)
-		return 0;
-
-	btf_type = btf__type_by_id(btf, type_id);
-	/* mark type on cloned BTF as used */
-	cloned_type = (struct btf_type *)btf__type_by_id(info->marked_btf, type_id);
-	cloned_type->name_off = MARKED;
-
-	switch (btf_kind(btf_type)) {
-	case BTF_KIND_UNKN:
-	case BTF_KIND_INT:
-	case BTF_KIND_FLOAT:
-	case BTF_KIND_ENUM:
-	case BTF_KIND_ENUM64:
-		break;
-	case BTF_KIND_STRUCT:
-	case BTF_KIND_UNION: {
-		struct btf_member *m = btf_members(btf_type);
-		__u16 vlen = btf_vlen(btf_type);
-
-		if (behind_ptr)
-			break;
-
-		for (i = 0; i < vlen; i++, m++) {
-			/* mark member */
-			btfgen_mark_member(info, type_id, i);
-
-			/* mark member's type */
-			err = btfgen_mark_type_match(info, m->type, false);
-			if (err)
-				return err;
-		}
-		break;
-	}
-	case BTF_KIND_CONST:
-	case BTF_KIND_FWD:
-	case BTF_KIND_RESTRICT:
-	case BTF_KIND_TYPEDEF:
-	case BTF_KIND_VOLATILE:
-		return btfgen_mark_type_match(info, btf_type->type, behind_ptr);
-	case BTF_KIND_PTR:
-		return btfgen_mark_type_match(info, btf_type->type, true);
-	case BTF_KIND_ARRAY: {
-		struct btf_array *array;
-
-		array = btf_array(btf_type);
-		/* mark array type */
-		err = btfgen_mark_type_match(info, array->type, false);
-		/* mark array's index type */
-		err = err ? : btfgen_mark_type_match(info, array->index_type, false);
-		if (err)
-			return err;
-		break;
-	}
-	case BTF_KIND_FUNC_PROTO: {
-		__u16 vlen = btf_vlen(btf_type);
-		struct btf_param *param;
-
-		/* mark ret type */
-		err = btfgen_mark_type_match(info, btf_type->type, false);
-		if (err)
-			return err;
-
-		/* mark parameters types */
-		param = btf_params(btf_type);
-		for (i = 0; i < vlen; i++) {
-			err = btfgen_mark_type_match(info, param->type, false);
-			if (err)
-				return err;
-			param++;
-		}
-		break;
-	}
-	/* tells if some other type needs to be handled */
-	default:
-		printf("unsupported kind: %s (%d)", btf_kind_str(btf_type), type_id);
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
-/* Mark types, members, and member types. Compared to btfgen_record_field_relo,
- * this function does not rely on the target spec for inferring members, but
- * uses the associated BTF.
- */
-static int btfgen_record_type_match_relo(struct btfgen_info *info, struct bpf_core_spec *targ_spec)
-{
-	return btfgen_mark_type_match(info, targ_spec->root_type_id, false);
-}
-
-static int btfgen_record_type_relo(struct btfgen_info *info, struct bpf_core_spec *targ_spec)
-{
-	return btfgen_mark_type(info, targ_spec->root_type_id, true);
-}
-
-static int btfgen_record_enumval_relo(struct btfgen_info *info, struct bpf_core_spec *targ_spec)
-{
-	return btfgen_mark_type(info, targ_spec->root_type_id, false);
-}
-
-static int btfgen_record_reloc(struct btfgen_info *info, struct bpf_core_spec *res)
-{
-	switch (res->relo_kind) {
-	case BPF_CORE_FIELD_BYTE_OFFSET:
-	case BPF_CORE_FIELD_BYTE_SIZE:
-	case BPF_CORE_FIELD_EXISTS:
-	case BPF_CORE_FIELD_SIGNED:
-	case BPF_CORE_FIELD_LSHIFT_U64:
-	case BPF_CORE_FIELD_RSHIFT_U64:
-		return btfgen_record_field_relo(info, res);
-	case BPF_CORE_TYPE_ID_LOCAL: /* BPF_CORE_TYPE_ID_LOCAL doesn't require kernel BTF */
-		return 0;
-	case BPF_CORE_TYPE_ID_TARGET:
-	case BPF_CORE_TYPE_EXISTS:
-	case BPF_CORE_TYPE_SIZE:
-		return btfgen_record_type_relo(info, res);
-	case BPF_CORE_TYPE_MATCHES:
-		return btfgen_record_type_match_relo(info, res);
-	case BPF_CORE_ENUMVAL_EXISTS:
-	case BPF_CORE_ENUMVAL_VALUE:
-		return btfgen_record_enumval_relo(info, res);
-	default:
-		return -EINVAL;
-	}
-}
-
 static struct bpf_core_cand_list *
 btfgen_find_cands(const struct btf *local_btf, const struct btf *targ_btf, __u32 local_id)
 {
@@ -545,9 +265,6 @@ static int btfgen_record_obj(struct btfgen_info *info, const char *obj_path)
 			// 	goto out;
 			// }
 			/* specs_scratch[2] is the target spec */
-			err = btfgen_record_reloc(info, &specs_scratch[2]);
-			if (err)
-				goto out;
 		}
 	}
 
@@ -565,12 +282,18 @@ out:
 	return err;
 }
 
+static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
+{
+	return vfprintf(stderr, format, args);
+}
+
 int main(int argc, char **argv)
 {
 	if (argc < 3) {
 		printf("Usage: %s <obj_path>\n", argv[0]);
 		return 1;
 	}
+	libbpf_set_print(libbpf_print_fn);
 	const char *obj_path = argv[1];
 	const char* btf_path = argv[2];
 	struct btfgen_info* info = btfgen_new_info(btf_path);
