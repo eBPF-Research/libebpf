@@ -55,6 +55,11 @@ build: ## build the package
 	cmake -Bbuild  -Dlibebpf_ENABLE_UNIT_TESTING=1
 	cmake --build build --config Debug
 
+build-ext: ## build the package exten
+	rm -rf build/
+	cmake -Bbuild -Dlibebpf_ENABLE_UNIT_TESTING=1 -Dlibebpf_ENABLE_EXTENSION=1 
+	cmake --build build --config Debug
+
 build-arm32: ## build the package on arm32
 	rm -rf build/
 	cmake -Bbuild -DCMAKE_TOOLCHAIN_FILE=cmake/arm-toolchain.cmake -DARCH=arm -Dlibebpf_ENABLE_UNIT_TESTING=1

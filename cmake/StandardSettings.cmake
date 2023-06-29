@@ -33,6 +33,13 @@ option(${PROJECT_NAME}_USE_GOOGLE_MOCK "Use the GoogleMock project for extending
 option(${PROJECT_NAME}_USE_CATCH2 "Use the Catch2 project for creating unit tests." OFF)
 
 #
+# extensions 
+# required libbpf
+#
+option(${PROJECT_NAME}_ENABLE_EXTENSION "Enable extensions." OFF)
+
+
+#
 # Static analyzers
 #
 # Currently supporting: Clang-Tidy, Cppcheck.
