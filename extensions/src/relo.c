@@ -5,6 +5,7 @@
 #include <time.h>
 #include <sys/resource.h>
 #include <bpf/libbpf.h>
+#include <bpf/bpf.h>
 #include <bpf/relo_core.h>
 #include <bpf/hashmap.h>
 #include <bpf/btf.h>
@@ -392,39 +393,39 @@ err_out:
 	return NULL;
 }
 
-static bool prog_contains_insn(const struct bpf_program *prog, size_t insn_idx)
-{
-	return insn_idx >= prog->sec_insn_off &&
-	       insn_idx < prog->sec_insn_off + prog->sec_insn_cnt;
-}
+// static bool prog_contains_insn(const struct bpf_program *prog, size_t insn_idx)
+// {
+// 	return insn_idx >= prog->sec_insn_off &&
+// 	       insn_idx < prog->sec_insn_off + prog->sec_insn_cnt;
+// }
 
-static struct bpf_program *find_prog_by_sec_insn(const struct bpf_object *obj,
-						 size_t sec_idx, size_t insn_idx)
-{
-	int l = 0, r = obj->nr_programs - 1, m;
-	struct bpf_program *prog;
+// static struct bpf_program *find_prog_by_sec_insn(const struct bpf_object *obj,
+// 						 size_t sec_idx, size_t insn_idx)
+// {
+// 	int l = 0, r = obj->nr_programs - 1, m;
+// 	struct bpf_program *prog;
 
-	if (!obj->nr_programs)
-		return NULL;
+// 	if (!obj->nr_programs)
+// 		return NULL;
 
-	while (l < r) {
-		m = l + (r - l + 1) / 2;
-		prog = &obj->programs[m];
+// 	while (l < r) {
+// 		m = l + (r - l + 1) / 2;
+// 		prog = &obj->programs[m];
 
-		if (prog->sec_idx < sec_idx ||
-		    (prog->sec_idx == sec_idx && prog->sec_insn_off <= insn_idx))
-			l = m;
-		else
-			r = m - 1;
-	}
-	/* matching program could be at index l, but it still might be the
-	 * wrong one, so we need to double check conditions for the last time
-	 */
-	prog = &obj->programs[l];
-	if (prog->sec_idx == sec_idx && prog_contains_insn(prog, insn_idx))
-		return prog;
-	return NULL;
-}
+// 		if (prog->sec_idx < sec_idx ||
+// 		    (prog->sec_idx == sec_idx && prog->sec_insn_off <= insn_idx))
+// 			l = m;
+// 		else
+// 			r = m - 1;
+// 	}
+// 	/* matching program could be at index l, but it still might be the
+// 	 * wrong one, so we need to double check conditions for the last time
+// 	 */
+// 	prog = &obj->programs[l];
+// 	if (prog->sec_idx == sec_idx && prog_contains_insn(prog, insn_idx))
+// 		return prog;
+// 	return NULL;
+// }
 
 /* Record relocation information for a single BPF object */
 static int btfgen_record_obj(struct btfgen_info *info, const char *obj_path)
@@ -443,7 +444,7 @@ static int btfgen_record_obj(struct btfgen_info *info, const char *obj_path)
 	struct bpf_insn *insn;
 	struct bpf_object *obj;
 	const char *sec_name;
-	int i, err = 0, insn_idx, sec_idx, sec_num;
+	int insn_idx, sec_idx, sec_num;
 
 	obj = bpf_object__open(obj_path);
 	if (!obj) {
@@ -451,22 +452,23 @@ static int btfgen_record_obj(struct btfgen_info *info, const char *obj_path)
 		printf("failed to open BPF object '%s': %s", obj_path, strerror(errno));
 		return err;
 	}
-
 	btf = btf__parse(obj_path, &btf_ext);
 	if (!btf) {
 		err = -errno;
-		printf("failed to parse BPF object '%s': %s", obj_path, strerror(errno));
+		printf("failed to parse BPF object '%s': %s\n", obj_path, strerror(errno));
 		return err;
 	}
 
 	if (!btf_ext) {
-		printf("failed to parse BPF object '%s': section %s not found",
+		printf("failed to parse BPF object '%s': section %s not found\n",
 		      obj_path, BTF_EXT_ELF_SEC);
 		err = -EINVAL;
 		goto out;
 	}
 
 	if (btf_ext->core_relo_info.len == 0) {
+		printf("failed to parse BPF object '%s' is empty\n",
+		      obj_path);
 		err = 0;
 		goto out;
 	}
@@ -478,30 +480,32 @@ static int btfgen_record_obj(struct btfgen_info *info, const char *obj_path)
 	}
 
 	seg = &btf_ext->core_relo_info;
-	sec_num = 0;
+	// sec_num = 0;
 	for_each_btf_ext_sec(seg, sec) {
-		sec_idx = seg->sec_idxs[sec_num];
-		sec_num++;
+		// sec_idx = seg->sec_idxs[sec_num];
+		// sec_num++;
+		// printf("sec_idx: %d\n", sec_idx);
 		for_each_btf_ext_rec(seg, sec, relo_idx, relo) {
 			struct bpf_core_spec specs_scratch[3] = {};
 			struct bpf_core_relo_res targ_res = {};
 			struct bpf_core_cand_list *cands = NULL;
 			const char *sec_name = btf__name_by_offset(btf, sec->sec_name_off);
+			printf("sec_name: %s\n", sec_name);
 			
-			prog = find_prog_by_sec_insn(obj, sec_idx, insn_idx);
-			if (!prog) {
-				/* When __weak subprog is "overridden" by another instance
-				 * of the subprog from a different object file, linker still
-				 * appends all the .BTF.ext info that used to belong to that
-				 * eliminated subprogram.
-				 * This is similar to what x86-64 linker does for relocations.
-				 * So just ignore such relocations just like we ignore
-				 * subprog instructions when discovering subprograms.
-				 */
-				pr_debug("sec '%s': skipping CO-RE relocation #%d for insn #%d belonging to eliminated weak subprogram\n",
-					 sec_name, i, insn_idx);
-				continue;
-			}
+			// prog = find_prog_by_sec_insn(obj, sec_idx, insn_idx);
+			// if (!prog) {
+			// 	/* When __weak subprog is "overridden" by another instance
+			// 	 * of the subprog from a different object file, linker still
+			// 	 * appends all the .BTF.ext info that used to belong to that
+			// 	 * eliminated subprogram.
+			// 	 * This is similar to what x86-64 linker does for relocations.
+			// 	 * So just ignore such relocations just like we ignore
+			// 	 * subprog instructions when discovering subprograms.
+			// 	 */
+			// 	pr_debug("sec '%s': skipping CO-RE relocation #%d for insn #%d belonging to eliminated weak subprogram\n",
+			// 		 sec_name, i, insn_idx);
+			// 	continue;
+			// }
 			/* no need to apply CO-RE relocation if the program is
 			 * not going to be loaded
 			 */
@@ -510,10 +514,10 @@ static int btfgen_record_obj(struct btfgen_info *info, const char *obj_path)
 			 * program's frame of reference; (sub-)program code is not yet
 			 * relocated, so it's enough to just subtract in-section offset
 			 */
-			insn_idx = insn_idx - prog->sec_insn_off;
-			if (insn_idx >= prog->insns_cnt)
-				return -EINVAL;
-			insn = &prog->insns[insn_idx];
+			// insn_idx = insn_idx - prog->sec_insn_off;
+			// if (insn_idx >= prog->insns_cnt)
+			// 	return -EINVAL;
+			// insn = &prog->insns[insn_idx];
 
 			if (relo->kind != BPF_CORE_TYPE_ID_LOCAL &&
 			    !hashmap__find(cand_cache, relo->type_id, &cands)) {
@@ -534,16 +538,16 @@ static int btfgen_record_obj(struct btfgen_info *info, const char *obj_path)
 			if (err)
 				goto out;
 
-			err = bpf_core_patch_insn(sec_name, insn, insn_idx, relo, relo_idx, &targ_res);
-			if (err) {
-				printf("prog '%s': relo #%d: failed to patch insn #%u: %d\n",
-					sec_name, relo_idx, insn_idx, err);
-				goto out;
-			}
-			// /* specs_scratch[2] is the target spec */
-			// err = btfgen_record_reloc(info, &specs_scratch[2]);
-			// if (err)
+			// err = bpf_core_patch_insn(sec_name, insn, insn_idx, relo, relo_idx, &targ_res);
+			// if (err) {
+			// 	printf("prog '%s': relo #%d: failed to patch insn #%u: %d\n",
+			// 		sec_name, relo_idx, insn_idx, err);
 			// 	goto out;
+			// }
+			/* specs_scratch[2] is the target spec */
+			err = btfgen_record_reloc(info, &specs_scratch[2]);
+			if (err)
+				goto out;
 		}
 	}
 
@@ -563,6 +567,10 @@ out:
 
 int main(int argc, char **argv)
 {
-
-	return 0;
+	if (argc < 2) {
+		printf("Usage: %s <obj_path>\n", argv[0]);
+		return 1;
+	}
+	const char *obj_path = argv[1];
+	return btfgen_record_obj(NULL, obj_path);
 }

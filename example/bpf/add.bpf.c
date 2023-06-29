@@ -1,3 +1,4 @@
+typedef unsigned long long uint64_t;
 const int i = 0;
 static int j = 1;
 int k = 1;
