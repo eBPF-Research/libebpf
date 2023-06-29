@@ -467,7 +467,7 @@ static int btfgen_record_obj(struct btfgen_info *info, const char *obj_path)
 	}
 
 	if (btf_ext->core_relo_info.len == 0) {
-		printf("failed to parse BPF object '%s' is empty\n",
+		printf("failed to parse BPF object '%s', no inst to relocate\n",
 		      obj_path);
 		err = 0;
 		goto out;
@@ -567,10 +567,16 @@ out:
 
 int main(int argc, char **argv)
 {
-	if (argc < 2) {
+	if (argc < 3) {
 		printf("Usage: %s <obj_path>\n", argv[0]);
 		return 1;
 	}
 	const char *obj_path = argv[1];
-	return btfgen_record_obj(NULL, obj_path);
+	const char* btf_path = argv[2];
+	struct btfgen_info* info = btfgen_new_info(btf_path);
+	if (!info) {
+		printf("failed to create btfgen_info\n");
+		return 1;
+	}
+	return btfgen_record_obj(info, obj_path);
 }

@@ -7,10 +7,14 @@ BPF_SRCS = $(wildcard *.bpf.c)
 # BPF object files
 BPF_OBJS = $(BPF_SRCS:.c=.o)
 
-all: $(BPF_OBJS)
+all: $(BPF_OBJS) base.btf
 
-%.o: %.c
+%.bpf.o: %.bpf.c
 	$(BPF_CC) $(BPF_CFLAGS) $< -o $@
 
+base.btf:
+	clang -g -c btf-base.c -o btf-base.bpf.o
+	pahole  --btf_encode_detached base.btf btf-base.bpf.o
+
 clean:
-	rm -f $(BPF_OBJS)
+	rm -f $(BPF_OBJS) base.btf

@@ -11,6 +11,10 @@
 // 	((void (*)(char *str))((void*)0x5))("hello bpf\n");
 //  	return 0;
 // }
+struct data {
+        int a;
+        int d;
+};
 
 // works:
 static void (*print_bpf)(char *str) = (void *)0x2;
