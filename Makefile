@@ -55,7 +55,7 @@ build: ## build the package
 	cmake -Bbuild  -Dlibebpf_ENABLE_UNIT_TESTING=1
 	cmake --build build --config Debug
 
-build-ext: ## build the package exten
+build-ext: ## build the package extension
 	rm -rf build/
 	cmake -Bbuild -Dlibebpf_ENABLE_UNIT_TESTING=1 -Dlibebpf_ENABLE_EXTENSION=1 
 	cmake --build build --config Debug
