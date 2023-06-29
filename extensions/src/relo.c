@@ -11,7 +11,7 @@
 #include <bpf/btf.h>
 #include <bpf/libbpf_internal.h>
 
-#define MARKED UINT32_MAX
+#define BPF_INSN_SZ (sizeof(struct bpf_insn))
 
 struct btfgen_info {
 	struct btf *src_btf;
@@ -119,52 +119,42 @@ err_out:
 // 	       insn_idx < prog->sec_insn_off + prog->sec_insn_cnt;
 // }
 
-// static struct bpf_program *find_prog_by_sec_insn(const struct bpf_object *obj,
-// 						 size_t sec_idx, size_t insn_idx)
-// {
-// 	int l = 0, r = obj->nr_programs - 1, m;
-// 	struct bpf_program *prog;
-
-// 	if (!obj->nr_programs)
-// 		return NULL;
-
-// 	while (l < r) {
-// 		m = l + (r - l + 1) / 2;
-// 		prog = &obj->programs[m];
-
-// 		if (prog->sec_idx < sec_idx ||
-// 		    (prog->sec_idx == sec_idx && prog->sec_insn_off <= insn_idx))
-// 			l = m;
-// 		else
-// 			r = m - 1;
-// 	}
-// 	/* matching program could be at index l, but it still might be the
-// 	 * wrong one, so we need to double check conditions for the last time
-// 	 */
-// 	prog = &obj->programs[l];
-// 	if (prog->sec_idx == sec_idx && prog_contains_insn(prog, insn_idx))
-// 		return prog;
-// 	return NULL;
-// }
+// find the program by section name
+static struct bpf_program *find_prog_by_secname(const struct bpf_object *obj,
+						 const char* name)
+{
+	struct bpf_program *prog;
+	const char* sec_name;
+	if (!obj || !name)
+		return NULL;
+	bpf_object__for_each_program(prog, obj) {
+		sec_name = bpf_program__section_name(prog);
+		if (!sec_name)
+			continue;
+		if (strcmp(sec_name, name) == 0)
+			return prog;
+	}
+	return NULL;
+}
 
 /* Record relocation information for a single BPF object */
 static int btfgen_record_obj(struct btfgen_info *info, const char *obj_path)
 {
-	const struct btf_ext_info_sec *sec;
-	const struct bpf_core_relo *relo;
-	const struct btf_ext_info *seg;
-	struct hashmap_entry *entry;
+	const struct btf_ext_info_sec *sec = NULL;
+	const struct bpf_core_relo *relo = NULL;
+	const struct btf_ext_info *seg = NULL;
+	struct hashmap_entry *entry = NULL;
 	struct hashmap *cand_cache = NULL;
 	struct btf_ext *btf_ext = NULL;
-	unsigned int relo_idx;
+	unsigned int relo_idx = 0;
 	struct btf *btf = NULL;
-	size_t i;
-	int err;
-	struct bpf_program *prog;
-	struct bpf_insn *insn;
-	struct bpf_object *obj;
-	const char *sec_name;
-	int insn_idx, sec_idx, sec_num;
+	size_t i = 0;
+	int err = -1;
+	struct bpf_program *prog = NULL;
+	struct bpf_insn *insn = NULL, *prog_insn = NULL;
+	struct bpf_object *obj = NULL;
+	const char *sec_name = NULL;
+	int insn_idx = 0, sec_idx = 0, sec_num = 0, insns_cnt = 0;
 
 	obj = bpf_object__open(obj_path);
 	if (!obj) {
@@ -211,33 +201,36 @@ static int btfgen_record_obj(struct btfgen_info *info, const char *obj_path)
 			struct bpf_core_cand_list *cands = NULL;
 			const char *sec_name = btf__name_by_offset(btf, sec->sec_name_off);
 			printf("sec_name: %s\n", sec_name);
+			if (relo->insn_off % BPF_INSN_SZ)
+				return -EINVAL;
+			insn_idx = relo->insn_off / BPF_INSN_SZ;
 			
-			// prog = find_prog_by_sec_insn(obj, sec_idx, insn_idx);
-			// if (!prog) {
-			// 	/* When __weak subprog is "overridden" by another instance
-			// 	 * of the subprog from a different object file, linker still
-			// 	 * appends all the .BTF.ext info that used to belong to that
-			// 	 * eliminated subprogram.
-			// 	 * This is similar to what x86-64 linker does for relocations.
-			// 	 * So just ignore such relocations just like we ignore
-			// 	 * subprog instructions when discovering subprograms.
-			// 	 */
-			// 	pr_debug("sec '%s': skipping CO-RE relocation #%d for insn #%d belonging to eliminated weak subprogram\n",
-			// 		 sec_name, i, insn_idx);
-			// 	continue;
-			// }
-			/* no need to apply CO-RE relocation if the program is
-			 * not going to be loaded
-			 */
+			prog = find_prog_by_secname(obj, sec_name);
+			if (!prog) {
+				/* When __weak subprog is "overridden" by another instance
+				 * of the subprog from a different object file, linker still
+				 * appends all the .BTF.ext info that used to belong to that
+				 * eliminated subprogram.
+				 * This is similar to what x86-64 linker does for relocations.
+				 * So just ignore such relocations just like we ignore
+				 * subprog instructions when discovering subprograms.
+				 */
+				printf("sec '%s': skipping CO-RE relocation #%d for insn #%d belonging to eliminated weak subprogram\n",
+					 sec_name, i, insn_idx);
+				continue;
+			}
+			prog_insn = bpf_program__insns(prog);
+			insns_cnt = bpf_program__insn_cnt(prog);
+			insn_idx = relo->insn_off / sizeof(struct bpf_insn);
 
 			/* adjust insn_idx from section frame of reference to the local
 			 * program's frame of reference; (sub-)program code is not yet
 			 * relocated, so it's enough to just subtract in-section offset
 			 */
 			// insn_idx = insn_idx - prog->sec_insn_off;
-			// if (insn_idx >= prog->insns_cnt)
-			// 	return -EINVAL;
-			// insn = &prog->insns[insn_idx];
+			if (insn_idx >= insns_cnt)
+				return -EINVAL;
+			insn = &prog_insn[insn_idx];
 
 			if (relo->kind != BPF_CORE_TYPE_ID_LOCAL &&
 			    !hashmap__find(cand_cache, relo->type_id, &cands)) {
@@ -258,12 +251,12 @@ static int btfgen_record_obj(struct btfgen_info *info, const char *obj_path)
 			if (err)
 				goto out;
 
-			// err = bpf_core_patch_insn(sec_name, insn, insn_idx, relo, relo_idx, &targ_res);
-			// if (err) {
-			// 	printf("prog '%s': relo #%d: failed to patch insn #%u: %d\n",
-			// 		sec_name, relo_idx, insn_idx, err);
-			// 	goto out;
-			// }
+			err = bpf_core_patch_insn(sec_name, insn, insn_idx, relo, relo_idx, &targ_res);
+			if (err) {
+				printf("prog '%s': relo #%d: failed to patch insn #%u: %d\n",
+					sec_name, relo_idx, insn_idx, err);
+				goto out;
+			}
 			/* specs_scratch[2] is the target spec */
 		}
 	}
@@ -289,6 +282,7 @@ static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va
 
 int main(int argc, char **argv)
 {
+	int res = 1;
 	if (argc < 3) {
 		printf("Usage: %s <obj_path>\n", argv[0]);
 		return 1;
@@ -301,5 +295,8 @@ int main(int argc, char **argv)
 		printf("failed to create btfgen_info\n");
 		return 1;
 	}
-	return btfgen_record_obj(info, obj_path);
+	res = btfgen_record_obj(info, obj_path);
+out:
+	btfgen_free_info(info);
+	return res;
 }

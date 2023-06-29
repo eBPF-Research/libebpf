@@ -17,8 +17,20 @@ struct data {
 #pragma clang attribute pop
 #endif
 
+#define SEC(name) \
+	_Pragma("GCC diagnostic push")					    \
+	_Pragma("GCC diagnostic ignored \"-Wignored-attributes\"")	    \
+	__attribute__((section(name), used))				    \
+	_Pragma("GCC diagnostic pop")					    \
 
+SEC("prog")
 int add_test(struct data *d) {
     return d->a + d->c;
 }
 
+// need prog->sec_idx == obj->efile.text_shndx && obj->nr_programs > 1;
+// text is not regconized as a program
+SEC("prog1")
+int main(){
+    return 0;
+}
