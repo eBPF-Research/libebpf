@@ -16,6 +16,9 @@ int ebpf_object_relocate_btf(struct btf *host_btf, const char *obj_path,
  * (FFI) functions array.
  */
 struct ebpf_context {
+	// vm at the first element
+	struct ebpf_vm *vm;
+
 	const char *obj_path;
 	struct bpf_object *obj;
 
@@ -27,7 +30,6 @@ struct ebpf_context {
 	ebpf_jit_fn fn;
 	struct bpf_insn *insns;
 	size_t insn_cnt;
-	struct ebpf_vm *vm;
 	struct ebpf_ffi_func_info ffi_funcs[MAX_FFI_FUNCS];
 
 	char *errmsg;
