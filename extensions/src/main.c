@@ -1,5 +1,6 @@
 #include "extension.h"
 #include <bpf/libbpf.h>
+#include <bpf/btf.h>
 
 static int libbpf_print_fn(enum libbpf_print_level level, const char *format,
 			   va_list args)
@@ -15,6 +16,42 @@ struct data {
 	int c;
 	int d;
 };
+
+void dump_type(void *ctx, const char *fmt, va_list args) {
+	vprintf(fmt, args);
+}
+
+void test_find_func_proto(const char *btf_path, const char* name) {
+	struct btf* host_btf = btf__parse(btf_path, NULL);
+	if (!host_btf) {
+		printf("failed to parse btf file: %s\n", btf_path);
+		return;
+	}
+	int id = btf__find_by_name(host_btf, name);
+	if (id < 0) {
+		printf("failed to find %s\n", name);
+		return;
+	}
+	const struct btf_type* t = btf__type_by_id(host_btf, id);
+	if (!t) {
+		printf("failed to find type %s\n", name);
+		return;
+	}
+	int type_id = btf__resolve_type(host_btf, t->type);
+	printf("found %s [id] %d %d\n", name, id, type_id);
+	struct btf_dump *dumper;
+
+	dumper = btf_dump__new(host_btf, dump_type, NULL, NULL);
+	if (!dumper) {
+		printf("failed to create dumper\n");
+		return;
+	}
+	if (!btf_is_func(t)) {
+		printf("not a func\n");
+	}
+	btf_dump__emit_type_decl(dumper, type_id, NULL);
+	printf("\n");
+}
 
 int main(int argc, char **argv)
 {
@@ -57,5 +94,6 @@ int main(int argc, char **argv)
 	return_val = ebpf_exec_userspace(ctx, &memory, sizeof(memory));
 	printf("res = %lld\n", return_val);
 	ebpf_free_context(ctx);
+	test_find_func_proto(btf_path, "main");
 	return res;
 }
