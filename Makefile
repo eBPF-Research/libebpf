@@ -64,6 +64,7 @@ build-arm32: ## build the package on arm32
 	rm -rf build/
 	cmake -Bbuild -DCMAKE_TOOLCHAIN_FILE=cmake/arm-toolchain.cmake -DARCH=arm -Dlibebpf_ENABLE_UNIT_TESTING=1
 	cmake --build build --config Debug
+	pahole --btf_encode_detached vm-exten.btf build/extensions/vm-exten # generate btf 
 
 run-arm32:## run the binary on arm32 qemu
 	qemu-arm -L /usr/arm-linux-gnueabihf/  build/bin/Debug/libebpf

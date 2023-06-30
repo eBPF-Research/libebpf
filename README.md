@@ -51,6 +51,29 @@ run
 python3 extensions/tools/compile_code.py -s example/bpf/test1.bpf.c 
 ```
 
+## extensions
+
+support load from a elf file, relocation on btf
+
+compile:
+
+```sh
+make build-ext
+```
+
+run:
+
+```sh
+build/extensions/vm-exten example/bpf/btf-relo.bpf.o vm-exten.btf
+```
+
+### build examples
+
+```sh
+cd example/bpf
+make
+```
+
 ### test for pytest
 
 Use python3.8 and pytest
