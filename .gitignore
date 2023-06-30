@@ -28,3 +28,5 @@ test/lib64
 test/share
 bpftool
 bpftoolx
+a.out
+example/dlsym/dlsym
