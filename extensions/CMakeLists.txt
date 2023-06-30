@@ -15,6 +15,10 @@ set(SRC_FILE
   src/relo.c
 )
 
+set(MAIN_FILE
+  src/main.c
+)
+
 if(${CMAKE_PROJECT_NAME}_BUILD_EXECUTABLE)
   add_executable(vm-exten ${SRC_FILE})
   set(${CMAKE_PROJECT_NAME}_EXTEN_LIB ${CMAKE_PROJECT_NAME}_LIB)
@@ -62,6 +66,7 @@ add_custom_command(
   ${DEST_DIR}
   COMMENT "Copying directory ${HEADER_DIRS} to ${DEST_DIR}"
 )
+
 foreach(file ${HEADER_FILES})
   add_custom_command(
     TARGET copy_headers
@@ -75,6 +80,7 @@ endforeach()
 add_dependencies(copy_headers libbpf-build)
 add_dependencies(${PROJECT_NAME} copy_headers)
 target_link_libraries(${PROJECT_NAME} PUBLIC ${LIBBPF_LIBRARIES} -lelf -lz -lpthread)
+target_include_directories()(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # set the -static flag for static linking
 set_target_properties(vm-exten PROPERTIES LINK_FLAGS "-static")

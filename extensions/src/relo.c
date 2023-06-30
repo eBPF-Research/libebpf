@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
-/* Copyright (c) 2020 Facebook */
 #include <signal.h>
 #include <stdio.h>
 #include <time.h>
@@ -112,12 +110,6 @@ err_out:
 	errno = -err;
 	return NULL;
 }
-
-// static bool prog_contains_insn(const struct bpf_program *prog, size_t insn_idx)
-// {
-// 	return insn_idx >= prog->sec_insn_off &&
-// 	       insn_idx < prog->sec_insn_off + prog->sec_insn_cnt;
-// }
 
 // find the program by section name
 static struct bpf_program *find_prog_by_secname(const struct bpf_object *obj,
@@ -273,30 +265,4 @@ out:
 	}
 
 	return err;
-}
-
-static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
-{
-	return vfprintf(stderr, format, args);
-}
-
-int main(int argc, char **argv)
-{
-	int res = 1;
-	if (argc < 3) {
-		printf("Usage: %s <obj_path>\n", argv[0]);
-		return 1;
-	}
-	libbpf_set_print(libbpf_print_fn);
-	const char *obj_path = argv[1];
-	const char* btf_path = argv[2];
-	struct btfgen_info* info = btfgen_new_info(btf_path);
-	if (!info) {
-		printf("failed to create btfgen_info\n");
-		return 1;
-	}
-	res = btfgen_record_obj(info, obj_path);
-out:
-	btfgen_free_info(info);
-	return res;
 }
