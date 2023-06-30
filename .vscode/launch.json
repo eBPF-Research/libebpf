@@ -8,7 +8,7 @@
         "name": "(gdb) extensions",
         "type": "cppdbg",
         "request": "launch",
-        "program": "${workspaceFolder}/extensions/src/relo",
+        "program": "${workspaceFolder}/build/extensions/vm-exten",
         "args": ["/home/yunwei/libebpf/example/bpf/btf-relo.bpf.o", "/home/yunwei/libebpf/example/bpf/base.btf"],
         "stopAtEntry": true,
         "cwd": "${fileDirname}",

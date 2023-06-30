@@ -22,6 +22,7 @@ int ebpf_relocate_btf(struct ebpf_context *context, const char *btf_path);
 // if program_name is NULL, will load the first program in the object
 int ebpf_load_userspace(struct ebpf_context *context, const char *program_name, bool jit);
 
-uint64_t ebpf_exec_userspace(struct ebpf_context *context, unsigned char* memory, size_t memory_size);
+// exec userspace bpf vm
+uint64_t ebpf_exec_userspace(struct ebpf_context *context, void* memory, size_t memory_size);
 
 #endif // _LIBEBPF_EXTENSION_H_

@@ -25,7 +25,7 @@ int main(int argc, char **argv)
 	uint64_t return_val;
 
 	// use a struct as memory
-	struct data memory = {0};
+	struct data memory = {1, 2, 3};
 
 	if (argc < 3) {
 		printf("Usage: %s <obj_path>\n", argv[0]);

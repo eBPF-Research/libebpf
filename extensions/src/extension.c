@@ -102,10 +102,12 @@ int ebpf_load_userspace(struct ebpf_context *context, const char *program_name,
 	}
 	context->insns = bpf_program__insns(prog);
 	context->insn_cnt = bpf_program__insn_cnt(prog);
-	res = ebpf_load(context->vm, context->insns, context->insn_cnt,
+	printf("load insn cnt: %d", context->insn_cnt);
+	res = ebpf_load(context->vm, context->insns, context->insn_cnt * sizeof(struct bpf_insn),
 			&context->errmsg);
 	if (res < 0) {
 		fprintf(stderr, "Failed to load insn: %s\n", context->errmsg);
+		return res;
 	}
 	if (jit) {
 		// run with jit mode
@@ -124,7 +126,7 @@ int ebpf_load_userspace(struct ebpf_context *context, const char *program_name,
 }
 
 uint64_t ebpf_exec_userspace(struct ebpf_context *context,
-			     unsigned char *memory, size_t memory_size)
+			     void *memory, size_t memory_size)
 {
 	uint64_t return_val = 0;
 	int res = -1;

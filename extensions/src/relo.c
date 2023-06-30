@@ -195,11 +195,11 @@ static int btfgen_record_obj(struct btfgen_info *info, struct bpf_object *obj, c
 				 * So just ignore such relocations just like we ignore
 				 * subprog instructions when discovering subprograms.
 				 */
-				printf("sec '%s': skipping CO-RE relocation #%d for insn #%d belonging to eliminated weak subprogram\n",
+				printf("sec '%s': skipping CO-RE relocation #%ld for insn #%d belonging to eliminated weak subprogram\n",
 					 sec_name, i, insn_idx);
 				continue;
 			}
-			prog_insn = bpf_program__insns(prog);
+			prog_insn = (struct bpf_insn*)bpf_program__insns(prog);
 			insns_cnt = bpf_program__insn_cnt(prog);
 			insn_idx = relo->insn_off / sizeof(struct bpf_insn);
 
@@ -262,7 +262,7 @@ int ebpf_object_relocate_btf(const char* btf_path, const char* obj_path, struct 
 		printf("failed to create btfgen_info\n");
 		return 1;
 	}
-	res = btfgen_record_obj(info, obj_path, obj);
+	res = btfgen_record_obj(info, obj, obj_path);
 out:
 	btfgen_free_info(info);
 	return res;
