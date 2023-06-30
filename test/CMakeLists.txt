@@ -14,10 +14,10 @@ verbose_message("Adding tests under ${CMAKE_PROJECT_NAME}Tests...")
 foreach(file ${test_sources})
   string(REGEX REPLACE "(.*/)([a-zA-Z0-9_ ]+)(\.c)" "\\2" test_name ${file}) 
   add_executable(${test_name}_Tests ${file})
-
+  if(NOT ${PROJECT_NAME}_ENABLE_ASAN)
   # set the -static flag for static linking
-set_target_properties(${test_name}_Tests PROPERTIES LINK_FLAGS "-static")
-
+    set_target_properties(${test_name}_Tests PROPERTIES LINK_FLAGS "-static")
+  endif()
   #
   # Set the compiler standard
   #

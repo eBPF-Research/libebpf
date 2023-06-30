@@ -13,6 +13,7 @@ verbose_message("extensions for vm")
 
 set(SRC_FILE
   src/relo.c
+  src/extension.c
 )
 
 set(MAIN_FILE
@@ -20,7 +21,7 @@ set(MAIN_FILE
 )
 
 if(${CMAKE_PROJECT_NAME}_BUILD_EXECUTABLE)
-  add_executable(vm-exten ${SRC_FILE})
+  add_executable(vm-exten ${SRC_FILE} ${MAIN_FILE})
   set(${CMAKE_PROJECT_NAME}_EXTEN_LIB ${CMAKE_PROJECT_NAME}_LIB)
 else()
   add_library(${CMAKE_PROJECT_NAME} ${SRC_FILE})
@@ -80,10 +81,12 @@ endforeach()
 add_dependencies(copy_headers libbpf-build)
 add_dependencies(${PROJECT_NAME} copy_headers)
 target_link_libraries(${PROJECT_NAME} PUBLIC ${LIBBPF_LIBRARIES} -lelf -lz -lpthread)
-target_include_directories()(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-# set the -static flag for static linking
-set_target_properties(vm-exten PROPERTIES LINK_FLAGS "-static")
+# set the -static flag for static linking 
+if(NOT ${PROJECT_NAME}_ENABLE_ASAN)
+  set_target_properties(vm-exten PROPERTIES LINK_FLAGS "-static")
+endif()
 
 target_link_libraries(
   vm-exten

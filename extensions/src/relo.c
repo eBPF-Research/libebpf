@@ -1,7 +1,6 @@
 #include <signal.h>
 #include <stdio.h>
 #include <time.h>
-#include <sys/resource.h>
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
 #include <bpf/relo_core.h>
@@ -130,7 +129,7 @@ static struct bpf_program *find_prog_by_secname(const struct bpf_object *obj,
 }
 
 /* Record relocation information for a single BPF object */
-static int btfgen_record_obj(struct btfgen_info *info, const char *obj_path)
+static int btfgen_record_obj(struct btfgen_info *info, struct bpf_object *obj, const char *obj_path)
 {
 	const struct btf_ext_info_sec *sec = NULL;
 	const struct bpf_core_relo *relo = NULL;
@@ -144,16 +143,9 @@ static int btfgen_record_obj(struct btfgen_info *info, const char *obj_path)
 	int err = -1;
 	struct bpf_program *prog = NULL;
 	struct bpf_insn *insn = NULL, *prog_insn = NULL;
-	struct bpf_object *obj = NULL;
 	const char *sec_name = NULL;
 	int insn_idx = 0, sec_idx = 0, sec_num = 0, insns_cnt = 0;
 
-	obj = bpf_object__open(obj_path);
-	if (!obj) {
-		err = -errno;
-		printf("failed to open BPF object '%s': %s", obj_path, strerror(errno));
-		return err;
-	}
 	btf = btf__parse(obj_path, &btf_ext);
 	if (!btf) {
 		err = -errno;
@@ -182,11 +174,7 @@ static int btfgen_record_obj(struct btfgen_info *info, const char *obj_path)
 	}
 
 	seg = &btf_ext->core_relo_info;
-	// sec_num = 0;
 	for_each_btf_ext_sec(seg, sec) {
-		// sec_idx = seg->sec_idxs[sec_num];
-		// sec_num++;
-		// printf("sec_idx: %d\n", sec_idx);
 		for_each_btf_ext_rec(seg, sec, relo_idx, relo) {
 			struct bpf_core_spec specs_scratch[3] = {};
 			struct bpf_core_relo_res targ_res = {};
@@ -265,4 +253,17 @@ out:
 	}
 
 	return err;
+}
+
+int ebpf_object_relocate_btf(const char* btf_path, const char* obj_path, struct bpf_object *obj) {
+	int res = -EINVAL;
+	struct btfgen_info* info = btfgen_new_info(btf_path);
+	if (!info) {
+		printf("failed to create btfgen_info\n");
+		return 1;
+	}
+	res = btfgen_record_obj(info, obj_path, obj);
+out:
+	btfgen_free_info(info);
+	return res;
 }
