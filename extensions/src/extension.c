@@ -5,7 +5,8 @@
 #include <bpf/btf.h>
 #include <bpf/bpf.h>
 
-int ebpf_object_relocate_btf(const char *btf_path, const char *obj_path,
+// relocate with btf
+int ebpf_object_relocate_btf(struct btf *host_btf, const char *obj_path,
 			     struct bpf_object *obj);
 
 #define MAX_FFI_FUNCS 128
@@ -17,6 +18,9 @@ int ebpf_object_relocate_btf(const char *btf_path, const char *obj_path,
 struct ebpf_context {
 	const char *obj_path;
 	struct bpf_object *obj;
+
+	const char *host_btf_path;
+	struct btf *host_btf;
 
 	bool jitted;
 	// used in jit
@@ -46,38 +50,28 @@ void ebpf_free_context(struct ebpf_context *context)
 	free(context);
 }
 
-int ebpf_open_object(struct ebpf_context *context, const char *obj_path,
-		     const struct ebpf_open_context_opts *opts)
+int ebpf_open_object(struct ebpf_context *context, const char *obj_path)
 {
-	struct ebpf_open_context_opts inner_opt = { 0 };
 	int res;
 
-	if (opts) {
-		memcpy(&inner_opt, opts, sizeof(struct ebpf_open_context_opts));
-	}
 	context->obj = bpf_object__open(obj_path);
 	if (!context->obj) {
 		printf("failed to open object file: %s\n", obj_path);
 		return -1;
 	}
 	context->obj_path = obj_path;
-	if (inner_opt.btf_path) {
-		res = ebpf_relocate_btf(context, inner_opt.btf_path);
-		if (res < 0) {
-			return res;
-		}
-	}
 	return 0;
 }
 
-int ebpf_relocate_btf(struct ebpf_context *context, const char *btf_path)
+int ebpf_load_relocate_btf(struct ebpf_context *context, const char *btf_path)
 {
-	if (!context->obj) {
-		printf("object file not opened\n");
+	context->host_btf = btf__parse(btf_path, NULL);
+	if (!context->host_btf) {
+		printf("failed to parse btf file: %s\n", btf_path);
 		return -1;
 	}
-	return ebpf_object_relocate_btf(btf_path, context->obj_path,
-					context->obj);
+	context->host_btf_path = btf_path;
+	return 0;
 }
 
 int ebpf_load_userspace(struct ebpf_context *context, const char *program_name,
@@ -90,20 +84,31 @@ int ebpf_load_userspace(struct ebpf_context *context, const char *program_name,
 		printf("object file not opened\n");
 		return -1;
 	}
+	// relocate the program
+	if (context->host_btf) {
+		res = ebpf_object_relocate_btf(context->host_btf,
+					       context->obj_path, context->obj);
+		if (res < 0) {
+			return res;
+		}
+	}
 	if (program_name) {
-		prog = bpf_object__find_program_by_name(context->obj, program_name);
+		prog = bpf_object__find_program_by_name(context->obj,
+							program_name);
 	} else {
 		// use the first prog in the object
 		prog = bpf_object__next_program(context->obj, NULL);
 	}
 	if (!prog) {
-		printf("cannot find program %s", program_name? program_name: "(NULL)");
+		printf("cannot find program %s",
+		       program_name ? program_name : "(NULL)");
 		return -1;
 	}
 	context->insns = bpf_program__insns(prog);
 	context->insn_cnt = bpf_program__insn_cnt(prog);
 	printf("load insn cnt: %d\n", context->insn_cnt);
-	res = ebpf_load(context->vm, context->insns, context->insn_cnt * sizeof(struct bpf_insn),
+	res = ebpf_load(context->vm, context->insns,
+			context->insn_cnt * sizeof(struct bpf_insn),
 			&context->errmsg);
 	if (res < 0) {
 		fprintf(stderr, "Failed to load insn: %s\n", context->errmsg);
@@ -125,8 +130,8 @@ int ebpf_load_userspace(struct ebpf_context *context, const char *program_name,
 	return 0;
 }
 
-uint64_t ebpf_exec_userspace(struct ebpf_context *context,
-			     void *memory, size_t memory_size)
+uint64_t ebpf_exec_userspace(struct ebpf_context *context, void *memory,
+			     size_t memory_size)
 {
 	uint64_t return_val = 0;
 	int res = -1;

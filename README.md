@@ -67,6 +67,8 @@ run:
 build/extensions/vm-exten example/bpf/btf-relo.bpf.o vm-exten.btf
 ```
 
+The example for bpf relocate is in [example/bpf/btf-relo.bpf.c](example/bpf/btf-relo.bpf.c)
+
 ### build examples
 
 ```sh
