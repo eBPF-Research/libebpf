@@ -53,9 +53,9 @@ python3 extensions/tools/compile_code.py -s example/bpf/test1.bpf.c
 
 ## extensions
 
-support load from a elf file, relocation on btf
+support load from a elf file, relocation on btf.
 
-compile:
+compile and generate btf info(need to install `pahole` first):
 
 ```sh
 make build-ext

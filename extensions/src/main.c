@@ -45,7 +45,7 @@ int main(int argc, char **argv)
 		printf("ebpf_relocate_btf failed: %s", btf_path);
 		return res;
 	}
-	// use the first program
+	// use the first program, with relocate
 	res = ebpf_load_userspace(ctx, NULL, false);
 	if (res < 0) {
 		printf("ebpf_relocate_btf failed: %s", btf_path);

@@ -27,10 +27,3 @@ SEC("prog")
 int add_test(struct data *d) {
     return d->a + d->c;
 }
-
-// need prog->sec_idx == obj->efile.text_shndx && obj->nr_programs > 1;
-// text is not regconized as a program
-SEC("prog1")
-int main(){
-    return 0;
-}
