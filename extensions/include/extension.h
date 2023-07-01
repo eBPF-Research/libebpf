@@ -24,6 +24,8 @@ uint64_t ebpf_exec_userspace(struct ebpf_context *context, void *memory,
 			     size_t memory_size);
 
 // get a address of a function in the current executable
+// if the function is not found, return NULL and set err_msg
+// if err_msg is set, the caller should free it
 void *get_function_addr(const char * func_name, char** err_msg);
 
 #endif // _LIBEBPF_EXTENSION_H_

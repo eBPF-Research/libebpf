@@ -16,6 +16,8 @@
 #define __SYM_USE_DLSYM__ 0
 #endif
 
+#define ERR_BUFFER_SIZE 256
+
 static void *get_function_addr_dlsym(const char * func_name, char** err_msg) {
     void* handle = dlopen(NULL, RTLD_LAZY); // Open the current executable
     if (!handle) {
@@ -92,15 +94,50 @@ static void* get_function_addr_elf_pie(const char* func_name, char* err_msg) {
     return func_addr;
 }
 
+void* get_function_addr_elf_no_pie(const char* func_name, char* err_msg) {
+    FILE *file = fopen("myprogram.off.txt", "r");
+    if (file == NULL) {
+        sprintf(err_msg, "Cannot open offsets file!");
+        return NULL;
+    }
+
+    uintptr_t offset = 0;
+    char name[256];
+
+    while (fscanf(file, "%lx %*s %255s", &offset, name) == 2) {
+        if (strcmp(name, func_name) == 0) {
+            break;
+        }
+    }
+
+    fclose(file);
+
+    if (strcmp(name, func_name) != 0) {
+        sprintf(err_msg, "Did not find %s!", func_name);
+        return NULL;
+    }
+
+    // Cast the offset to a function pointer
+    void* func_ptr = (void (*)())offset;
+
+    return func_ptr;
+}
 
 void *get_function_addr(const char * func_name, char** err_msg) {
+    char err_buffer[ERR_BUFFER_SIZE];
+    void* res = NULL;
 #if __SYM_USE_DLSYM__
-    return get_function_addr_dlsym(func_name, err_msg);
+    res = get_function_addr_dlsym(func_name, err_msg);
+    if (err_msg)
+        strncpy(err_buffer, *err_msg, ERR_BUFFER_SIZE);
 #elif __SYM_USE_ELF_NO_PIE__
-    return get_function_addr_elf_no_pie(func_name, err_msg);
+    res = get_function_addr_elf_no_pie(func_name, err_buffer);
 #elif __SYM_USE_ELF_PIE__
-    return get_function_addr_elf_pie(func_name, err_msg);
+    res = get_function_addr_elf_pie(func_name, err_buffer);
 #else
     #error "No symbol resolution method defined"
 #endif
+    if (err_msg && res == NULL)
+        *err_msg = strdup(err_buffer);
+    return res;
 }

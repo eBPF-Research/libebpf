@@ -14,6 +14,7 @@ verbose_message("extensions for vm")
 set(SRC_FILE
   src/relo.c
   src/extension.c
+  src/func_addr.c
 )
 
 set(MAIN_FILE
@@ -27,11 +28,11 @@ else()
   add_library(${CMAKE_PROJECT_NAME} ${SRC_FILE})
   set(${CMAKE_PROJECT_NAME}_EXTEN_LIB ${CMAKE_PROJECT_NAME})
 endif()
-
+set(LIBBPF_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/libbpf/)
 include(ExternalProject)
 ExternalProject_Add(libbpf
   PREFIX libbpf
-  SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libbpf/src
+  SOURCE_DIR ${LIBBPF_DIR}/src
   CONFIGURE_COMMAND ""
   BUILD_COMMAND make
     BUILD_STATIC_ONLY=1
@@ -48,7 +49,6 @@ ExternalProject_Add(libbpf
 
 # Set BpfObject input parameters -- note this is usually not necessary unless
 # you're in a highly vendored environment (like libbpf-bootstrap)
-set(BPFOBJECT_VMLINUX_H ${CMAKE_CURRENT_SOURCE_DIR}/vmlinux/vmlinux.h)
 set(LIBBPF_INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR}/libbpf)
 set(LIBBPF_LIBRARIES ${CMAKE_CURRENT_BINARY_DIR}/libbpf/libbpf.a)
 
@@ -58,7 +58,7 @@ add_custom_target(copy_headers
 )
 
 set(HEADER_FILES relo_core.h hashmap.h nlattr.h libbpf_internal.h)
-set(HEADER_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/libbpf/include/linux)
+set(HEADER_DIRS ${LIBBPF_DIR}/include/linux)
 set(DEST_DIR ${LIBBPF_INCLUDE_DIRS}/linux)
 add_custom_command(
   TARGET copy_headers
@@ -72,7 +72,7 @@ foreach(file ${HEADER_FILES})
   add_custom_command(
     TARGET copy_headers
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    ${CMAKE_CURRENT_SOURCE_DIR}/libbpf/src/${file}
+    ${LIBBPF_DIR}/src/${file}
     ${LIBBPF_INCLUDE_DIRS}/bpf/${file}
     COMMENT "Copying ${file}"
   )
