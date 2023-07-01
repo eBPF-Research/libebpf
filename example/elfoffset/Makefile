@@ -1,17 +1,21 @@
 CC=gcc
 CFLAGS=-g -fno-pie -no-pie
-TARGET=myprogram
 
 .PHONY: all clean
 
-all: $(TARGET) offsets.txt
-	./$(TARGET)
+all: myprogram.off.txt maps.off.txt 
 
-$(TARGET): $(TARGET).c
-	$(CC) $(CFLAGS) $< -o $@
+myprogram: myprogram.c
+	$(CC) -fno-pie -no-pie myprogram.c -o myprogram
 
-offsets.txt: $(TARGET)
-	nm $(TARGET) | grep ' T ' > offsets.txt
+myprogram.off.txt: myprogram
+	nm myprogram | grep ' T ' > myprogram.off.txt
+
+maps: maps.c
+	$(CC) -g maps.c -o maps
+
+maps.off.txt: maps
+	nm maps | grep ' T ' > maps.off.txt
 
 clean:
-	rm -f $(TARGET) offsets.txt
+	rm -f maps myprogram offsets.txt

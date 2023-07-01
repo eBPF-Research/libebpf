@@ -8,7 +8,7 @@ void my_function() {
 }
 
 int main() {
-    FILE *file = fopen("offsets.txt", "r");
+    FILE *file = fopen("myprogram.off.txt", "r");
     if (file == NULL) {
         printf("Cannot open offsets file!\n");
         return 1;

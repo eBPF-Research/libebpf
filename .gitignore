@@ -31,4 +31,5 @@ bpftoolx
 a.out
 example/dlsym/dlsym
 example/elfoffset/myprogram
-example/elfoffset/offsets.txt
+example/elfoffset/*.txt
+example/elfoffset/maps
