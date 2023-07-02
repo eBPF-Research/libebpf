@@ -1,54 +1,78 @@
-#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <assert.h>
+#include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <string.h>
-#include <inttypes.h>
 
-void* get_function_addr_elf_pie(const char* func_name, char* err_msg) {
-    uintptr_t base_address = 0;
-    FILE* maps = fopen("/proc/self/maps", "r");
-    if (maps == NULL) {
-        sprintf(err_msg, "Cannot open /proc/self/maps");
-        return NULL;
+#if defined(__x86_64__) || defined(_M_X64)
+#define SIZE_ORIG_BYTES 16
+static void inline_hook_replace_inst(void *orig_func, void *hook_func) {
+    	// Write a jump instruction at the start of the original function.
+	*((unsigned char *)orig_func + 0) = 0xE9; // JMP instruction
+	*((void **)((unsigned char *)orig_func + 1)) =
+		(unsigned char *)hook_func - (unsigned char *)orig_func - 5;
+}
+#elif defined(__aarch64__) || defined(_M_ARM64)
+#define SIZE_ORIG_BYTES 32
+static void inline_hook_replace_inst(void *orig_func, void *hook_func) {
+    int offset = ((intptr_t)hook_func - (intptr_t)orig_func) / 4;
+    if (offset < -0x2000000 || offset > 0x1ffffff) {
+        printf("Offset %d out of range!\n", offset);
+        exit(1);
     }
+    uint32_t branch_instruction = 0x14000000 | (offset & 0x03ffffff);
+    *((uint32_t*)orig_func) = branch_instruction;
+}
+#elif defined(__arm__) || defined(_M_ARM)
+#define SIZE_ORIG_BYTES 20
+static void inline_hook_replace_inst(void *orig_func, void *hook_func) {
+	// Construct a branch instruction to the hook function.
+    // The instruction for a branch in ARM is 0xEA000000 | ((<offset> / 4) & 0x00FFFFFF)
+    // The offset needs to be divided by 4 because the PC advances by 4 bytes each step in ARM
+    int offset = ((intptr_t)hook_func - (intptr_t)orig_func - 8) / 4;
+    int branch_instruction = 0xEA000000 | (offset & 0x00FFFFFF);
 
-    char line[256];
-    while (fgets(line, sizeof(line), maps) != NULL) {
-        char perms[5];
-        sscanf(line, "%" PRIxPTR "-%*x %4s", &base_address, perms);
-        if (perms[2] == 'x') {
-            break;
-        }
-    }
+    // Write the branch instruction to the start of the original function.
+    *(int *)orig_func = branch_instruction;
+}
+#else
+#error "Unsupported architecture"
+#endif
 
-    fclose(maps);
+void *get_page_addr(void *addr)
+{
+	return (void *)((uintptr_t)addr & ~(getpagesize() - 1));
+}
 
-    if (base_address == 0) {
-        sprintf(err_msg, "Cannot find base address");
-        return NULL;
-    }
+unsigned char orig_bytes[SIZE_ORIG_BYTES];
 
-    FILE* offsets = fopen("maps.off.txt", "r");
-    if (offsets == NULL) {
-        sprintf(err_msg, "Cannot open offsets file");
-        return NULL;
-    }
+void inline_hook(void *orig_func, void *hook_func)
+{
+	// Store the original bytes of the function.
+	memcpy(orig_bytes, orig_func, SIZE_ORIG_BYTES);
 
-    uintptr_t offset = 0;
-    char name[256] = "";
-    while (fscanf(offsets, "%lx %*s %255s", &offset, name) == 2) {
-        if (strcmp(name, func_name) == 0) {
-            break;
-        }
-    }
+	// Make the memory page writable.
+	mprotect(get_page_addr(orig_func), getpagesize(),
+		 PROT_READ | PROT_WRITE | PROT_EXEC);
 
-    fclose(offsets);
+    inline_hook_replace_inst(orig_func, hook_func);
 
-    if (strcmp(name, func_name) != 0) {
-        sprintf(err_msg, "Cannot find function %s", func_name);
-        return NULL;
-    }
+	// Make the memory page executable only.
+	mprotect(get_page_addr(orig_func), getpagesize(),
+		 PROT_READ | PROT_EXEC);
+}
 
-    void* func_addr = (void*)(base_address + offset - 0x1000);
-    return func_addr;
+void remove_hook(void *orig_func)
+{
+	// Make the memory page writable.
+	mprotect(get_page_addr(orig_func), getpagesize(),
+		 PROT_READ | PROT_WRITE | PROT_EXEC);
+
+	// Restore the original bytes of the function.
+	memcpy(orig_func, orig_bytes, SIZE_ORIG_BYTES);
+
+	// Make the memory page executable only.
+	mprotect(get_page_addr(orig_func), getpagesize(),
+		 PROT_READ | PROT_EXEC);
 }
