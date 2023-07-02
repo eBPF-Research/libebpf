@@ -29,10 +29,15 @@ static void inline_hook_replace_inst(void *orig_func, void *hook_func) {
 		(unsigned char *)hook_func - (unsigned char *)orig_func - 5;
 }
 #elif defined(__aarch64__) || defined(_M_ARM64)
-#define SIZE_ORIG_BYTES 16
+#define SIZE_ORIG_BYTES 32
 static void inline_hook_replace_inst(void *orig_func, void *hook_func) {
-    	// Write a jump instruction at the start of the original function.
-	assert(0);
+    int offset = ((intptr_t)hook_func - (intptr_t)orig_func) / 4;
+    if (offset < -0x2000000 || offset > 0x1ffffff) {
+        printf("Offset %d out of range!\n", offset);
+        exit(1);
+    }
+    uint32_t branch_instruction = 0x14000000 | (offset & 0x03ffffff);
+    *((uint32_t*)orig_func) = branch_instruction;
 }
 #elif defined(__arm__) || defined(_M_ARM)
 #define SIZE_ORIG_BYTES 20
