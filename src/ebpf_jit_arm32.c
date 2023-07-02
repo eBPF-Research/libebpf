@@ -5,8 +5,6 @@
  * Copyright (c) 2017 Shubham Bansal <illusionist.neo@gmail.com>
  * Copyright (c) 2011 Mircea Gherzan <mgherzan@gmail.com>
  *
- * Supports (__LINUX_ARM_ARCH__ >= 6
- *  || ctx->cpu_architecture >= CPU_ARCH_ARMv5TE)
  */
 #include "libebpf/libebpf.h"
 #include "linux_bpf.h"
