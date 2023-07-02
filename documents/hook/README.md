@@ -15,3 +15,25 @@
 6. **恢复内存权限**：在修改了目标函数之后，你应该再次使用 `mprotect` 函数来恢复内存页的原始权限。
 
 请注意，这种技术可能违反一些操作系统或硬件的保护机制，因此它可能不会在所有系统或配置上都能正常工作。在使用这种技术时，你应当格外小心，确保你完全理解你的修改可能带来的后果。
+
+## build and run
+
+for x86
+
+```console
+$ make
+$ ./maps
+Hello, world!
+Hello from hook!
+Hello, world!
+```
+
+for arm32:
+
+```console
+$ make arm
+$ ./maps-arm
+Hello, world!
+Hello from hook!
+Hello, world!
+```

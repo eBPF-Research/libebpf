@@ -24,4 +24,4 @@ jobs:
         make git clang llvm pkg-config build-essential
 
     - name: build package
-      run:  make -C extensions build
+      run:  make build-ext
