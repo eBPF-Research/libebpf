@@ -40,7 +40,7 @@ jobs:
         source test/bin/activate
         pip install --upgrade pip
         pip install -r test/requirements.txt
-        make build-x86
+        make build
         make test
     - name: run tests arm64
       run: |
