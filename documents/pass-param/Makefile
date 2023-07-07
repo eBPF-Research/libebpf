@@ -3,7 +3,7 @@ ARM32CC=arm-linux-gnueabi-gcc
 ARM64CC=aarch64-linux-gnu-gcc
 CFLAGS=-g -fno-pie -no-pie
 ARMCFLAGS=-g -fpie
-SRC = main.c hook.c funcaddr.c
+SRC = main.c hook.c funcaddr.c patch.c
 
 .PHONY: all clean arm32 arm64 x86
 

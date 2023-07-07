@@ -21,7 +21,7 @@ jobs:
       run: |
         sudo apt-get install -y --no-install-recommends \
         libelf1 libelf-dev zlib1g-dev libclang-13-dev \
-        make git clang llvm pkg-config build-essential
+        make git clang llvm pkg-config build-essential pahole
 
     - name: build package
       run:  make build-ext

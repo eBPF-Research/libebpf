@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <bpf/libbpf.h>
+#include <linux/bpf.h>
 #include <bpf/bpf.h>
 #include <bpf/relo_core.h>
 #include <bpf/hashmap.h>

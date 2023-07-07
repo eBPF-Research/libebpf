@@ -65,7 +65,6 @@ void my_hook_function() {
     );
 }
 
-
 // This is the original function to hook.
 int my_function(int parm1, char* str, char c)
 {
