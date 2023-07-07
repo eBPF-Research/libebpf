@@ -58,7 +58,7 @@ support load from a elf file, relocation on btf.
 compile and generate btf info(need to install `pahole` first):
 
 ```sh
-make build-ext
+make build-runtime
 ```
 
 run:

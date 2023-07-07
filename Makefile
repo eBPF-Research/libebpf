@@ -30,11 +30,15 @@ INSTALL_LOCATION := ~/.local
 help:
 	@python -c "$$PRINT_HELP_PYSCRIPT" < $(MAKEFILE_LIST)
 
+test-core: build
+	cd build/ && ctest -VV
+
+test-runtime: build-runtime
+	make -C example/bpf
+	cd build/ && ctest -VV
+
 test: ## run tests quickly with pytest on x86, you need to build first
 	pytest -v -s test/test_framework
-
-test-runtime: build-ext
-	cd build/ && ctest -VV
 
 coverage: ## check code coverage quickly GCC
 	rm -rf build/
@@ -58,7 +62,7 @@ build: ## build the package
 	cmake -Bbuild  -Dlibebpf_ENABLE_UNIT_TESTING=1
 	cmake --build build --config Debug
 
-build-ext: ## build the package extension
+build-runtime: ## build the package extension
 	rm -rf build/
 	cmake -Bbuild -Dlibebpf_ENABLE_UNIT_TESTING=1 -Dlibebpf_ENABLE_EXTENSION=1 
 	cmake --build build --config Debug

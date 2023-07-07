@@ -26,7 +26,8 @@ foreach(file ${test_sources})
   #
 
   # target_compile_features(${test_name}_Tests PUBLIC cxx_std_17)
-
+  target_include_directories(${test_name}_Tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../extensions/include)
+  target_include_directories(${test_name}_Tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
   #
   # Setup code coverage if enabled
   #

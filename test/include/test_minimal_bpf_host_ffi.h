@@ -1,5 +1,5 @@
-#ifndef BPF_FFI_DEFS_H
-#define BPF_FFI_DEFS_H
+#ifndef BPF_MINIMAL_TEST_FFI_DEFS_H
+#define BPF_MINIMAL_TEST_FFI_DEFS_H
 
 #include <stdint.h>
 #include <assert.h>

@@ -1,6 +1,6 @@
 #include <string.h>
-#include "bpf_progs.h"
-#include "bpf_host_ffi.h"
+#include "test_bpf_progs.h"
+#include "test_minimal_bpf_host_ffi.h"
 #include <stdlib.h>
 #include "test_defs.h"
 

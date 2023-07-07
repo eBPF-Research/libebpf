@@ -24,4 +24,4 @@ jobs:
         make git clang llvm pkg-config build-essential pahole
 
     - name: build package
-      run:  make build-ext
+      run:  make build-runtime

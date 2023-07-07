@@ -1,5 +1,5 @@
 #include <string.h>
-#include "bpf_progs.h"
+#include "test_bpf_progs.h"
 #include "test_defs.h"
 #include "libebpf/libebpf.h"
 #include <stdlib.h>

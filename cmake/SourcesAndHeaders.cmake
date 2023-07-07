@@ -56,7 +56,7 @@ if(${PROJECT_NAME}_ENABLE_EXTENSION)
     extensions/include/
   )
   set(EXT_TESTS
-    # extensions/test/test_relo.c
+    src/runtime.c
     # extensions/test/test_func_addr.c
   )
 endif()

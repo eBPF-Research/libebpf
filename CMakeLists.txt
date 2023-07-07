@@ -212,12 +212,14 @@ add_dependencies(${PROJECT_NAME} copy_headers)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE ${LIBBPF_LIBRARIES} -lelf -lz -lpthread)
 target_include_directories(${PROJECT_NAME} PRIVATE ${LIBBPF_INCLUDE_DIRS})
+target_include_directories(${PROJECT_NAME} PUBLIC $<INSTALL_INTERFACE:extensions/include>)
 if(${PROJECT_NAME}_BUILD_EXECUTABLE AND ${PROJECT_NAME}_ENABLE_UNIT_TESTING)
-target_include_directories(${PROJECT_NAME}_LIB PRIVATE ${LIBBPF_INCLUDE_DIRS})
+target_include_directories(${PROJECT_NAME}_LIB PUBLIC ${LIBBPF_INCLUDE_DIRS})
  target_link_libraries(${PROJECT_NAME}_LIB 
- PRIVATE 
+ PUBLIC 
  ${LIBBPF_LIBRARIES} 
  -lelf -lz -lpthread)
+ target_include_directories(${PROJECT_NAME}_LIB PUBLIC $<INSTALL_INTERFACE:extensions/include>)
 endif()
 
 endif()
@@ -343,6 +345,7 @@ install(
 install(
   DIRECTORY
   include/${PROJECT_NAME_LOWERCASE}
+  extensions/include/
   DESTINATION
   include
 )
