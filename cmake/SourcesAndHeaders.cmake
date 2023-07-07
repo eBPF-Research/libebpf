@@ -47,8 +47,19 @@ else()
   message(FATAL_ERROR "Unsupported architecture")
 endif()
 
+if(${PROJECT_NAME}_ENABLE_EXTENSION)
+  set(EXT_SOURCE 
+    extensions/src/relo.c
+    extensions/src/extension.c
+    extensions/src/func_addr.c)
+  set(EXT_HEADERS
+    extensions/include/
+  )
+endif()
+
 set(sources
   ${ARCH_SOURCES}
+  ${EXT_SOURCE}
   src/ebpf_jit.c
   src/ebpf_vm.c
   src/linux_bpf_core.c
@@ -63,6 +74,7 @@ set(headers
     include/
     src/
     ${ARCH_HEADERS}
+    ${EXT_HEADERS}
     ${headerfiles}
 )
 message(STATUS ${headers})

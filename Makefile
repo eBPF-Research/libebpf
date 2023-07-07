@@ -33,6 +33,10 @@ help:
 test: ## run tests quickly with pytest on x86, you need to build first
 	pytest -v -s test/test_framework
 
+test-ext: build-ext
+
+
+
 coverage: ## check code coverage quickly GCC
 	rm -rf build/
 	cmake -Bbuild -DCMAKE_INSTALL_PREFIX=$(INSTALL_LOCATION) -Dlibebpf_ENABLE_CODE_COVERAGE=1
@@ -59,7 +63,7 @@ build-ext: ## build the package extension
 	rm -rf build/
 	cmake -Bbuild -Dlibebpf_ENABLE_UNIT_TESTING=1 -Dlibebpf_ENABLE_EXTENSION=1 
 	cmake --build build --config Debug
-	pahole --btf_encode_detached vm-exten.btf build/extensions/vm-exten # generate btf 
+	pahole --btf_encode_detached vm-exten.btf build/bin/Debug/libebpf # generate btf 
 
 build-arm32: ## build the package on arm32
 	rm -rf build/

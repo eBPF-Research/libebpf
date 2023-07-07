@@ -1,13 +1,3 @@
-cmake_minimum_required(VERSION 3.15)
-
-#
-# Project details
-#
-
-project(
-  vm-exten
-  LANGUAGES C
-)
 
 verbose_message("extensions for vm")
 
@@ -28,6 +18,7 @@ else()
   add_library(${CMAKE_PROJECT_NAME} ${SRC_FILE})
   set(${CMAKE_PROJECT_NAME}_EXTEN_LIB ${CMAKE_PROJECT_NAME})
 endif()
+
 set(LIBBPF_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/libbpf/)
 include(ExternalProject)
 ExternalProject_Add(libbpf

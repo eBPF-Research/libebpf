@@ -96,7 +96,7 @@ main(int argc, char** argv)
             break;
         default:
             usage(argv[0]);
-            return 1;
+            return 0;
         }
     }
 
@@ -107,7 +107,7 @@ main(int argc, char** argv)
 
     if (argc != optind + 1) {
         usage(argv[0]);
-        return 1;
+        return 0;
     }
 
     const char* code_filename = argv[optind];

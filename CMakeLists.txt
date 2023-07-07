@@ -155,17 +155,71 @@ verbose_message("Applied compiler warnings. Using standard ${CMAKE_CXX_STANDARD}
 # Model project dependencies
 #
 
-target_link_libraries(
- ${PROJECT_NAME}
- PUBLIC
- m
+if(${PROJECT_NAME}_ENABLE_EXTENSION)
+
+set(LIBBPF_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/libbpf/)
+include(ExternalProject)
+ExternalProject_Add(libbpf
+  PREFIX libbpf
+  SOURCE_DIR ${LIBBPF_DIR}/src
+  CONFIGURE_COMMAND ""
+  BUILD_COMMAND make
+    BUILD_STATIC_ONLY=1
+    OBJDIR=${CMAKE_CURRENT_BINARY_DIR}/libbpf/libbpf
+    DESTDIR=${CMAKE_CURRENT_BINARY_DIR}/libbpf
+    INCLUDEDIR=
+    LIBDIR=
+    UAPIDIR=
+    install
+  BUILD_IN_SOURCE TRUE
+  INSTALL_COMMAND ""
+  STEP_TARGETS build
 )
+
+# Set BpfObject input parameters -- note this is usually not necessary unless
+# you're in a highly vendored environment (like libbpf-bootstrap)
+set(LIBBPF_INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR}/libbpf)
+set(LIBBPF_LIBRARIES ${CMAKE_CURRENT_BINARY_DIR}/libbpf/libbpf.a)
+
+add_custom_target(copy_headers
+  COMMENT "Copying headers"
+)
+
+set(HEADER_FILES relo_core.h hashmap.h nlattr.h libbpf_internal.h)
+set(HEADER_DIRS ${LIBBPF_DIR}/include/linux)
+set(DEST_DIR ${LIBBPF_INCLUDE_DIRS}/linux)
+add_custom_command(
+  TARGET copy_headers
+  COMMAND ${CMAKE_COMMAND} -E copy_directory
+  ${HEADER_DIRS}
+  ${DEST_DIR}
+  COMMENT "Copying directory ${HEADER_DIRS} to ${DEST_DIR}"
+)
+
+foreach(file ${HEADER_FILES})
+  add_custom_command(
+    TARGET copy_headers
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    ${LIBBPF_DIR}/src/${file}
+    ${LIBBPF_INCLUDE_DIRS}/bpf/${file}
+    COMMENT "Copying ${file}"
+  )
+endforeach()
+
+add_dependencies(copy_headers libbpf-build)
+add_dependencies(${PROJECT_NAME} copy_headers)
+
+
+target_link_libraries(${PROJECT_NAME} PRIVATE ${LIBBPF_LIBRARIES} -lelf -lz -lpthread)
+target_include_directories(${PROJECT_NAME} PRIVATE ${LIBBPF_INCLUDE_DIRS})
 if(${PROJECT_NAME}_BUILD_EXECUTABLE AND ${PROJECT_NAME}_ENABLE_UNIT_TESTING)
- target_link_libraries(
-   ${PROJECT_NAME}_LIB
-   PUBLIC
-     m
- )
+target_include_directories(${PROJECT_NAME}_LIB PRIVATE ${LIBBPF_INCLUDE_DIRS})
+ target_link_libraries(${PROJECT_NAME}_LIB 
+ PRIVATE 
+ ${LIBBPF_LIBRARIES} 
+ -lelf -lz -lpthread)
+endif()
+
 endif()
 
 # For Windows, it is necessary to link with the MultiThreaded library.
@@ -350,10 +404,4 @@ if(${PROJECT_NAME}_ENABLE_UNIT_TESTING)
   enable_testing()
   message(STATUS "Build unit tests for the project. Tests should always be found in the test folder\n")
   add_subdirectory(test)
-endif()
-
-if(${PROJECT_NAME}_ENABLE_EXTENSION)
-  enable_testing()
-  message(STATUS "Build extensions for the packages, including elf, relocations, and ffi supports\n")
-  add_subdirectory(extensions)
 endif()
