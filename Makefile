@@ -33,9 +33,8 @@ help:
 test: ## run tests quickly with pytest on x86, you need to build first
 	pytest -v -s test/test_framework
 
-test-ext: build-ext
-
-
+test-runtime: build-ext
+	cd build/ && ctest -VV
 
 coverage: ## check code coverage quickly GCC
 	rm -rf build/

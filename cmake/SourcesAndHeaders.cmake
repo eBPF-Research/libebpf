@@ -55,6 +55,10 @@ if(${PROJECT_NAME}_ENABLE_EXTENSION)
   set(EXT_HEADERS
     extensions/include/
   )
+  set(EXT_TESTS
+    # extensions/test/test_relo.c
+    # extensions/test/test_func_addr.c
+  )
 endif()
 
 set(sources
@@ -80,5 +84,8 @@ set(headers
 message(STATUS ${headers})
 
 set(test_sources
+  ${EXT_TESTS}
   src/test.c
+  src/test_jit.c
+  src/test_ffi.c
 )
