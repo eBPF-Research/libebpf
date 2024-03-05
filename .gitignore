@@ -34,3 +34,5 @@ documents/elfoffset/myprogram
 documents/elfoffset/*.txt
 documents/elfoffset/maps
 Catch2
+
+/build
