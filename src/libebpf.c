@@ -1,8 +1,7 @@
 #define _GNU_SOURCE
 #include <libebpf.h>
 #include <stdlib.h>
-
-struct ebpf_vm {};
+#include <libebpf_internal.h>
 
 static ebpf_malloc global_malloc = &malloc;
 static ebpf_free global_free = &free;

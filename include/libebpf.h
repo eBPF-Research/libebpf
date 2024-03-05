@@ -7,6 +7,9 @@
 extern "C" {
 #endif
 
+#define MAX_EXTERNAL_HELPER ((size_t)4096)
+#define MAX_EXTERNAL_HELPER_NAME_LENGTH ((size_t)100)
+#define EBPF_STACK_SIZE ((size_t)512)
 /**
  * @brief Opaque type for a libebpf virtual machine
  *
