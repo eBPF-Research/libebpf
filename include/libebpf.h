@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include "libebpf_insn.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -10,6 +11,8 @@ extern "C" {
 #define MAX_EXTERNAL_HELPER ((size_t)4096)
 #define MAX_EXTERNAL_HELPER_NAME_LENGTH ((size_t)100)
 #define EBPF_STACK_SIZE ((size_t)512)
+#define MAX_LOCAL_FUNCTION_LEVEL 20
+
 /**
  * @brief Opaque type for a libebpf virtual machine
  *
@@ -80,7 +83,7 @@ void ebpf_vm_destroy(ebpf_vm_t *);
  * @param fn The function instance
  * @return int 0 if succeeded, otherwise if failed. Call ebpf_error_string to get the error details.
  */
-int ebpf_vm_register_external_helper(ebpf_vm_t *vm, size_t index, const char *name, ebpf_external_helper_fn *fn);
+int ebpf_vm_register_external_helper(ebpf_vm_t *vm, size_t index, const char *name, ebpf_external_helper_fn fn);
 
 /**
  * @brief Load instructions for the given vm instance
@@ -90,7 +93,7 @@ int ebpf_vm_register_external_helper(ebpf_vm_t *vm, size_t index, const char *na
  * @param code_len Count of instructions
  * @return int 0 if succeeded, other if failed. Use ebpf_error_string to get the error details.
  */
-int ebpf_vm_load_instructions(ebpf_vm_t *vm, const void *code, size_t code_len);
+int ebpf_vm_load_instructions(ebpf_vm_t *vm, const struct libebpf_insn *code, size_t code_len);
 
 /**
  * @brief Unload instructions for the given vm instance. Will also remove the compiled function.
