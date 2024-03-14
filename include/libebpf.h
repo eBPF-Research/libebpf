@@ -34,6 +34,41 @@ typedef int (*ebpf_jit_fn)(void *mem, size_t mem_len, uint64_t *return_value);
 typedef uint64_t (*ebpf_external_helper_fn)(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
 
 /**
+ * @brief Helper prototype for the map_by_fd function.
+ * See https://docs.kernel.org/bpf/standardization/instruction-set.html#id20 for details
+ *
+ */
+typedef uint64_t (*ebpf_map_by_fd_callback)(int fd);
+
+/**
+ * @brief Helper prototype for the map_val function.
+ * See https://docs.kernel.org/bpf/standardization/instruction-set.html#id20 for details
+ *
+ */
+typedef char *(*ebpf_map_val_callback)(uint64_t map_ptr);
+
+/**
+ * @brief Helper prototype for the var_addr function.
+ * See https://docs.kernel.org/bpf/standardization/instruction-set.html#id20 for details
+ *
+ */
+typedef char *(*ebpf_var_addr_callback)(int var_id);
+
+/**
+ * @brief Helper prototype for the code_addr function.
+ * See https://docs.kernel.org/bpf/standardization/instruction-set.html#id20 for details
+ *
+ */
+typedef char *(*ebpf_code_addr_callback)(int);
+
+/**
+ * @brief Helper prototype for the map_by_idx function.
+ * See https://docs.kernel.org/bpf/standardization/instruction-set.html#id20 for details
+ *
+ */
+typedef uint64_t (*ebpf_map_by_idx_callback)(int);
+
+/**
  * @brief Function prototype for the global custom memory allocator
  *
  */
@@ -84,6 +119,19 @@ void ebpf_vm_destroy(ebpf_vm_t *);
  * @return int 0 if succeeded, otherwise if failed. Call ebpf_error_string to get the error details.
  */
 int ebpf_vm_register_external_helper(ebpf_vm_t *vm, size_t index, const char *name, ebpf_external_helper_fn fn);
+
+/**
+ * @brief Set ld64 helpers
+ * See https://docs.kernel.org/bpf/standardization/instruction-set.html#id20 for details
+ * @param vm The virtual machine instance
+ * @param map_by_fd
+ * @param map_by_idx
+ * @param map_val
+ * @param code_addr
+ * @param var_addr
+ */
+void ebpf_vm_set_ld64_helpers(ebpf_vm_t *vm, ebpf_map_by_fd_callback map_by_fd, ebpf_map_by_idx_callback map_by_idx, ebpf_map_val_callback map_val,
+                              ebpf_code_addr_callback code_addr, ebpf_var_addr_callback var_addr);
 
 /**
  * @brief Load instructions for the given vm instance

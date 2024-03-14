@@ -46,4 +46,28 @@
         }                                                                                                                                            \
     }
 
+#define SIMPLE_STX_CLAUSE(bpf_size, st_ty)                                                                                                           \
+    case BPF_CLASS_STX | bpf_size | BPF_LS_MODE_MEM: {                                                                                               \
+        *(st_ty *)(uintptr_t)(reg[insn->dst_reg] + insn->offset) = reg[insn->src_reg];                                                               \
+        break;                                                                                                                                       \
+    }
+
+#define SIMPLE_ST_CLAUSE(bpf_size, st_ty)                                                                                                            \
+    case BPF_CLASS_ST | bpf_size | BPF_LS_MODE_MEM: {                                                                                                \
+        *(st_ty *)(uintptr_t)(reg[insn->dst_reg] + insn->offset) = insn->imm;                                                                        \
+        break;                                                                                                                                       \
+    }
+
+#define SIMPLE_LDX_CLAUSE(bpf_size, ld_type)                                                                                                         \
+    case BPF_CLASS_LDX | bpf_size | BPF_LS_MODE_MEM: {                                                                                               \
+        reg[insn->dst_reg] = *(ld_type *)(uintptr_t)(reg[insn->src_reg] + insn->offset);                                                             \
+        break;                                                                                                                                       \
+    }
+
+#define SIMPLE_LDX_SIGNED_CLAUSE(bpf_size, ld_type)                                                                                                  \
+    case BPF_CLASS_LDX | bpf_size | BPF_LS_MODE_MEMSX: {                                                                                             \
+        reg[insn->dst_reg] = (int64_t) * (ld_type *)(uintptr_t)(reg[insn->src_reg] + insn->offset);                                                  \
+        break;                                                                                                                                       \
+    }
+
 #endif

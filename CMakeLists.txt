@@ -13,6 +13,8 @@ add_library(
   libebpf
   STATIC
   src/libebpf.c
+  src/libebpf_vm.c
+  src/libebpf_verify.c
 )
 
 target_include_directories(

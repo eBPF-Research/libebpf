@@ -14,6 +14,11 @@ struct ebpf_vm {
     struct ebpf_external_helper_definition *helpers;
     size_t insn_cnt;
     struct libebpf_insn *insns;
+    ebpf_map_by_fd_callback map_by_fd;
+    ebpf_map_by_idx_callback map_by_idx;
+    ebpf_map_val_callback map_val;
+    ebpf_code_addr_callback code_addr;
+    ebpf_var_addr_callback var_addr;
 };
 
 static int ebpf_set_error_string(const char *fmt, ...) {
@@ -28,5 +33,7 @@ static int ebpf_set_error_string(const char *fmt, ...) {
     va_end(args);
     return ret;
 }
+
+int ebpf_vm_verify(ebpf_vm_t *vm, const struct libebpf_insn *code, size_t code_len);
 
 #endif

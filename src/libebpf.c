@@ -69,3 +69,12 @@ void ebpf_vm_unload_instructions(ebpf_vm_t *vm) {
         vm->insn_cnt = 0;
     }
 }
+
+void ebpf_vm_set_ld64_helpers(ebpf_vm_t *vm, ebpf_map_by_fd_callback map_by_fd, ebpf_map_by_idx_callback map_by_idx, ebpf_map_val_callback map_val,
+                              ebpf_code_addr_callback code_addr, ebpf_var_addr_callback var_addr) {
+    vm->code_addr = code_addr;
+    vm->var_addr = var_addr;
+    vm->map_by_fd = map_by_fd;
+    vm->map_by_idx = map_by_idx;
+    vm->map_val = map_val;
+}
