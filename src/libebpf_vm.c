@@ -1,12 +1,18 @@
 #include "libebpf_insn.h"
 #include <asm-generic/errno-base.h>
 #include <assert.h>
+#include <stdio.h>
 #include <libebpf.h>
 #include <libebpf_internal.h>
 #include <stdint.h>
 #include "ends_conversion.h"
 #include "clause_helpers.h"
 #include <stdbool.h>
+
+struct local_function_stack_state {
+    uint64_t r6, r7, r8, r9;
+    uint16_t return_address;
+};
 
 static inline bool ebpf_runtime_bound_check(const struct ebpf_vm *vm, void *addr, int size, const char *type, uint16_t cur_pc, void *mem,
                                             size_t mem_len, void *stack) {
@@ -41,6 +47,8 @@ int ebpf_vm_run(ebpf_vm_t *vm, void *mem, size_t mem_len, uint64_t *return_value
     reg[2] = mem_len;
     reg[10] = (uintptr_t)stack + sizeof(stack);
     char *stack_base = (char *)((uintptr_t)reg[10] - EBPF_STACK_SIZE);
+    struct local_function_stack_state states[MAX_LOCAL_FUNCTION_LEVEL];
+    int next_state_slot = MAX_LOCAL_FUNCTION_LEVEL - 1;
     while (1) {
         const struct libebpf_insn *insn = insns + pc;
         pc++;
@@ -270,7 +278,20 @@ int ebpf_vm_run(ebpf_vm_t *vm, void *mem, size_t mem_len, uint64_t *return_value
             if (insn->src_reg == 0) {
                 reg[0] = vm->helpers[insn->imm].fn(reg[1], reg[2], reg[3], reg[4], reg[5]);
             } else if (insn->src_reg == 1) {
-                assert("Not implemented yet: local helpers");
+                if (next_state_slot == -1) {
+                    ebpf_set_error_string("Too many local function frames! pc %d", pc);
+                    return -E2BIG;
+                }
+                struct local_function_stack_state *state = &states[next_state_slot];
+                state->r6 = reg[6];
+                state->r7 = reg[7];
+                state->r8 = reg[8];
+                state->r9 = reg[9];
+                state->return_address = pc;
+                reg[10] -= EBPF_STACK_SIZE;
+                stack_base -= EBPF_STACK_SIZE;
+                pc += insn->imm;
+                next_state_slot--;
             } else if (insn->src_reg == 2) {
                 assert("Not implemented yet!");
             }
@@ -278,8 +299,22 @@ int ebpf_vm_run(ebpf_vm_t *vm, void *mem, size_t mem_len, uint64_t *return_value
         }
         case BPF_CLASS_JMP | BPF_SOURCE_K | BPF_JMP_EXIT:
         case BPF_CLASS_JMP | BPF_SOURCE_X | BPF_JMP_EXIT: {
-            *return_value = reg[0];
-            return 0;
+            if (next_state_slot != MAX_LOCAL_FUNCTION_LEVEL - 1) {
+                // Here means we should return from a local function
+                next_state_slot++;
+                struct local_function_stack_state *state = &states[next_state_slot];
+                reg[6] = state->r6;
+                reg[7] = state->r7;
+                reg[8] = state->r8;
+                reg[9] = state->r9;
+                pc = state->return_address;
+                reg[10] += EBPF_STACK_SIZE;
+                stack_base += EBPF_STACK_SIZE;
+                break;
+            } else {
+                *return_value = reg[0];
+                return 0;
+            }
         }
 
             SIMPLE_STX_CLAUSE(BPF_LS_SIZE_B, uint8_t, 1);

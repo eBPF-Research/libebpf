@@ -27,6 +27,11 @@ int ebpf_vm_verify(ebpf_vm_t *vm, const struct libebpf_insn *code, size_t code_l
         const struct libebpf_insn *insn = code + pc;
 
         if (bit_test_mask(insn->code, BPF_CLASS_MASK, BPF_CLASS_ALU) || bit_test_mask(insn->code, BPF_CLASS_MASK, BPF_CLASS_ALU64)) {
+            if (insn->dst_reg == 10) {
+                ebpf_set_error_string("Write to stack register is forbidden. pc %d", pc);
+                return -EPERM;
+            }
+
             // Check register access for ALU instructions
             if (insn->dst_reg > 10) {
                 ebpf_set_error_string("Invalid dst register %d at pc %d", (int)insn->dst_reg, (int)pc);
@@ -189,6 +194,12 @@ int ebpf_vm_verify(ebpf_vm_t *vm, const struct libebpf_insn *code, size_t code_l
                 err = -EPERM;
                 goto out;
             }
+            if (bit_test_mask(insn->code, BPF_CLASS_MASK, BPF_CLASS_LDX)) {
+                if (insn->dst_reg == 10) {
+                    ebpf_set_error_string("Write to stack register is forbidden. pc %d", pc);
+                    return -EPERM;
+                }
+            }
         }
         // ST instructions, check dst register
         else if (bit_test_mask(insn->code, BPF_LS_MODE_MASK | BPF_CLASS_MASK, (BPF_LS_MODE_MEM | BPF_CLASS_ST))) {
@@ -225,6 +236,10 @@ int ebpf_vm_verify(ebpf_vm_t *vm, const struct libebpf_insn *code, size_t code_l
         }
         // ld64 helpers
         else if (insn->code == (BPF_LS_MODE_IMM | BPF_LS_SIZE_DW | BPF_CLASS_LD)) {
+            if (insn->dst_reg == 10) {
+                ebpf_set_error_string("Write to stack register is forbidden. pc %d", pc);
+                return -EPERM;
+            }
             if (pc == code_len - 1) {
                 ebpf_set_error_string("Expected one more instructions at pc %d, since it's a 16 bytes instruction", pc);
                 err = -EPERM;
