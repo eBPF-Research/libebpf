@@ -31,7 +31,7 @@ int ebpf_vm_run(ebpf_vm_t *vm, void *mem, size_t mem_len, uint64_t *return_value
     uint16_t pc = 0;
     const struct libebpf_insn *insns = vm->insns;
     uint64_t reg[11];
-    uint16_t stack[MAX_LOCAL_FUNCTION_LEVEL * EBPF_STACK_SIZE];
+    char stack[MAX_LOCAL_FUNCTION_LEVEL * EBPF_STACK_SIZE];
     if (!insns) {
         ebpf_set_error_string("Instructions not loaded yet");
         return -EINVAL;
@@ -40,7 +40,7 @@ int ebpf_vm_run(ebpf_vm_t *vm, void *mem, size_t mem_len, uint64_t *return_value
     reg[1] = (uintptr_t)mem;
     reg[2] = mem_len;
     reg[10] = (uintptr_t)stack + sizeof(stack);
-
+    char *stack_base = (char *)((uintptr_t)reg[10] - EBPF_STACK_SIZE);
     while (1) {
         const struct libebpf_insn *insn = insns + pc;
         pc++;
@@ -133,16 +133,16 @@ int ebpf_vm_run(ebpf_vm_t *vm, void *mem, size_t mem_len, uint64_t *return_value
             uint64_t dst = reg[insn->dst_reg];
             if (insn->offset == 0) {
                 if (bit_test_mask(insn->code, BPF_CLASS_MASK, BPF_CLASS_ALU)) {
-                    reg[insn->dst_reg] = src != 0 ? (uint32_t)dst % (uint32_t)src : 0;
+                    reg[insn->dst_reg] = src != 0 ? (uint32_t)dst % (uint32_t)src : (uint32_t)dst;
                 } else {
-                    reg[insn->dst_reg] = src != 0 ? dst % src : 0;
+                    reg[insn->dst_reg] = src != 0 ? dst % src : dst;
                 }
             } else if (insn->offset == 1) {
                 // smod
                 if (bit_test_mask(insn->code, BPF_CLASS_MASK, BPF_CLASS_ALU)) {
-                    reg[insn->dst_reg] = src != 0 ? (int32_t)dst % (int32_t)src : 0;
+                    reg[insn->dst_reg] = src != 0 ? (int32_t)dst % (int32_t)src : (int32_t)dst;
                 } else {
-                    reg[insn->dst_reg] = src != 0 ? (int64_t)dst % (int64_t)src : 0;
+                    reg[insn->dst_reg] = src != 0 ? (int64_t)dst % (int64_t)src : (int64_t)dst;
                 }
             }
             break;

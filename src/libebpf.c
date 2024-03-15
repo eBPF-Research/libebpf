@@ -56,7 +56,8 @@ int ebpf_vm_load_instructions(ebpf_vm_t *vm, const struct libebpf_insn *code, si
         return err;
     }
     if (vm->insns) {
-        _libebpf_global_free(vm->insns);
+        ebpf_set_error_string("code has already been loaded into this VM. Use ebpf_unload_code() if you need to reuse this VM");
+        return -EEXIST;
     }
     vm->insns = _libebpf_global_malloc(sizeof(struct libebpf_insn) * code_len);
     if (!vm->insns) {

@@ -78,7 +78,7 @@ def check_datafile(filename):
             raise AssertionError("Expected VM to exit with an error code")
 
 @pytest.mark.parametrize("filename", testdata.list_files(_test_data_dir))
-# @pytest.mark.parametrize("filename", ["jeq-imm.data"])
+# @pytest.mark.parametrize("filename", ["stack.data"])
 def test_datafiles(filename):
     # This is now a regular test function that will be called once for each filename
     check_datafile(filename)
