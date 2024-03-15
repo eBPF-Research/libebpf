@@ -1,11 +1,28 @@
 #include "libebpf_insn.h"
 #include <asm-generic/errno-base.h>
+#include <assert.h>
 #include <libebpf.h>
 #include <libebpf_internal.h>
 #include <stdint.h>
 #include "ends_conversion.h"
 #include "clause_helpers.h"
 #include <stdbool.h>
+
+static inline bool ebpf_runtime_bound_check(const struct ebpf_vm *vm, void *addr, int size, const char *type, uint16_t cur_pc, void *mem,
+                                            size_t mem_len, void *stack) {
+    if (!vm->bounds_check_enabled)
+        return true;
+    if (mem && (addr >= mem && ((char *)addr + size) <= ((char *)mem + mem_len))) {
+        return true;
+    } else if (addr >= stack && ((char *)addr + size) <= ((char *)stack + EBPF_STACK_SIZE)) {
+        return true;
+    } else {
+        ebpf_set_error_string("ebpf error: out of bounds memory %s at PC %u, addr %p, size %d\nmem %p/%zd stack %p/%d\n", type, cur_pc, addr, size,
+                              mem, mem_len, stack, EBPF_STACK_SIZE);
+        return false;
+    }
+}
+
 int ebpf_vm_run(ebpf_vm_t *vm, void *mem, size_t mem_len, uint64_t *return_value) {
     if (!vm->insns) {
         ebpf_set_error_string("Instructions not loaded yet!");
@@ -34,7 +51,7 @@ int ebpf_vm_run(ebpf_vm_t *vm, void *mem, size_t mem_len, uint64_t *return_value
         case BPF_CLASS_ALU64 | BPF_SOURCE_X | BPF_ALU_ADD: {
             uint64_t src = insn->code_alu.src == 0 ? insn->imm : reg[insn->src_reg];
             uint64_t dst = reg[insn->dst_reg];
-            if (insn->code & BPF_CLASS_ALU) {
+            if (bit_test_mask(insn->code, BPF_CLASS_MASK, BPF_CLASS_ALU)) {
                 reg[insn->dst_reg] = (uint32_t)dst + (uint32_t)src;
             } else {
                 reg[insn->dst_reg] = dst + src;
@@ -54,14 +71,14 @@ int ebpf_vm_run(ebpf_vm_t *vm, void *mem, size_t mem_len, uint64_t *return_value
             uint64_t src = insn->code_alu.src == 0 ? insn->imm : reg[insn->src_reg];
             uint64_t dst = reg[insn->dst_reg];
             if (insn->offset == 0) {
-                if (insn->code & BPF_CLASS_ALU) {
+                if (bit_test_mask(insn->code, BPF_CLASS_MASK, BPF_CLASS_ALU)) {
                     reg[insn->dst_reg] = src != 0 ? (uint32_t)dst / (uint32_t)src : 0;
                 } else {
                     reg[insn->dst_reg] = src != 0 ? dst / src : 0;
                 }
             } else if (insn->offset == 1) {
                 // sdiv
-                if (insn->code & BPF_CLASS_ALU) {
+                if (bit_test_mask(insn->code, BPF_CLASS_MASK, BPF_CLASS_ALU)) {
                     reg[insn->dst_reg] = src != 0 ? (int32_t)dst / (int32_t)src : 0;
                 } else {
                     reg[insn->dst_reg] = src != 0 ? (int64_t)dst / (int64_t)src : 0;
@@ -76,7 +93,7 @@ int ebpf_vm_run(ebpf_vm_t *vm, void *mem, size_t mem_len, uint64_t *return_value
         case BPF_CLASS_ALU64 | BPF_SOURCE_X | BPF_ALU_LSH: {
             uint64_t src = insn->code_alu.src == 0 ? insn->imm : reg[insn->src_reg];
             uint64_t dst = reg[insn->dst_reg];
-            if (insn->code & BPF_CLASS_ALU) {
+            if (bit_test_mask(insn->code, BPF_CLASS_MASK, BPF_CLASS_ALU)) {
                 reg[insn->dst_reg] = ((uint32_t)dst) << (src & 0x1f);
             } else {
                 reg[insn->dst_reg] = dst << (src & 0x3f);
@@ -89,7 +106,7 @@ int ebpf_vm_run(ebpf_vm_t *vm, void *mem, size_t mem_len, uint64_t *return_value
         case BPF_CLASS_ALU64 | BPF_SOURCE_X | BPF_ALU_RSH: {
             uint64_t src = insn->code_alu.src == 0 ? insn->imm : reg[insn->src_reg];
             uint64_t dst = reg[insn->dst_reg];
-            if (insn->code & BPF_CLASS_ALU) {
+            if (bit_test_mask(insn->code, BPF_CLASS_MASK, BPF_CLASS_ALU)) {
                 reg[insn->dst_reg] = ((uint32_t)dst) >> (src & 0x1f);
             } else {
                 reg[insn->dst_reg] = dst >> (src & 0x3f);
@@ -101,7 +118,7 @@ int ebpf_vm_run(ebpf_vm_t *vm, void *mem, size_t mem_len, uint64_t *return_value
         case BPF_CLASS_ALU64 | BPF_SOURCE_K | BPF_ALU_NEG:
         case BPF_CLASS_ALU64 | BPF_SOURCE_X | BPF_ALU_NEG: {
             uint64_t dst = reg[insn->dst_reg];
-            if (insn->code & BPF_CLASS_ALU) {
+            if (bit_test_mask(insn->code, BPF_CLASS_MASK, BPF_CLASS_ALU)) {
                 reg[insn->dst_reg] = (uint32_t)(-(int32_t)dst);
             } else {
                 reg[insn->dst_reg] = (uint64_t)(-(int64_t)dst);
@@ -115,14 +132,14 @@ int ebpf_vm_run(ebpf_vm_t *vm, void *mem, size_t mem_len, uint64_t *return_value
             uint64_t src = insn->code_alu.src == 0 ? insn->imm : reg[insn->src_reg];
             uint64_t dst = reg[insn->dst_reg];
             if (insn->offset == 0) {
-                if (insn->code & BPF_CLASS_ALU) {
+                if (bit_test_mask(insn->code, BPF_CLASS_MASK, BPF_CLASS_ALU)) {
                     reg[insn->dst_reg] = src != 0 ? (uint32_t)dst % (uint32_t)src : 0;
                 } else {
                     reg[insn->dst_reg] = src != 0 ? dst % src : 0;
                 }
             } else if (insn->offset == 1) {
                 // smod
-                if (insn->code & BPF_CLASS_ALU) {
+                if (bit_test_mask(insn->code, BPF_CLASS_MASK, BPF_CLASS_ALU)) {
                     reg[insn->dst_reg] = src != 0 ? (int32_t)dst % (int32_t)src : 0;
                 } else {
                     reg[insn->dst_reg] = src != 0 ? (int64_t)dst % (int64_t)src : 0;
@@ -135,31 +152,30 @@ int ebpf_vm_run(ebpf_vm_t *vm, void *mem, size_t mem_len, uint64_t *return_value
         case BPF_CLASS_ALU | BPF_SOURCE_X | BPF_ALU_MOV_MOVSX:
         case BPF_CLASS_ALU64 | BPF_SOURCE_K | BPF_ALU_MOV_MOVSX:
         case BPF_CLASS_ALU64 | BPF_SOURCE_X | BPF_ALU_MOV_MOVSX: {
-            uint64_t dst = reg[insn->dst_reg];
             uint64_t src = insn->code_alu.src == 0 ? insn->imm : reg[insn->src_reg];
             if (insn->offset == 0) {
-                if (insn->code & BPF_CLASS_ALU) {
+                if (bit_test_mask(insn->code, BPF_CLASS_MASK, BPF_CLASS_ALU)) {
                     reg[insn->dst_reg] = (uint32_t)src;
                 } else {
                     reg[insn->dst_reg] = src;
                 }
             } else if (insn->offset == 8) {
                 // dst = (s8) src
-                if (insn->code & BPF_CLASS_ALU) {
+                if (bit_test_mask(insn->code, BPF_CLASS_MASK, BPF_CLASS_ALU)) {
                     reg[insn->dst_reg] = (uint32_t)(int8_t)src;
                 } else {
                     reg[insn->dst_reg] = (uint64_t)(int8_t)src;
                 }
             } else if (insn->offset == 16) {
                 // dst = (s16) src
-                if (insn->code & BPF_CLASS_ALU) {
+                if (bit_test_mask(insn->code, BPF_CLASS_MASK, BPF_CLASS_ALU)) {
                     reg[insn->dst_reg] = (uint32_t)(int16_t)src;
                 } else {
                     reg[insn->dst_reg] = (uint64_t)(int16_t)src;
                 }
             } else if (insn->offset == 32) {
                 // dst = (s32) src
-                if (insn->code & BPF_CLASS_ALU) {
+                if (bit_test_mask(insn->code, BPF_CLASS_MASK, BPF_CLASS_ALU)) {
                     reg[insn->dst_reg] = (uint32_t)(int32_t)src;
                 } else {
                     reg[insn->dst_reg] = (uint64_t)(int32_t)src;
@@ -174,8 +190,8 @@ int ebpf_vm_run(ebpf_vm_t *vm, void *mem, size_t mem_len, uint64_t *return_value
         case BPF_CLASS_ALU64 | BPF_SOURCE_X | BPF_ALU_ARSH: {
             uint64_t src = insn->code_alu.src == 0 ? insn->imm : reg[insn->src_reg];
             uint64_t dst = reg[insn->dst_reg];
-            if (insn->code & BPF_CLASS_ALU) {
-                reg[insn->dst_reg] = ((int32_t)dst) >> (src & 0x1f);
+            if (bit_test_mask(insn->code, BPF_CLASS_MASK, BPF_CLASS_ALU)) {
+                reg[insn->dst_reg] = (uint32_t)(((int32_t)dst) >> (src & 0x1f));
             } else {
                 reg[insn->dst_reg] = ((int64_t)dst) >> (src & 0x3f);
             }
@@ -227,13 +243,14 @@ int ebpf_vm_run(ebpf_vm_t *vm, void *mem, size_t mem_len, uint64_t *return_value
         case BPF_CLASS_JMP32 | BPF_SOURCE_X | BPF_JMP_JEQ: {
             uint64_t src = insn->code_alu.src == 0 ? insn->imm : reg[insn->src_reg];
             uint64_t dst = reg[insn->dst_reg];
-            if (insn->code & BPF_CLASS_JMP) {
+            if (bit_test_mask(insn->code, BPF_CLASS_MASK, BPF_CLASS_JMP)) {
                 if (dst == src)
                     pc += insn->offset;
             } else {
                 if ((uint32_t)dst == (uint32_t)src)
                     pc += insn->offset;
             }
+            break;
         }
             SIMPLE_JMP_OP_CLAUSE(BPF_JMP_JGT, >);
             SIMPLE_JMP_OP_CLAUSE(BPF_JMP_JGE, >=);
@@ -253,62 +270,40 @@ int ebpf_vm_run(ebpf_vm_t *vm, void *mem, size_t mem_len, uint64_t *return_value
             if (insn->src_reg == 0) {
                 reg[0] = vm->helpers[insn->imm].fn(reg[1], reg[2], reg[3], reg[4], reg[5]);
             } else if (insn->src_reg == 1) {
+                assert("Not implemented yet: local helpers");
             } else if (insn->src_reg == 2) {
+                assert("Not implemented yet!");
             }
             break;
         }
         case BPF_CLASS_JMP | BPF_SOURCE_K | BPF_JMP_EXIT:
         case BPF_CLASS_JMP | BPF_SOURCE_X | BPF_JMP_EXIT: {
-            return reg[0];
+            *return_value = reg[0];
+            return 0;
         }
 
-            SIMPLE_STX_CLAUSE(BPF_LS_SIZE_B, uint8_t);
-            SIMPLE_STX_CLAUSE(BPF_LS_SIZE_H, uint16_t);
-            SIMPLE_STX_CLAUSE(BPF_LS_SIZE_W, uint32_t);
-            SIMPLE_STX_CLAUSE(BPF_LS_SIZE_DW, uint64_t);
+            SIMPLE_STX_CLAUSE(BPF_LS_SIZE_B, uint8_t, 1);
+            SIMPLE_STX_CLAUSE(BPF_LS_SIZE_H, uint16_t, 2);
+            SIMPLE_STX_CLAUSE(BPF_LS_SIZE_W, uint32_t, 4);
+            SIMPLE_STX_CLAUSE(BPF_LS_SIZE_DW, uint64_t, 8);
 
-            SIMPLE_ST_CLAUSE(BPF_LS_SIZE_B, uint8_t);
-            SIMPLE_ST_CLAUSE(BPF_LS_SIZE_H, uint16_t);
-            SIMPLE_ST_CLAUSE(BPF_LS_SIZE_W, uint32_t);
-            SIMPLE_ST_CLAUSE(BPF_LS_SIZE_DW, uint64_t);
+            SIMPLE_ST_CLAUSE(BPF_LS_SIZE_B, uint8_t, 1);
+            SIMPLE_ST_CLAUSE(BPF_LS_SIZE_H, uint16_t, 2);
+            SIMPLE_ST_CLAUSE(BPF_LS_SIZE_W, uint32_t, 4);
+            SIMPLE_ST_CLAUSE(BPF_LS_SIZE_DW, uint64_t, 8);
 
-            SIMPLE_LDX_CLAUSE(BPF_LS_SIZE_B, uint8_t);
-            SIMPLE_LDX_CLAUSE(BPF_LS_SIZE_H, uint16_t);
-            SIMPLE_LDX_CLAUSE(BPF_LS_SIZE_W, uint32_t);
-            SIMPLE_LDX_CLAUSE(BPF_LS_SIZE_DW, uint64_t);
+            SIMPLE_LDX_CLAUSE(BPF_LS_SIZE_B, uint8_t, 1);
+            SIMPLE_LDX_CLAUSE(BPF_LS_SIZE_H, uint16_t, 2);
+            SIMPLE_LDX_CLAUSE(BPF_LS_SIZE_W, uint32_t, 4);
+            SIMPLE_LDX_CLAUSE(BPF_LS_SIZE_DW, uint64_t, 8);
 
-            SIMPLE_LDX_SIGNED_CLAUSE(BPF_LS_SIZE_B, int8_t);
-            SIMPLE_LDX_SIGNED_CLAUSE(BPF_LS_SIZE_H, int16_t);
-            SIMPLE_LDX_SIGNED_CLAUSE(BPF_LS_SIZE_W, int32_t);
-            SIMPLE_LDX_SIGNED_CLAUSE(BPF_LS_SIZE_DW, int64_t);
+            SIMPLE_LDX_SIGNED_CLAUSE(BPF_LS_SIZE_B, int8_t, 1);
+            SIMPLE_LDX_SIGNED_CLAUSE(BPF_LS_SIZE_H, int16_t, 2);
+            SIMPLE_LDX_SIGNED_CLAUSE(BPF_LS_SIZE_W, int32_t, 4);
+            SIMPLE_LDX_SIGNED_CLAUSE(BPF_LS_SIZE_DW, int64_t, 8);
 
         case BPF_CLASS_STX | BPF_LS_SIZE_W | BPF_LS_MODE_ATOMIC: {
             // 32-bit atomic operations
-            uint32_t old_value;
-            bool value_set = false;
-            if (insn->imm & 0x00) {
-                // Atomic add
-                // *(u32*)(dst+offset) += src;
-                old_value = __atomic_fetch_add((uint32_t *)(uintptr_t)(reg[insn->dst_reg] + insn->offset), reg[insn->src_reg], __ATOMIC_SEQ_CST);
-                value_set = true;
-            } else if (insn->imm & 0x40) {
-                // Atomic or
-                // *(u32*)(dst+offset) |= src;
-                old_value = __atomic_fetch_or((uint32_t *)(uintptr_t)(reg[insn->dst_reg] + insn->offset), reg[insn->src_reg], __ATOMIC_SEQ_CST);
-                value_set = true;
-            } else if (insn->imm & 0x50) {
-                // Atomic and
-                // *(u32*)(dst+offset) &= src;
-                old_value = __atomic_fetch_and((uint32_t *)(uintptr_t)(reg[insn->dst_reg] + insn->offset), reg[insn->src_reg], __ATOMIC_SEQ_CST);
-                value_set = true;
-            } else if (insn->imm & 0xa0) {
-                // Atomic xor
-                // *(u32*)(dst+offset) ^= src;
-                old_value = __atomic_fetch_xor((uint32_t *)(uintptr_t)(reg[insn->dst_reg] + insn->offset), reg[insn->src_reg], __ATOMIC_SEQ_CST);
-                value_set = true;
-            }
-            if (value_set)
-                reg[insn->src_reg] = old_value;
             if (insn->imm == BPF_ATOMIC_XCHG) {
                 __atomic_exchange((uint32_t *)(uintptr_t)(reg[insn->dst_reg] + insn->offset), (uint32_t *)&reg[insn->src_reg],
                                   (uint32_t *)&reg[insn->src_reg], __ATOMIC_SEQ_CST);
@@ -320,53 +315,79 @@ int ebpf_vm_run(ebpf_vm_t *vm, void *mem, size_t mem_len, uint64_t *return_value
                     reg[0] >>= 32;
                     reg[0] <<= 32;
                 }
+            } else {
+                uint32_t old_value;
+                bool value_set = false;
+                if (bit_test_mask(insn->imm, BPF_ATOMIC_OPERATION_MASK, BPF_ATOMIC_ADD)) {
+                    // Atomic add
+                    // *(u32*)(dst+offset) += src;
+                    old_value = __atomic_fetch_add((uint32_t *)(uintptr_t)(reg[insn->dst_reg] + insn->offset), reg[insn->src_reg], __ATOMIC_SEQ_CST);
+
+                } else if (bit_test_mask(insn->imm, BPF_ATOMIC_OPERATION_MASK, BPF_ATOMIC_OR)) {
+                    // Atomic or
+                    // *(u32*)(dst+offset) |= src;
+                    old_value = __atomic_fetch_or((uint32_t *)(uintptr_t)(reg[insn->dst_reg] + insn->offset), reg[insn->src_reg], __ATOMIC_SEQ_CST);
+
+                } else if (bit_test_mask(insn->imm, BPF_ATOMIC_OPERATION_MASK, BPF_ATOMIC_AND)) {
+                    // Atomic and
+                    // *(u32*)(dst+offset) &= src;
+                    old_value = __atomic_fetch_and((uint32_t *)(uintptr_t)(reg[insn->dst_reg] + insn->offset), reg[insn->src_reg], __ATOMIC_SEQ_CST);
+
+                } else if (bit_test_mask(insn->imm, BPF_ATOMIC_OPERATION_MASK, BPF_ATOMIC_XOR)) {
+                    // Atomic xor
+                    // *(u32*)(dst+offset) ^= src;
+                    old_value = __atomic_fetch_xor((uint32_t *)(uintptr_t)(reg[insn->dst_reg] + insn->offset), reg[insn->src_reg], __ATOMIC_SEQ_CST);
+                }
+                if (bit_test_mask(insn->imm, BPF_ATOMIC_FETCH_MASK, BPF_ATOMIC_FETCH))
+                    reg[insn->src_reg] = old_value;
             }
             break;
         }
         case BPF_CLASS_STX | BPF_LS_SIZE_DW | BPF_LS_MODE_ATOMIC: {
             // 64-bit atomic operations
-            uint64_t old_value;
-            bool value_set = false;
-            if (insn->imm & 0x00) {
-                // Atomic add
-                // *(u32*)(dst+offset) += src;
-                old_value = __atomic_fetch_add((uint64_t *)(uintptr_t)(reg[insn->dst_reg] + insn->offset), reg[insn->src_reg], __ATOMIC_SEQ_CST);
-                value_set = true;
-            } else if (insn->imm & 0x40) {
-                // Atomic or
-                // *(u32*)(dst+offset) |= src;
-                old_value = __atomic_fetch_or((uint64_t *)(uintptr_t)(reg[insn->dst_reg] + insn->offset), reg[insn->src_reg], __ATOMIC_SEQ_CST);
-                value_set = true;
-            } else if (insn->imm & 0x50) {
-                // Atomic and
-                // *(u32*)(dst+offset) &= src;
-                old_value = __atomic_fetch_and((uint64_t *)(uintptr_t)(reg[insn->dst_reg] + insn->offset), reg[insn->src_reg], __ATOMIC_SEQ_CST);
-                value_set = true;
-            } else if (insn->imm & 0xa0) {
-                // Atomic xor
-                // *(u32*)(dst+offset) ^= src;
-                old_value = __atomic_fetch_xor((uint64_t *)(uintptr_t)(reg[insn->dst_reg] + insn->offset), reg[insn->src_reg], __ATOMIC_SEQ_CST);
-                value_set = true;
-            }
-            if (value_set)
-                reg[insn->src_reg] = old_value;
+
             if (insn->imm == BPF_ATOMIC_XCHG) {
                 __atomic_exchange((uint64_t *)(uintptr_t)(reg[insn->dst_reg] + insn->offset), (uint64_t *)&reg[insn->src_reg],
                                   (uint64_t *)&reg[insn->src_reg], __ATOMIC_SEQ_CST);
             } else if (insn->imm == BPF_ATOMIC_CMPXCHG) {
-                if (!__atomic_compare_exchange_n((uint64_t *)(uintptr_t)(reg[insn->dst_reg] + insn->offset), &reg[0], reg[insn->src_reg], false,
-                                                 __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
+                if (!__atomic_compare_exchange_n((uint64_t *)(uintptr_t)(reg[insn->dst_reg] + insn->offset), (uint64_t *)&reg[0],
+                                                 (uint64_t)reg[insn->src_reg], false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
                     reg[0] = *(uint64_t *)(uintptr_t)(reg[insn->dst_reg] + insn->offset);
                 }
+            } else {
+                uint64_t old_value;
+                bool value_set = false;
+                if (bit_test_mask(insn->imm, BPF_ATOMIC_OPERATION_MASK, BPF_ATOMIC_ADD)) {
+                    // Atomic add
+                    // *(u32*)(dst+offset) += src;
+                    old_value = __atomic_fetch_add((uint64_t *)(uintptr_t)(reg[insn->dst_reg] + insn->offset), reg[insn->src_reg], __ATOMIC_SEQ_CST);
+
+                } else if (bit_test_mask(insn->imm, BPF_ATOMIC_OPERATION_MASK, BPF_ATOMIC_OR)) {
+                    // Atomic or
+                    // *(u32*)(dst+offset) |= src;
+                    old_value = __atomic_fetch_or((uint64_t *)(uintptr_t)(reg[insn->dst_reg] + insn->offset), reg[insn->src_reg], __ATOMIC_SEQ_CST);
+
+                } else if (bit_test_mask(insn->imm, BPF_ATOMIC_OPERATION_MASK, BPF_ATOMIC_AND)) {
+                    // Atomic and
+                    // *(u32*)(dst+offset) &= src;
+                    old_value = __atomic_fetch_and((uint64_t *)(uintptr_t)(reg[insn->dst_reg] + insn->offset), reg[insn->src_reg], __ATOMIC_SEQ_CST);
+
+                } else if (bit_test_mask(insn->imm, BPF_ATOMIC_OPERATION_MASK, BPF_ATOMIC_XOR)) {
+                    // Atomic xor
+                    // *(u32*)(dst+offset) ^= src;
+                    old_value = __atomic_fetch_xor((uint64_t *)(uintptr_t)(reg[insn->dst_reg] + insn->offset), reg[insn->src_reg], __ATOMIC_SEQ_CST);
+                }
+                if (bit_test_mask(insn->imm, BPF_ATOMIC_FETCH_MASK, BPF_ATOMIC_FETCH))
+                    reg[insn->src_reg] = old_value;
             }
             break;
         }
         case BPF_CLASS_LD | BPF_LS_SIZE_DW | BPF_LS_MODE_IMM: {
             // 64bit imm operations
-            uint32_t next_imm = insns[pc + 1].imm;
+            uint32_t next_imm = insns[pc].imm;
             pc++;
             if (insn->src_reg == 0) {
-                reg[insn->dst_reg] = (((uint64_t)next_imm << 32) | insn->imm);
+                reg[insn->dst_reg] = (((uint64_t)next_imm << 32) | (uint64_t)(uint32_t)insn->imm);
             } else if (insn->src_reg == 1) {
                 reg[insn->dst_reg] = vm->map_by_fd(insn->imm);
             } else if (insn->src_reg == 2) {

@@ -24,3 +24,5 @@ target_include_directories(
 )
 
 set_target_properties(libebpf PROPERTIES C_STANDARD 11)
+
+add_subdirectory(test)

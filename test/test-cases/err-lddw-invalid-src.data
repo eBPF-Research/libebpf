@@ -1,0 +1,5 @@
+-- raw
+0x5566778800001118
+0x0000000000000000
+-- error
+Failed to load code: Requires map_by_fd to be set at pc 0 for lddw helpers imm 1

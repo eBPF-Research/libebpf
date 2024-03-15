@@ -16,10 +16,10 @@ struct libebpf_insn {
             uint8_t mode : 3;
         } code_load_store;
     };
-    uint8_t src_reg : 4;
     uint8_t dst_reg : 4;
-    uint16_t offset;
-    uint32_t imm;
+    uint8_t src_reg : 4;
+    int16_t offset;
+    int32_t imm;
 };
 
 #define BPF_CLASS_LD 0x00
@@ -31,12 +31,13 @@ struct libebpf_insn {
 #define BPF_CLASS_JMP32 0x06
 #define BPF_CLASS_ALU64 0x07
 
+#define BPF_CLASS_MASK 0x07
+
 #define BPF_SOURCE_K 0x00
 #define BPF_SOURCE_X 0x08
 
 #define BPF_SOURCE_IMM BPF_SOURCE_K
 #define BPF_SOURCE_REG BPF_SOURCE_X
-
 
 #define BPF_ALU_ADD 0x00
 #define BPF_ALU_SUB 0x10
@@ -52,6 +53,10 @@ struct libebpf_insn {
 #define BPF_ALU_MOV_MOVSX 0xb0
 #define BPF_ALU_ARSH 0xc0
 #define BPF_ALU_END 0xd0
+
+#define BPF_ALU_CODE_MASK 0xf0
+#define BPF_ALU_SOURCE_MASK 0x8
+#define BPF_ALU_CLASS_MASK BPF_CLASS_MASK
 
 #define BPF_END_TO_LE 0x00
 #define BPF_END_TO_BE 0x08
@@ -71,12 +76,18 @@ struct libebpf_insn {
 #define BPF_JMP_JSLT 0xc0
 #define BPF_JMP_JSLE 0xd0
 
+#define BPF_JMP_CODE_MASK BPF_ALU_CODE_MASK
+#define BPF_JMP_SOURCE_MASK BPF_ALU_SOURCE_MASK
+#define BPF_JMP_CLASS_MASK BPF_CLASS_MASK
+
 #define BPF_LS_MODE_IMM 0x00
 #define BPF_LS_MODE_ABS 0x20
 #define BPF_LS_MODE_IND 0x40
 #define BPF_LS_MODE_MEM 0x60
 #define BPF_LS_MODE_MEMSX 0x80
 #define BPF_LS_MODE_ATOMIC 0xc0
+
+#define BPF_LS_MODE_MASK 0xe0
 
 // Byte
 #define BPF_LS_SIZE_B 0x10
@@ -87,6 +98,9 @@ struct libebpf_insn {
 // 8 bytes
 #define BPF_LS_SIZE_DW 0x18
 
+#define BPF_LS_SIZE_MASK 0x18
+
+
 #define BPF_ATOMIC_ADD 0x00
 #define BPF_ATOMIC_OR 0x40
 #define BPF_ATOMIC_AND 0x50
@@ -94,5 +108,8 @@ struct libebpf_insn {
 #define BPF_ATOMIC_FETCH 0x01
 #define BPF_ATOMIC_XCHG (0xe0 | BPF_ATOMIC_FETCH)
 #define BPF_ATOMIC_CMPXCHG (0xf0 | BPF_ATOMIC_FETCH)
+
+#define BPF_ATOMIC_OPERATION_MASK 0xf0
+#define BPF_ATOMIC_FETCH_MASK 0x01
 
 #endif

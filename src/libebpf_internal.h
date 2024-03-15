@@ -5,6 +5,7 @@
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <stdbool.h>
 struct ebpf_external_helper_definition {
     char name[MAX_EXTERNAL_HELPER_NAME_LENGTH];
     ebpf_external_helper_fn fn;
@@ -19,7 +20,10 @@ struct ebpf_vm {
     ebpf_map_val_callback map_val;
     ebpf_code_addr_callback code_addr;
     ebpf_var_addr_callback var_addr;
+    bool bounds_check_enabled;
 };
+
+extern char _libebpf_global_error_string[1024];
 
 static int ebpf_set_error_string(const char *fmt, ...) {
     const char *fmt_str = (const char *)fmt;
@@ -28,12 +32,20 @@ static int ebpf_set_error_string(const char *fmt, ...) {
 #pragma GCC diagnostic ignored "-Wformat-nonliteral"
 #pragma GCC diagnostic ignored "-Wvarargs"
     va_start(args, fmt_str);
-    long ret = vprintf(fmt_str, args);
+    long ret = vsnprintf(_libebpf_global_error_string, sizeof(_libebpf_global_error_string), fmt_str, args);
 #pragma GCC diagnostic pop
     va_end(args);
     return ret;
 }
 
 int ebpf_vm_verify(ebpf_vm_t *vm, const struct libebpf_insn *code, size_t code_len);
+static inline int bit_test(uint64_t m, uint64_t pat) {
+    return (m & pat) == pat;
+}
+static inline int bit_test_mask(uint64_t m, uint64_t msk, uint64_t pat) {
+    return (m & msk) == pat;
+}
+extern ebpf_malloc _libebpf_global_malloc;
+extern ebpf_free _libebpf_global_free;
 
 #endif

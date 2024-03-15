@@ -6,38 +6,38 @@
 #include <stdlib.h>
 #include <libebpf_internal.h>
 
-static ebpf_malloc global_malloc = &malloc;
-static ebpf_free global_free = &free;
+ebpf_malloc _libebpf_global_malloc = &malloc;
+ebpf_free _libebpf_global_free = &free;
 
-static char global_error_string[1024] = "";
+char _libebpf_global_error_string[1024] = "";
 
 void ebpf_set_global_memory_allocator(ebpf_malloc malloc, ebpf_free free) {
-    global_malloc = malloc;
-    global_free = free;
+    _libebpf_global_malloc = malloc;
+    _libebpf_global_free = free;
 }
 
 const char *ebpf_error_string() {
-    return global_error_string;
+    return _libebpf_global_error_string;
 }
 
 ebpf_vm_t *ebpf_vm_create() {
-    ebpf_vm_t *vm = global_malloc(sizeof(ebpf_vm_t));
+    ebpf_vm_t *vm = _libebpf_global_malloc(sizeof(ebpf_vm_t));
     if (!vm) {
         ebpf_set_error_string("global_malloc returned NULL when allocating ebpf_vm");
         return NULL;
     }
     memset(vm, 0, sizeof(*vm));
-    vm->helpers = global_malloc(sizeof(ebpf_external_helper_fn) * MAX_EXTERNAL_HELPER);
+    vm->helpers = _libebpf_global_malloc(sizeof(ebpf_external_helper_fn) * MAX_EXTERNAL_HELPER);
     if (!vm->helpers) {
         ebpf_set_error_string("global_malloc returned NULL when allocating helpers");
-        global_free(vm);
+        _libebpf_global_free(vm);
         return NULL;
     }
-
+    vm->bounds_check_enabled = true;
     return vm;
 }
 void ebpf_vm_destroy(ebpf_vm_t *vm) {
-    global_free(vm);
+    _libebpf_global_free(vm);
 }
 
 int ebpf_vm_register_external_helper(ebpf_vm_t *vm, size_t index, const char *name, ebpf_external_helper_fn fn) {
@@ -51,10 +51,14 @@ int ebpf_vm_register_external_helper(ebpf_vm_t *vm, size_t index, const char *na
 }
 
 int ebpf_vm_load_instructions(ebpf_vm_t *vm, const struct libebpf_insn *code, size_t code_len) {
-    if (vm->insns) {
-        global_free(vm->insns);
+    int err;
+    if ((err = ebpf_vm_verify(vm, code, code_len)) < 0) {
+        return err;
     }
-    vm->insns = global_malloc(sizeof(struct libebpf_insn) * code_len);
+    if (vm->insns) {
+        _libebpf_global_free(vm->insns);
+    }
+    vm->insns = _libebpf_global_malloc(sizeof(struct libebpf_insn) * code_len);
     if (!vm->insns) {
         ebpf_set_error_string("Failed to call malloc");
         return -ENOMEM;
@@ -64,7 +68,7 @@ int ebpf_vm_load_instructions(ebpf_vm_t *vm, const struct libebpf_insn *code, si
 }
 void ebpf_vm_unload_instructions(ebpf_vm_t *vm) {
     if (vm->insns) {
-        global_free(vm->insns);
+        _libebpf_global_free(vm->insns);
         vm->insns = NULL;
         vm->insn_cnt = 0;
     }
