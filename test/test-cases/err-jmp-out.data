@@ -1,0 +1,5 @@
+-- asm
+ja +2
+exit
+-- error
+Failed to load code: JA at 0 jumps out of the program

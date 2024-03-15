@@ -13,6 +13,8 @@ add_library(
   libebpf
   STATIC
   src/libebpf.c
+  src/libebpf_vm.c
+  src/libebpf_verify.c
 )
 
 target_include_directories(
@@ -22,3 +24,5 @@ target_include_directories(
 )
 
 set_target_properties(libebpf PROPERTIES C_STANDARD 11)
+
+add_subdirectory(test)
