@@ -367,7 +367,21 @@ int ebpf_vm_run(ebpf_vm_t *vm, void *mem, size_t mem_len, uint64_t *return_value
             pc++;
             if (insn->src_reg == 0) {
                 reg[insn->dst_reg] = (((uint64_t)next_imm << 32) | insn->imm);
+            } else if (insn->src_reg == 1) {
+                reg[insn->dst_reg] = vm->map_by_fd(insn->imm);
+            } else if (insn->src_reg == 2) {
+                reg[insn->dst_reg] = (uintptr_t)(vm->map_val(vm->map_by_fd(insn->imm)) + next_imm);
+            } else if (insn->src_reg == 3) {
+                reg[insn->dst_reg] = (uintptr_t)vm->var_addr(insn->imm);
+            } else if (insn->src_reg == 4) {
+                reg[insn->dst_reg] = (uintptr_t)vm->code_addr(insn->imm);
+            } else if (insn->src_reg == 5) {
+                reg[insn->dst_reg] = (uintptr_t)vm->map_by_idx(insn->imm);
+            } else if (insn->src_reg == 6) {
+                reg[insn->dst_reg] = (uintptr_t)(vm->map_val(vm->map_by_idx(insn->imm)) + next_imm);
             }
+
+            break;
         }
         }
     }
