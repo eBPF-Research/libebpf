@@ -1,6 +1,5 @@
 # pypi version of parcon does not support python3
-git+https://github.com/javawizard/parcon
-nose ~= 1.3.7
+git+https://github.com/rprinz08/parcon
 pyelftools ~= 0.29
 pytest
 colorama

@@ -3,7 +3,7 @@ import tempfile
 import struct
 import re
 from subprocess import Popen, PIPE
-from nose.plugins.skip import Skip, SkipTest
+# from nose.plugins.skip import Skip, SkipTest
 import ebpf.assembler
 import testdata
 import pytest
@@ -19,11 +19,11 @@ def check_datafile(filename):
     """
     data = testdata.read(_test_data_dir, filename)
     if 'asm' not in data and 'raw' not in data:
-        raise SkipTest("no asm or raw section in datafile")
+        pytest.skip("no asm or raw section in datafile")
     if 'result' not in data and 'error' not in data and 'error pattern' not in data:
-        raise SkipTest("no result or error section in datafile")
+        pytest.skip("no result or error section in datafile")
     if not os.path.exists(VM):
-        raise SkipTest("VM not found: ", VM)
+        pytest.skip(f"VM not found: {VM}")
 
     if 'raw' in data:
         code = b''.join(struct.pack("=Q", x) for x in data['raw'])
