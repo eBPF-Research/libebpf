@@ -1,5 +1,5 @@
 #include "libebpf_insn.h"
-#include "misc.h"
+#include <errno.h>
 #include <string.h>
 #define _GNU_SOURCE
 #include <libebpf.h>

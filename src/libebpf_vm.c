@@ -1,6 +1,6 @@
 #include "libebpf_insn.h"
-#include "misc.h"
 #include <assert.h>
+#include <errno.h>
 #include <stdio.h>
 #include <libebpf.h>
 #include <libebpf_internal.h>
