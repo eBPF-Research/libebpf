@@ -1,5 +1,5 @@
 #include "libebpf_insn.h"
-#include <asm-generic/errno-base.h>
+#include "misc.h"
 #include <assert.h>
 #include <stdio.h>
 #include <libebpf.h>

@@ -11,8 +11,8 @@ Add this directory into your CMake project, and links target `libebpf`. See `lib
 
 ## How to run tests?
 
-- Build CMake target `libebpf_test_runner`
-- `cd test && python3.8 -m venv env`
+- Build CMake target `libebpf_test_runner` (bash build.sh)
+- `cd test && python3 -m venv env`
 - `source ./env/bin/activate`
 - `pip install -r requirements.txt`
 - `pytest`

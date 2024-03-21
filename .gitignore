@@ -5,6 +5,7 @@ CMakeFiles/*
 [Tt]esting/*
 ebpf_code.h
 vm-exten.btf
+.idea
 
 ### VisualStudioCode ###
 .vscode/settings.json
@@ -35,5 +36,11 @@ documents/elfoffset/*.txt
 documents/elfoffset/maps
 Catch2
 
+# py env
+venv
+env
+
+# output
 /build
 /testb*
+/cmake-*

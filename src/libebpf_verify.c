@@ -1,7 +1,7 @@
 #include "libebpf.h"
 #include "libebpf_internal.h"
 #include "libebpf_insn.h"
-#include <asm-generic/errno-base.h>
+#include "misc.h"
 #include <stdbool.h>
 #include <string.h>
 
