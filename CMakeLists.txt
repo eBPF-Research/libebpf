@@ -16,7 +16,6 @@ add_library(
   src/libebpf_vm.c
   src/libebpf_vm_verify.c
   src/libebpf_execution.c
-  src/libebpf_vm.c
 )
 
 target_include_directories(

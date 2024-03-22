@@ -31,7 +31,7 @@ BinPackParameters: true
 BraceWrapping:
   AfterClass: false
   AfterControlStatement: true
-  AfterEnum: false
+  AfterEnum: true
   AfterFunction: true
   AfterNamespace: true
   AfterObjCDeclaration: false

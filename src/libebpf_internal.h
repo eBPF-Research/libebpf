@@ -6,6 +6,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <string.h>
 struct ebpf_external_helper_definition {
     char name[MAX_EXTERNAL_HELPER_NAME_LENGTH];
     ebpf_external_helper_fn fn;
@@ -26,15 +27,17 @@ struct ebpf_vm {
 extern char _libebpf_global_error_string[1024];
 
 static int ebpf_set_error_string(const char *fmt, ...) {
+    char output_buf[1024];
     const char *fmt_str = (const char *)fmt;
     va_list args;
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-nonliteral"
 #pragma GCC diagnostic ignored "-Wvarargs"
     va_start(args, fmt_str);
-    long ret = vsnprintf(_libebpf_global_error_string, sizeof(_libebpf_global_error_string), fmt_str, args);
+    long ret = vsnprintf(output_buf, sizeof(output_buf), fmt_str, args);
 #pragma GCC diagnostic pop
     va_end(args);
+    strncpy(_libebpf_global_error_string, output_buf, sizeof(_libebpf_global_error_string));
     return ret;
 }
 

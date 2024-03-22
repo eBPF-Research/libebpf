@@ -1,6 +1,7 @@
 #ifndef _LIBEBPF_EXECUTION_INTERNAL_H
 #define _LIBEBPF_EXECUTION_INTERNAL_H
 
+#include "libebpf_map.h"
 #include "utils/spinlock.h"
 
 #define LIBEBPF_MAX_MAP_COUNT 100
@@ -9,5 +10,24 @@ struct ebpf_execution_context {
     struct ebpf_map *maps[LIBEBPF_MAX_MAP_COUNT];
     ebpf_spinlock_t map_alloc_lock;
 };
+
+struct ebpf_map {
+    struct ebpf_map_attr attr;
+    void *map_private_data;
+    struct ebpf_map_ops *ops;
+    char name[100];
+};
+
+struct ebpf_map_ops {
+    bool used;
+    int (*alloc_map)(struct ebpf_map *map, struct ebpf_map_attr *attr);
+    void (*map_free)(struct ebpf_map *map);
+    int (*elem_lookup)(struct ebpf_map *map, const void *key, void *value);
+    int (*elem_update)(struct ebpf_map *map, const void *key, const void *value, uint64_t flags);
+    int (*elem_delete)(struct ebpf_map *map, const void *key);
+    int (*map_get_next_key)(struct ebpf_map *map, const void *key, void *next_key);
+};
+
+extern struct ebpf_map_ops map_ops[(int)__MAX_BPF_MAP_TYPE];
 
 #endif

@@ -54,4 +54,57 @@ struct ebpf_map_attr {
  */
 int ebpf_execution_context__map_create(ebpf_execution_context_t *ctx, const char *map_name, struct ebpf_map_attr *attr);
 
+/**
+ * @brief Destroy a specified map
+ *
+ * @param ctx Context
+ * @param map_id ID of the map
+ * @return int 0 if succeeded. Otherwise failed.
+ */
+int ebpf_execution_context__map_destroy(ebpf_execution_context_t *ctx, int map_id);
+
+/**
+ * @brief Lookup a key in a certain map
+ *
+ * @param ctx Context
+ * @param map_id ID of the map
+ * @param key Buffer to the key. Must be in size of at least key_size
+ * @param value Buffer to the value. Must be in size of at least value_size
+ * @return int 0 if succeeded, and value buffer will be updated. Otherwise failed.
+ */
+int ebpf_execution_context__map_elem_lookup(ebpf_execution_context_t *ctx, int map_id, const void *key, void *value);
+
+/**
+ * @brief Update a (key, value) pair in a certain map
+ *
+ * @param ctx Context
+ * @param map_id ID of the map
+ * @param key Buffer to the key
+ * @param value Buffer to the value
+ * @param flags Map-specified flags
+ * @return int 0 if succeeded, otherwise failed.
+ */
+int ebpf_execution_context__map_elem_update(ebpf_execution_context_t *ctx, int map_id, const void *key, const void *value, uint64_t flags);
+
+/**
+ * @brief Delete an element from the map
+ *
+ * @param ctx Context
+ * @param map_id ID of the map
+ * @param key Buffer to the key
+ * @return int 0 if succeeded, otherwise failed
+ */
+int ebpf_execution_context__map_elem_delete(ebpf_execution_context_t *ctx, int map_id, const void *key);
+
+/**
+ * @brief Get the next key after the given key
+ *
+ * @param ctx Context
+ * @param map_id ID of the map
+ * @param key Buffer to the given key. If set to NULL, will get the first key
+ * @param next_key Buffer to store the nexy key
+ * @return int -ENOENT if key is the last key. Other negative values mean an error. Positive if succeeded
+ */
+int ebpf_execution_context__map_get_next_key(ebpf_execution_context_t *ctx, int map_id, const void *key, void *next_key);
+
 #endif
