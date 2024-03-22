@@ -59,7 +59,7 @@ static int array_map__map_get_next_key(struct ebpf_map *map, const void *key, vo
         return 0;
     }
     uint32_t idx = *(uint32_t *)key;
-    if (idx >= map->attr.max_ents) {
+    if (idx >= map->attr.max_ents - 1) {
         ebpf_set_error_string("Already last index");
         return -ENOENT;
     }

@@ -1,0 +1,20 @@
+add_subdirectory(catch2)
+
+add_executable(
+    ebpf_execution_context_test
+    ./test_map.cpp
+)
+
+add_dependencies(ebpf_execution_context_test
+    Catch2
+    libebpf
+)
+target_link_libraries(ebpf_execution_context_test
+    PRIVATE
+    libebpf
+    Catch2::Catch2WithMain
+)
+
+target_include_directories(ebpf_execution_context_test PRIVATE ${Catch2_INCLUDE})
+
+set_target_properties(ebpf_execution_context_test PROPERTIES CXX_STANDARD 20 LINKER_LANGUAGE CXX) 

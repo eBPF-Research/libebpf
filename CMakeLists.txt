@@ -6,7 +6,7 @@ cmake_minimum_required(VERSION 3.15)
 project(
   "libebpf"
   VERSION 0.1.0
-  LANGUAGES C
+  LANGUAGES C CXX
 )
 
 add_library(
@@ -16,6 +16,7 @@ add_library(
   src/libebpf_vm.c
   src/libebpf_vm_verify.c
   src/libebpf_execution.c
+  src/libebpf_map_implementation.c
 )
 
 target_include_directories(
@@ -24,6 +25,7 @@ target_include_directories(
   PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-set_target_properties(libebpf PROPERTIES C_STANDARD 11)
+set_target_properties(libebpf PROPERTIES C_STANDARD 11 PREFIX "")
 
-add_subdirectory(test)
+add_subdirectory(vm-test)
+add_subdirectory(execution-test)

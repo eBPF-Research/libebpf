@@ -4,7 +4,7 @@
 #include <libebpf_execution.h>
 #include "libebpf_internal.h"
 #include <errno.h>
-ebpf_execution_context_t *ebpf_execution_context_create() {
+ebpf_execution_context_t *ebpf_execution_context__create() {
     ebpf_execution_context_t *ctx = _libebpf_global_malloc(sizeof(ebpf_execution_context_t));
     memset(ctx, 0, sizeof(*ctx));
     if (!ctx) {
@@ -15,15 +15,19 @@ ebpf_execution_context_t *ebpf_execution_context_create() {
     return ctx;
 }
 
-void ebpf_execution_context_destroy(ebpf_execution_context_t *ctx) {
+void ebpf_execution_context__destroy(ebpf_execution_context_t *ctx) {
+    // Destroy maps
+    for (int i = 0; i < sizeof(ctx->maps) / sizeof(ctx->maps[0]); i++) {
+        if (ctx->maps[i])
+            _libebpf_global_free(ctx->maps[i]);
+    }
     _libebpf_global_free(ctx);
 }
-
 
 int ebpf_execution_context__map_create(ebpf_execution_context_t *ctx, const char *map_name, struct ebpf_map_attr *attr) {
     ebpf_spinlock_lock(&ctx->map_alloc_lock);
     int result = -1;
-    int idx;
+    int idx = -1;
     if (attr->type < 0 || attr->type >= sizeof(map_ops) / sizeof(map_ops[0]) || !map_ops[attr->type].used) {
         ebpf_set_error_string("Invalid or unsupported map type %d", attr->type);
         result = -EINVAL;
@@ -32,9 +36,10 @@ int ebpf_execution_context__map_create(ebpf_execution_context_t *ctx, const char
     for (int i = 0; i < LIBEBPF_MAX_MAP_COUNT; i++) {
         if (!ctx->maps[i]) {
             idx = i;
+            break;
         }
     }
-    if (result == -1) {
+    if (idx == -1) {
         ebpf_set_error_string("No map slots available");
         result = -ENOMEM;
         goto cleanup;
@@ -73,6 +78,7 @@ int ebpf_execution_context__map_destroy(ebpf_execution_context_t *ctx, int map_i
     }
     ctx->maps[map_id]->ops->map_free(ctx->maps[map_id]);
     _libebpf_global_free(ctx->maps[map_id]);
+    ctx->maps[map_id] = NULL;
 cleanup:
     ebpf_spinlock_unlock(&ctx->map_alloc_lock);
     return result;

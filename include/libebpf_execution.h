@@ -19,14 +19,14 @@ typedef struct ebpf_execution_context ebpf_execution_context_t;
  *
  * @return ebpf_execution_context_t* A pointer to the context if succeeded. NULL if failed. Call ebpf_error_string to get error details.
  */
-ebpf_execution_context_t *ebpf_execution_context_create();
+ebpf_execution_context_t *ebpf_execution_context__create();
 
 /**
  * @brief Destroy the execution context
  *
  * @param ctx Pointer to the context
  */
-void ebpf_execution_context_destroy(ebpf_execution_context_t *ctx);
+void ebpf_execution_context__destroy(ebpf_execution_context_t *ctx);
 
 
 #ifdef __cplusplus

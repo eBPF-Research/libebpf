@@ -2,6 +2,11 @@
 #define _LIBEBPF_MAP_H
 #include "libebpf_execution.h"
 #include <stdint.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * @brief Map types that we support
  * All maps are ensured to be thread safe. Locks are spin lock.
@@ -107,4 +112,7 @@ int ebpf_execution_context__map_elem_delete(ebpf_execution_context_t *ctx, int m
  */
 int ebpf_execution_context__map_get_next_key(ebpf_execution_context_t *ctx, int map_id, const void *key, void *next_key);
 
+#ifdef __cplusplus
+}
+#endif
 #endif
