@@ -8,12 +8,13 @@
 
 ebpf_malloc _libebpf_global_malloc = &malloc;
 ebpf_free _libebpf_global_free = &free;
-
+ebpf_realloc _libebpf_global_realloc = &realloc;
 char _libebpf_global_error_string[1024] = "";
 
-void ebpf_set_global_memory_allocator(ebpf_malloc malloc, ebpf_free free) {
+void ebpf_set_global_memory_allocator(ebpf_malloc malloc, ebpf_free free, ebpf_realloc realloc) {
     _libebpf_global_malloc = malloc;
     _libebpf_global_free = free;
+    _libebpf_global_realloc = realloc;
 }
 
 const char *ebpf_error_string() {

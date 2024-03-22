@@ -23,12 +23,19 @@ typedef void *(*ebpf_malloc)(size_t size);
 typedef void (*ebpf_free)(void *mem);
 
 /**
+ * @brief Function prototype for global custom re-alloc
+ *
+ */
+typedef void *(*ebpf_realloc)(void *, size_t);
+
+/**
  * @brief Set the global memory allocator. If not set, default to malloc & free in stdlib.h
  *
  * @param malloc The malloc function
  * @param free The free function
+ * @param realloc The realloc function
  */
-void ebpf_set_global_memory_allocator(ebpf_malloc malloc, ebpf_free free);
+void ebpf_set_global_memory_allocator(ebpf_malloc malloc, ebpf_free free, ebpf_realloc realloc);
 
 /**
  * @brief Get the global error string
