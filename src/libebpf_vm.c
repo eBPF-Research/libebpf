@@ -5,8 +5,8 @@
 #include <libebpf.h>
 #include <libebpf_internal.h>
 #include <stdint.h>
-#include "ends_conversion.h"
-#include "clause_helpers.h"
+#include "utils/ends_conversion.h"
+#include "utils/clause_helpers.h"
 #include <stdbool.h>
 
 struct local_function_stack_state {
