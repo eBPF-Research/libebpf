@@ -18,3 +18,5 @@ target_link_libraries(ebpf_execution_context_test
 target_include_directories(ebpf_execution_context_test PRIVATE ${Catch2_INCLUDE})
 
 set_target_properties(ebpf_execution_context_test PROPERTIES CXX_STANDARD 20 LINKER_LANGUAGE CXX) 
+target_compile_options(ebpf_execution_context_test PRIVATE -fsanitize=address -fsanitize=undefined)
+target_link_options(ebpf_execution_context_test PRIVATE -fsanitize=address -fsanitize=undefined)

@@ -5,6 +5,7 @@
 #include "libebpf_map.h"
 #include "utils/hashmap.h"
 #include "utils/spinlock.h"
+#include <stdio.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <errno.h>
@@ -115,6 +116,7 @@ static int hash_map__alloc(struct ebpf_map *map, struct ebpf_map_attr *attr) {
 
 static void hash_map__free(struct ebpf_map *map) {
     hashmap_free(((struct ebpf_hashmap_private_data *)map->map_private_data)->hashmap);
+    _libebpf_global_free(map->map_private_data);
 }
 
 static int hash_map__elem_lookup(struct ebpf_map *map, const void *key, void *value) {
@@ -167,15 +169,13 @@ static int hash_map__elem_delete(struct ebpf_map *map, const void *key) {
     struct ebpf_hashmap_private_data *priv_data = map->map_private_data;
     ebpf_spinlock_lock(&priv_data->lock);
     struct ebpf_hashmap_entry *out = (struct ebpf_hashmap_entry *)hashmap_delete(priv_data->hashmap, &entry);
-    int err = 0;
+    ebpf_spinlock_unlock(&priv_data->lock);
     if (!out) {
         ebpf_set_error_string("Element not found");
-        err = -ENOENT;
-        goto cleanup;
+        return -ENOENT;
     }
-cleanup:
-    ebpf_spinlock_unlock(&priv_data->lock);
-    return err;
+    entry_free(out);
+    return 0;
 }
 static int hash_map__map_get_next_key(struct ebpf_map *map, const void *key, void *next_key) {
     struct ebpf_hashmap_private_data *priv_data = map->map_private_data;
