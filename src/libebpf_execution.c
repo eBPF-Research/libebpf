@@ -75,7 +75,7 @@ cleanup:
 int ebpf_execution_context__map_destroy(ebpf_execution_context_t *ctx, int map_id) {
     ebpf_spinlock_lock(&ctx->map_alloc_lock);
     int result = 0;
-    if (!ctx->maps[map_id]) {
+    if (!ctx->maps[map_id] || map_id < 0 || map_id >= LIBEBPF_MAX_MAP_COUNT) {
         ebpf_set_error_string("Invalid map_id %d", map_id);
         result = -EINVAL;
         goto cleanup;
@@ -89,36 +89,49 @@ cleanup:
 }
 
 int ebpf_execution_context__map_elem_lookup(ebpf_execution_context_t *ctx, int map_id, const void *key, void *value) {
-    struct ebpf_map *map = ctx->maps[map_id];
-    if (!map) {
+    if (map_id < 0 || map_id >= LIBEBPF_MAX_MAP_COUNT || !ctx->maps[map_id]) {
         ebpf_set_error_string("Invalid map_id: %d", map_id);
         return -EINVAL;
     }
+    struct ebpf_map *map = ctx->maps[map_id];
     return map->ops->elem_lookup(map, key, value);
 }
 
 int ebpf_execution_context__map_elem_update(ebpf_execution_context_t *ctx, int map_id, const void *key, const void *value, uint64_t flags) {
-    struct ebpf_map *map = ctx->maps[map_id];
-    if (!map) {
+    if (map_id < 0 || map_id >= LIBEBPF_MAX_MAP_COUNT || !ctx->maps[map_id]) {
         ebpf_set_error_string("Invalid map_id: %d", map_id);
         return -EINVAL;
     }
+    struct ebpf_map *map = ctx->maps[map_id];
     return map->ops->elem_update(map, key, value, flags);
 }
 int ebpf_execution_context__map_elem_delete(ebpf_execution_context_t *ctx, int map_id, const void *key) {
-    struct ebpf_map *map = ctx->maps[map_id];
-    if (!map) {
+    if (map_id < 0 || map_id >= LIBEBPF_MAX_MAP_COUNT || !ctx->maps[map_id]) {
         ebpf_set_error_string("Invalid map_id: %d", map_id);
         return -EINVAL;
     }
+    struct ebpf_map *map = ctx->maps[map_id];
     return map->ops->elem_delete(map, key);
 }
 
 int ebpf_execution_context__map_get_next_key(ebpf_execution_context_t *ctx, int map_id, const void *key, void *next_key) {
-    struct ebpf_map *map = ctx->maps[map_id];
-    if (!map) {
+    if (map_id < 0 || map_id >= LIBEBPF_MAX_MAP_COUNT || !ctx->maps[map_id]) {
         ebpf_set_error_string("Invalid map_id: %d", map_id);
         return -EINVAL;
     }
+    struct ebpf_map *map = ctx->maps[map_id];
     return map->ops->map_get_next_key(map, key, next_key);
+}
+
+struct ringbuf_map_private_data *ebpf_execution_context__get_ringbuf_map_private_data(ebpf_execution_context_t *ctx, int map_id) {
+    if (map_id < 0 || map_id >= LIBEBPF_MAX_MAP_COUNT || !ctx->maps[map_id]) {
+        ebpf_set_error_string("Invalid map_id: %d", map_id);
+        return NULL;
+    }
+    struct ebpf_map *map = ctx->maps[map_id];
+    if (map->attr.type != EBPF_MAP_TYPE_RINGBUF) {
+        ebpf_set_error_string("Map id %d is not a ringbuf map", map_id);
+        return NULL;
+    }
+    return map->map_private_data;
 }

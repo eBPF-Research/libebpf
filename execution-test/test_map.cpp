@@ -1,14 +1,18 @@
 #include "libebpf_execution.h"
 #include "libebpf_map.h"
+#include "libebpf_map_ringbuf.h"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include <cerrno>
+#include <chrono>
 #include <cstdint>
 #include <cstring>
 #include <map>
 #include <random>
+#include <set>
 #include <string>
 #include <vector>
+#include <thread>
 
 struct hashmap_value {
     int a;
@@ -110,5 +114,85 @@ TEST_CASE("Test array map") {
     REQUIRE(ebpf_execution_context__map_get_next_key(ctx, id, &key, &key) == -ENOENT);
     REQUIRE(ebpf_execution_context__map_destroy(ctx, id) == 0);
     REQUIRE(ebpf_execution_context__map_get_next_key(ctx, id, &key, &key) < 0);
+    ebpf_execution_context__destroy(ctx);
+}
+
+static int handle_event(void *ctx, void *data, int len) {
+    auto &vec = *(std::vector<std::vector<uint8_t> > *)ctx;
+    std::vector<uint8_t> curr((uint8_t *)data, (uint8_t *)data + len);
+    vec.push_back(curr);
+    return 0;
+}
+
+bool operator<(const std::vector<uint8_t> &a, const std::vector<uint8_t> &b) {
+    if (a.size() != b.size())
+        return a.size() < b.size();
+    return memcmp(a.data(), b.data(), a.size()) < 0;
+}
+
+TEST_CASE("Test ringbuf map") {
+    ebpf_execution_context_t *ctx = ebpf_execution_context__create();
+    REQUIRE(ctx != nullptr);
+    struct ebpf_map_attr attr {
+        .type = EBPF_MAP_TYPE_RINGBUF, .max_ents = 256 * 1024, .flags = 0,
+    };
+    int id = ebpf_execution_context__map_create(ctx, "my_map", &attr);
+    REQUIRE(id >= 0);
+
+    std::mt19937 gen;
+    gen.seed(std::random_device()());
+    std::uniform_int_distribution<uint8_t> rand_bytes(0, 255);
+
+    std::vector<std::vector<uint8_t> > rand_data;
+    // Generate 10 pieces of random sized data
+    for (int i = 1; i <= 10; i++) {
+        size_t size = rand_bytes(gen);
+        std::vector<uint8_t> curr;
+        for (int j = 1; j <= size; j++)
+            curr.push_back(rand_bytes(gen));
+        rand_data.push_back(curr);
+    }
+    auto priv_data = ebpf_execution_context__get_ringbuf_map_private_data(ctx, id);
+    REQUIRE(priv_data != nullptr);
+    auto producer = std::thread([=]() {
+        std::vector<void *> buffers;
+        // Produce data
+        for (const auto &section : rand_data) {
+            auto buffer = ringbuf_map_reserve(priv_data, section.size());
+            REQUIRE(buffer != nullptr);
+            buffers.push_back(buffer);
+        }
+        for (size_t i = 0; i < buffers.size(); i++) {
+            memcpy(buffers[i], rand_data[i].data(), rand_data[i].size());
+        }
+        for (size_t i = 0; i < buffers.size(); i++) {
+            // Discard if i is even
+            ringbuf_map_submit(priv_data, buffers[i], i % 2 == 0);
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        }
+    });
+    auto consumer = std::thread([=]() {
+        std::vector<std::vector<uint8_t> > received_buffer;
+        // There should be five pieces of random data
+        while (received_buffer.size() < 5) {
+            ringbuf_map_fetch_data(priv_data, &received_buffer, handle_event);
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+        // Compare if the received data are equal to the sended ones
+        std::set<std::vector<uint8_t> > s1, s2;
+        for (auto x : received_buffer)
+            s1.insert(x);
+        for (int i = 0; i < 5; i++)
+            s2.insert(rand_data[i * 2 + 1]);
+        REQUIRE(s1.size() == s2.size());
+        for (const auto &x : s1) {
+            REQUIRE(s2.count(x) == 1);
+        }
+    });
+    producer.join();
+    consumer.join();
+
+    REQUIRE(ebpf_execution_context__map_destroy(ctx, id) == 0);
+
     ebpf_execution_context__destroy(ctx);
 }

@@ -8,21 +8,30 @@
 
 #define ARG_PAGE_SIZE 16
 
-#define READ_ONCE(x) (*(volatile typeof(x) *)&x)
-#define WRITE_ONCE(x, v) (*(volatile typeof(x) *)&x) = (v)
+#define READ_ONCE_UL(x) (*(volatile unsigned long *)&x)
+#define WRITE_ONCE_UL(x, v) (*(volatile unsigned long *)&x) = (v)
+#define READ_ONCE_I(x) (*(volatile int *)&x)
+#define WRITE_ONCE_I(x, v) (*(volatile int *)&x) = (v)
 
-#define smp_load_acquire(p)                                                                                                                          \
+#define smp_store_release_ul(p, v)                                                                                                                   \
+    do {                                                                                                                                             \
+        smp_mb();                                                                                                                                    \
+        WRITE_ONCE_UL(*p, v);                                                                                                                        \
+    } while (0)
+
+#define smp_load_acquire_ul(p)                                                                                                                       \
     ({                                                                                                                                               \
-        typeof(*p) ___p = READ_ONCE(*p);                                                                                                             \
+        unsigned long ___p = READ_ONCE_UL(*p);                                                                                                       \
         smp_mb();                                                                                                                                    \
         ___p;                                                                                                                                        \
     })
 
-#define smp_store_release(p, v)                                                                                                                      \
-    do {                                                                                                                                             \
+#define smp_load_acquire_i(p)                                                                                                                        \
+    ({                                                                                                                                               \
+        int ___p = READ_ONCE_I(*p);                                                                                                                  \
         smp_mb();                                                                                                                                    \
-        WRITE_ONCE(*p, v);                                                                                                                           \
-    } while (0)
+        ___p;                                                                                                                                        \
+    })
 
 #define smp_mb() __sync_synchronize()
 
@@ -103,11 +112,11 @@ static int ringbuf_map__map_get_next_key(struct ebpf_map *map, const void *key, 
 }
 
 bool ringbuf_map_has_data(struct ringbuf_map_private_data *data) {
-    unsigned long cons_pos = smp_load_acquire(data->consumer_pos);
-    unsigned long prod_pos = smp_load_acquire(data->producer_pos);
+    unsigned long cons_pos = smp_load_acquire_ul(data->consumer_pos);
+    unsigned long prod_pos = smp_load_acquire_ul(data->producer_pos);
     if (cons_pos < prod_pos) {
         int *len_ptr = (int *)(data->data + (cons_pos & (data->attr->max_ents - 1)));
-        int len = smp_load_acquire(len_ptr);
+        int len = smp_load_acquire_i(len_ptr);
         if ((len & EBPF_RINGBUF_BUSY_BIT) == 0)
             return true;
     }
@@ -124,8 +133,8 @@ void *ringbuf_map_reserve(struct ringbuf_map_private_data *data, size_t size) {
     ebpf_spinlock_lock(&data->reserve_lock);
     int err = 0;
     void *result = NULL;
-    unsigned long cons_pos = smp_load_acquire(data->consumer_pos);
-    unsigned long prod_pos = smp_load_acquire(data->producer_pos);
+    unsigned long cons_pos = smp_load_acquire_ul(data->consumer_pos);
+    unsigned long prod_pos = smp_load_acquire_ul(data->producer_pos);
     unsigned long avail_size = data->attr->max_ents - (prod_pos - cons_pos);
     size_t required_size = (size + EBPF_RINGBUF_HDR_SZ + 7) / 8 * 8;
     if (required_size > data->attr->max_ents || avail_size < required_size) {
@@ -136,7 +145,7 @@ void *ringbuf_map_reserve(struct ringbuf_map_private_data *data, size_t size) {
     struct ringbuf_hdr *header = data->data + (prod_pos & (data->attr->max_ents - 1));
     header->len = size | EBPF_RINGBUF_BUSY_BIT;
     header->fd = 233;
-    smp_store_release(data->producer_pos, prod_pos + required_size);
+    smp_store_release_ul(data->producer_pos, prod_pos + required_size);
     result = data->data + ((prod_pos + EBPF_RINGBUF_HDR_SZ) & (data->attr->max_ents - 1));
 cleanup:
     ebpf_spinlock_unlock(&data->reserve_lock);
@@ -162,19 +171,18 @@ static inline int roundup_len(uint32_t len) {
 }
 
 int ringbuf_map_fetch_data(struct ringbuf_map_private_data *data, void *context, int (*callback)(void *context, void *data, int size)) {
-    int *len_ptr, len, err;
+    int err;
     int64_t cnt = 0;
-    unsigned long cons_pos, prod_pos;
-    bool got_new_data;
-    void *sample;
 
-    cons_pos = smp_load_acquire(data->consumer_pos);
+    bool got_new_data = false;
+
+    unsigned long cons_pos = smp_load_acquire_ul(data->consumer_pos);
     do {
         got_new_data = false;
-        prod_pos = smp_load_acquire(data->producer_pos);
+        unsigned long prod_pos = smp_load_acquire_ul(data->producer_pos);
         while (cons_pos < prod_pos) {
-            len_ptr = data->data + (cons_pos & (data->attr->max_ents - 1));
-            len = smp_load_acquire(len_ptr);
+            int *len_ptr = data->data + (cons_pos & (data->attr->max_ents - 1));
+            int len = smp_load_acquire_i(len_ptr);
 
             if (len & EBPF_RINGBUF_BUSY_BIT)
                 goto done;
@@ -183,16 +191,16 @@ int ringbuf_map_fetch_data(struct ringbuf_map_private_data *data, void *context,
             cons_pos += roundup_len(len);
 
             if ((len & EBPF_RINGBUF_DISCARD_BIT) == 0) {
-                sample = (void *)len_ptr + EBPF_RINGBUF_HDR_SZ;
+                void *sample = (void *)len_ptr + EBPF_RINGBUF_HDR_SZ;
                 err = callback(context, sample, len);
                 if (err < 0) {
-                    smp_store_release(data->consumer_pos, cons_pos);
+                    smp_store_release_ul(data->consumer_pos, cons_pos);
                     return err;
                 }
                 cnt++;
             }
 
-            smp_store_release(data->consumer_pos, cons_pos);
+            smp_store_release_ul(data->consumer_pos, cons_pos);
         }
     } while (got_new_data);
 done:

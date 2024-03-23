@@ -2,7 +2,7 @@
 #define _LIBEBPF_MAP_H
 #include "libebpf_execution.h"
 #include <stdint.h>
-
+#include "libebpf_map_ringbuf.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -117,6 +117,15 @@ int ebpf_execution_context__map_elem_delete(ebpf_execution_context_t *ctx, int m
  * @return int -ENOENT if key is the last key. Other negative values mean an error. Positive if succeeded
  */
 int ebpf_execution_context__map_get_next_key(ebpf_execution_context_t *ctx, int map_id, const void *key, void *next_key);
+
+/**
+ * @brief Get the opaque pointer to the private data of a ringbuf map. Useful if you want to call ringbuf_map_* functions
+ *
+ * @param ctx Context
+ * @param map_id ID of the map
+ * @return struct ringbuf_map_private_data* the pointer if succeeded, otherwise NULL
+ */
+struct ringbuf_map_private_data *ebpf_execution_context__get_ringbuf_map_private_data(ebpf_execution_context_t *ctx, int map_id);
 
 #ifdef __cplusplus
 }
