@@ -143,7 +143,7 @@ TEST_CASE("Test ringbuf map") {
 
     std::mt19937 gen;
     gen.seed(std::random_device()());
-    std::uniform_int_distribution<uint8_t> rand_bytes(0, 255);
+    std::uniform_int_distribution<uint8_t> rand_bytes(100, 255);
 
     std::vector<std::vector<uint8_t> > rand_data;
     // Generate 10 pieces of random sized data

@@ -115,7 +115,7 @@ static char *map_val(uint64_t map_ptr) {
 }
 void ebpf_execution_context__setup_internal_helpers(ebpf_vm_t *vm) {
     ebpf_vm_set_ld64_helpers(vm, map_by_fd, NULL, map_val, NULL, NULL);
-    ebpf_vm_register_external_helper(vm, 1, "bpf_map_update_elem", bpf_map_update_elem);
+    ebpf_vm_register_external_helper(vm, 1, "bpf_map_lookup_elem", bpf_map_lookup_elem);
     ebpf_vm_register_external_helper(vm, 2, "bpf_map_update_elem", bpf_map_update_elem);
     ebpf_vm_register_external_helper(vm, 3, "bpf_map_delete_elem", bpf_map_delete_elem);
     ebpf_vm_register_external_helper(vm, 131, "bpf_ringbuf_reserve", bpf_ringbuf_reserve);

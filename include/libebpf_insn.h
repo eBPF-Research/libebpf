@@ -100,7 +100,6 @@ struct libebpf_insn {
 
 #define BPF_LS_SIZE_MASK 0x18
 
-
 #define BPF_ATOMIC_ADD 0x00
 #define BPF_ATOMIC_OR 0x40
 #define BPF_ATOMIC_AND 0x50
@@ -111,5 +110,9 @@ struct libebpf_insn {
 
 #define BPF_ATOMIC_OPERATION_MASK 0xf0
 #define BPF_ATOMIC_FETCH_MASK 0x01
+
+#define BPF_RAW_INSN(OP, DST, SRC, OFF, IMM) ((struct libebpf_insn){ .code = OP, .dst_reg = DST, .src_reg = SRC, .offset = OFF, .imm = IMM })
+
+#define BPF_RAW_INSN_IMM64(SRC, DST, IMM1, IMM2) BPF_RAW_INSN(0x18, DST, SRC, 0, IMM1), BPF_RAW_INSN(0, 0, 0, 0, IMM2)
 
 #endif

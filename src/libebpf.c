@@ -38,6 +38,9 @@ ebpf_vm_t *ebpf_vm_create() {
     return vm;
 }
 void ebpf_vm_destroy(ebpf_vm_t *vm) {
+    _libebpf_global_free(vm->helpers);
+    if (vm->insns)
+        _libebpf_global_free(vm->insns);
     _libebpf_global_free(vm);
 }
 
