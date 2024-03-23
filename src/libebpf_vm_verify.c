@@ -5,7 +5,6 @@
 #include <stdbool.h>
 #include <string.h>
 
-// int ebpf_verify_memory_access(ebpf)
 
 int ebpf_vm_verify(ebpf_vm_t *vm, const struct libebpf_insn *code, size_t code_len) {
     if (code_len > 65536) {
