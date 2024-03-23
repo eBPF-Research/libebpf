@@ -29,7 +29,7 @@ typedef void (*ebpf_free)(void *mem);
 typedef void *(*ebpf_realloc)(void *, size_t);
 
 /**
- * @brief Set the global memory allocator. If not set, default to malloc & free in stdlib.h
+ * @brief Set the global memory allocator. If not set, default to malloc & free & realloc in stdlib.h
  *
  * @param malloc The malloc function
  * @param free The free function

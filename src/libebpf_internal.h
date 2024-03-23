@@ -50,5 +50,5 @@ static inline int bit_test_mask(uint64_t m, uint64_t msk, uint64_t pat) {
 }
 extern ebpf_malloc _libebpf_global_malloc;
 extern ebpf_free _libebpf_global_free;
-
+extern ebpf_realloc _libebpf_global_realloc;
 #endif

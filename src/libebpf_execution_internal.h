@@ -28,6 +28,6 @@ struct ebpf_map_ops {
     int (*map_get_next_key)(struct ebpf_map *map, const void *key, void *next_key);
 };
 
-extern struct ebpf_map_ops map_ops[(int)__MAX_BPF_MAP_TYPE];
+extern struct ebpf_map_ops map_ops[(int)__MAX_EBPF_MAP_TYPE];
 
 #endif

@@ -15,7 +15,13 @@ extern "C" {
  * BPF_MAP_TYPE_RINGBUF - Ringbuf map, with which eBPF programs could send data to ebpf_execution_context. Users could call a specified function to
  * retrive data.
  */
-enum ebpf_map_type { EBPF_MAP_TYPE_UNSPEC = 0, EBPF_MAP_TYPE_HASH = 1, BPF_MAP_TYPE_ARRAY = 2, BPF_MAP_TYPE_RINGBUF = 27, __MAX_BPF_MAP_TYPE = 33 };
+enum ebpf_map_type {
+    EBPF_MAP_TYPE_UNSPEC = 0,
+    EBPF_MAP_TYPE_HASH = 1,
+    EBPF_MAP_TYPE_ARRAY = 2,
+    EBPF_MAP_TYPE_RINGBUF = 27,
+    __MAX_EBPF_MAP_TYPE = 33
+};
 
 /**
  * @brief Attribute of a map

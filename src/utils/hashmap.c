@@ -309,7 +309,7 @@ const void *hashmap_set(struct hashmap *map, const void *item) {
 // hashmap_get_with_hash works like hashmap_get but you provide your
 // own hash. The 'hash' callback provided to the hashmap_new function
 // will not be called
-const void *hashmap_get_with_hash(struct hashmap *map, const void *key, uint64_t hash) {
+const void *hashmap_get_with_hash(struct hashmap *map, const void *key, uint64_t hash, size_t *idx_out) {
     hash = clip_hash(hash);
     size_t i = hash & map->mask;
     while (1) {
@@ -319,6 +319,8 @@ const void *hashmap_get_with_hash(struct hashmap *map, const void *key, uint64_t
         if (bucket->hash == hash) {
             void *bitem = bucket_item(bucket);
             if (!map->compare || map->compare(key, bitem, map->udata) == 0) {
+                if (idx_out)
+                    *idx_out = i;
                 return bitem;
             }
         }
@@ -328,8 +330,8 @@ const void *hashmap_get_with_hash(struct hashmap *map, const void *key, uint64_t
 
 // hashmap_get returns the item based on the provided key. If the item is not
 // found then NULL is returned.
-const void *hashmap_get(struct hashmap *map, const void *key) {
-    return hashmap_get_with_hash(map, key, get_hash(map, key));
+const void *hashmap_get(struct hashmap *map, const void *key, size_t *idx_out) {
+    return hashmap_get_with_hash(map, key, get_hash(map, key), idx_out);
 }
 
 // hashmap_probe returns the item in the bucket at position or NULL if an item
