@@ -4,7 +4,8 @@
 #include <stddef.h>
 #include "libebpf_vm.h"
 #include "libebpf_execution.h"
-#include "libebpf_vm.h"
+#include "libebpf_map.h"
+#include "libebpf_map_ringbuf.h"
 #ifdef __cplusplus
 extern "C" {
 #endif

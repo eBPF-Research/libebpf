@@ -6,11 +6,6 @@
 
 #define LIBEBPF_MAX_MAP_COUNT 100
 
-struct ebpf_execution_context {
-    struct ebpf_map *maps[LIBEBPF_MAX_MAP_COUNT];
-    ebpf_spinlock_t map_alloc_lock;
-};
-
 struct ebpf_map {
     struct ebpf_map_attr attr;
     void *map_private_data;
@@ -28,6 +23,13 @@ struct ebpf_map_ops {
     int (*map_get_next_key)(struct ebpf_map *map, const void *key, void *next_key);
 };
 
-extern struct ebpf_map_ops map_ops[(int)__MAX_EBPF_MAP_TYPE];
+struct ebpf_execution_context {
+    struct ebpf_map *maps[LIBEBPF_MAX_MAP_COUNT];
+    ebpf_spinlock_t map_alloc_lock;
+    struct ebpf_map_ops map_ops[(int)__MAX_EBPF_MAP_TYPE];
+};
 
+extern struct ebpf_map_ops HASH_MAP_OPS;
+extern struct ebpf_map_ops ARRAY_MAP_OPS;
+extern struct ebpf_map_ops RINGBUF_MAP_OPS;
 #endif

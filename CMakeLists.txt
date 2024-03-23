@@ -16,7 +16,9 @@ add_library(
   src/libebpf_vm.c
   src/libebpf_vm_verify.c
   src/libebpf_execution.c
-  src/libebpf_map_implementation.c
+  src/libebpf_map_hash.c
+  src/libebpf_map_array.c
+  src/libebpf_map_ringbuf.c
   src/utils/hashmap.c
 )
 
@@ -26,7 +28,7 @@ target_include_directories(
   PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-set_target_properties(libebpf PROPERTIES C_STANDARD 11 PREFIX "")
+set_target_properties(libebpf PROPERTIES C_STANDARD 11 C_EXTENSIONS TRUE PREFIX "")
 
 add_subdirectory(vm-test)
 add_subdirectory(execution-test)

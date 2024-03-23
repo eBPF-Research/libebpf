@@ -1,4 +1,5 @@
 #include "libebpf_execution_internal.h"
+#include "libebpf_map.h"
 #include "utils/spinlock.h"
 #include <string.h>
 #include <libebpf_execution.h>
@@ -12,6 +13,9 @@ ebpf_execution_context_t *ebpf_execution_context__create() {
         return NULL;
     }
     ebpf_spinlock_init(&ctx->map_alloc_lock);
+    ctx->map_ops[EBPF_MAP_TYPE_ARRAY] = ARRAY_MAP_OPS;
+    ctx->map_ops[EBPF_MAP_TYPE_HASH] = HASH_MAP_OPS;
+    ctx->map_ops[EBPF_MAP_TYPE_RINGBUF] = RINGBUF_MAP_OPS;
     return ctx;
 }
 
@@ -28,7 +32,7 @@ int ebpf_execution_context__map_create(ebpf_execution_context_t *ctx, const char
     ebpf_spinlock_lock(&ctx->map_alloc_lock);
     int result = -1;
     int idx = -1;
-    if (attr->type < 0 || attr->type >= sizeof(map_ops) / sizeof(map_ops[0]) || !map_ops[attr->type].used) {
+    if (attr->type < 0 || attr->type >= sizeof(ctx->map_ops) / sizeof(ctx->map_ops[0]) || !ctx->map_ops[attr->type].used) {
         ebpf_set_error_string("Invalid or unsupported map type %d", attr->type);
         result = -EINVAL;
         goto cleanup;
@@ -50,7 +54,7 @@ int ebpf_execution_context__map_create(ebpf_execution_context_t *ctx, const char
         result = -ENOMEM;
         goto cleanup;
     }
-    struct ebpf_map_ops *ops = &map_ops[attr->type];
+    struct ebpf_map_ops *ops = &ctx->map_ops[attr->type];
     struct ebpf_map *map = ctx->maps[idx];
     map->attr = *attr;
     map->ops = ops;
