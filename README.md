@@ -9,10 +9,14 @@ Features:
 
 Add this directory into your CMake project, and links target `libebpf`. See `libebpf.h` for details.
 
-## How to run tests?
+## How to run vm tests?
 
 - Build CMake target `libebpf_test_runner`
 - `cd vm-test && python3.8 -m venv env`
 - `source ./env/bin/activate`
 - `pip install -r requirements.txt`
 - `pytest`
+
+## How to run execution context tests?
+- Build CMake target `ebpf_execution_context_test`
+- Run `./build/execution-test/ebpf_execution_context_test`
