@@ -1,6 +1,7 @@
 #ifndef _LIBEBPF_EXECUTION_INTERNAL_H
 #define _LIBEBPF_EXECUTION_INTERNAL_H
 
+#include "libebpf_internal.h"
 #include "libebpf_map.h"
 #include "utils/spinlock.h"
 
@@ -11,6 +12,7 @@ struct ebpf_map {
     void *map_private_data;
     struct ebpf_map_ops *ops;
     char name[100];
+    int self_id;
 };
 
 struct ebpf_map_ops {
@@ -21,6 +23,7 @@ struct ebpf_map_ops {
     int (*elem_update)(struct ebpf_map *map, const void *key, const void *value, uint64_t flags);
     int (*elem_delete)(struct ebpf_map *map, const void *key);
     int (*map_get_next_key)(struct ebpf_map *map, const void *key, void *next_key);
+    void *(*elem_lookup_from_helper)(struct ebpf_map *map, const void *key);
 };
 
 struct ebpf_execution_context {

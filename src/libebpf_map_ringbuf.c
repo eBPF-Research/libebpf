@@ -53,6 +53,7 @@ struct ringbuf_map_private_data {
     unsigned long *producer_pos;
     void *data;
     struct ebpf_map_attr *attr;
+    int self_map_id;
 };
 
 static int popcount(uint32_t x) {
@@ -84,6 +85,7 @@ static int ringbuf_map__alloc(struct ebpf_map *map, struct ebpf_map_attr *attr) 
     data->producer_pos = data->raw_buffer + ARG_PAGE_SIZE;
     data->data = data->raw_buffer + 2 * ARG_PAGE_SIZE;
     data->attr = &map->attr;
+    data->self_map_id = map->self_id;
     map->map_private_data = data;
     return 0;
 }
@@ -97,6 +99,10 @@ static void ringbuf_map__free(struct ebpf_map *map) {
 static int ringbuf_map__elem_lookup(struct ebpf_map *map, const void *key, void *value) {
     ebpf_set_error_string("Ringbuf map doesn't support lookup");
     return -ENOTSUP;
+}
+static void *ringbuf_map__elem_lookup_from_helper(struct ebpf_map *map, const void *key) {
+    ebpf_set_error_string("Ringbuf map doesn't support lookup");
+    return NULL;
 }
 static int ringbuf_map__elem_update(struct ebpf_map *map, const void *key, const void *value, uint64_t flags) {
     ebpf_set_error_string("Ringbuf map doesn't support update");
@@ -144,7 +150,7 @@ void *ringbuf_map_reserve(struct ringbuf_map_private_data *data, size_t size) {
     }
     struct ringbuf_hdr *header = data->data + (prod_pos & (data->attr->max_ents - 1));
     header->len = size | EBPF_RINGBUF_BUSY_BIT;
-    header->fd = 233;
+    header->fd = data->self_map_id;
     smp_store_release_ul(data->producer_pos, prod_pos + required_size);
     result = data->data + ((prod_pos + EBPF_RINGBUF_HDR_SZ) & (data->attr->max_ents - 1));
 cleanup:
@@ -212,6 +218,7 @@ struct ebpf_map_ops RINGBUF_MAP_OPS = { .used = true,
                                         .map_free = ringbuf_map__free,
                                         .elem_update = ringbuf_map__elem_update,
                                         .elem_lookup = ringbuf_map__elem_lookup,
+                                        .elem_lookup_from_helper = ringbuf_map__elem_lookup_from_helper,
                                         .elem_delete = ringbuf_map__elem_delete,
                                         .map_get_next_key = ringbuf_map__map_get_next_key
 

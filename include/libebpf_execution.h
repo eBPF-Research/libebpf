@@ -1,6 +1,7 @@
 #ifndef _LIBEBPF_EXECUTION_H
 #define _LIBEBPF_EXECUTION_H
 
+#include "libebpf_vm.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -13,6 +14,13 @@ extern "C" {
 struct ebpf_execution_context;
 
 typedef struct ebpf_execution_context ebpf_execution_context_t;
+
+/**
+ * @brief Global context for the current thread. You must set it before run your ebpf program, if you want to use features provided by
+ * ebpf_execution_context
+ *
+ */
+extern __thread ebpf_execution_context_t *ebpf_execution_context__thread_global_context;
 
 /**
  * @brief Create an execution context
@@ -28,7 +36,12 @@ ebpf_execution_context_t *ebpf_execution_context__create();
  */
 void ebpf_execution_context__destroy(ebpf_execution_context_t *ctx);
 
-
+/**
+ * @brief Setup helpers provided by ebpf_execution_context for the given ebpf_vm
+ *
+ * @param vm The vm instance
+ */
+void ebpf_execution_context__setup_internal_helpers(ebpf_vm_t *vm);
 #ifdef __cplusplus
 }
 #endif

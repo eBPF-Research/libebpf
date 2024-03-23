@@ -13,7 +13,9 @@
 #include <string>
 #include <vector>
 #include <thread>
-
+extern "C" {
+#include "libebpf_execution_internal.h"
+}
 struct hashmap_value {
     int a;
     uint64_t b;
@@ -194,5 +196,27 @@ TEST_CASE("Test ringbuf map") {
 
     REQUIRE(ebpf_execution_context__map_destroy(ctx, id) == 0);
 
+    ebpf_execution_context__destroy(ctx);
+}
+
+TEST_CASE("Test hashmap kernel helpers") {
+    ebpf_execution_context_t *ctx = ebpf_execution_context__create();
+    REQUIRE(ctx != nullptr);
+    struct ebpf_map_attr attr {
+        .type = EBPF_MAP_TYPE_HASH, .key_size = 4, .value_size = sizeof(hashmap_value), .max_ents = 100, .flags = 0,
+    };
+    int id = ebpf_execution_context__map_create(ctx, "my_map", &attr);
+    REQUIRE(id >= 0);
+    {
+        int key = 111;
+        hashmap_value value{ .a = 233, .b = 456, .c = "aaaa" };
+        REQUIRE(ebpf_execution_context__map_elem_update(ctx, id, &key, &value, 0) == 0);
+    }
+    int key = 111;
+    hashmap_value *buf = (hashmap_value *)ctx->map_ops[EBPF_MAP_TYPE_HASH].elem_lookup_from_helper(ctx->maps[id], &key);
+    REQUIRE(buf != nullptr);
+    REQUIRE(ebpf_execution_context__map_elem_delete(ctx, id, &key) == 0);
+    buf->a = 112;
+    buf->b = 233;
     ebpf_execution_context__destroy(ctx);
 }

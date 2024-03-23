@@ -34,6 +34,15 @@ static int array_map__elem_lookup(struct ebpf_map *map, const void *key, void *v
     memcpy(value, map->map_private_data + idx * map->attr.value_size, map->attr.value_size);
     return 0;
 }
+
+static void *array_map__elem_lookup_from_helper(struct ebpf_map *map, const void *key) {
+    uint32_t idx = *(uint32_t *)key;
+    if (idx >= map->attr.max_ents) {
+        ebpf_set_error_string("Invalid index %" PRIu32, idx);
+        return NULL;
+    }
+    return map->map_private_data + idx * map->attr.value_size;
+}
 static int array_map__elem_update(struct ebpf_map *map, const void *key, const void *value, uint64_t flags) {
     uint32_t idx = *(uint32_t *)key;
     if (idx >= map->attr.max_ents) {
@@ -67,6 +76,7 @@ struct ebpf_map_ops ARRAY_MAP_OPS = { .used = true,
                                       .map_free = array_map__free,
                                       .elem_update = array_map__elem_update,
                                       .elem_lookup = array_map__elem_lookup,
+                                      .elem_lookup_from_helper = array_map__elem_lookup_from_helper,
                                       .elem_delete = array_map__elem_delete,
                                       .map_get_next_key = array_map__map_get_next_key
 

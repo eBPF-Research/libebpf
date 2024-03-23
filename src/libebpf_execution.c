@@ -5,6 +5,9 @@
 #include <libebpf_execution.h>
 #include "libebpf_internal.h"
 #include <errno.h>
+
+__thread ebpf_execution_context_t *ebpf_execution_context__thread_global_context;
+
 ebpf_execution_context_t *ebpf_execution_context__create() {
     ebpf_execution_context_t *ctx = _libebpf_global_malloc(sizeof(ebpf_execution_context_t));
     memset(ctx, 0, sizeof(*ctx));
@@ -22,8 +25,10 @@ ebpf_execution_context_t *ebpf_execution_context__create() {
 void ebpf_execution_context__destroy(ebpf_execution_context_t *ctx) {
     // Destroy maps
     for (int i = 0; i < sizeof(ctx->maps) / sizeof(ctx->maps[0]); i++) {
-        if (ctx->maps[i])
+        if (ctx->maps[i]) {
+            ctx->map_ops[ctx->maps[i]->attr.type].map_free(ctx->maps[i]);
             _libebpf_global_free(ctx->maps[i]);
+        }
     }
     _libebpf_global_free(ctx);
 }
@@ -59,6 +64,7 @@ int ebpf_execution_context__map_create(ebpf_execution_context_t *ctx, const char
     map->attr = *attr;
     map->ops = ops;
     strncpy(map->name, map_name, sizeof(map->name));
+    map->self_id = idx;
     // Failed to do initialization
     if ((result = ops->alloc_map(map, attr)) < 0) {
         _libebpf_global_free(ctx->maps[idx]);

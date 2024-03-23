@@ -19,6 +19,7 @@ add_library(
   src/libebpf_map_hash.c
   src/libebpf_map_array.c
   src/libebpf_map_ringbuf.c
+  src/libebpf_execution_helpers.c
   src/utils/hashmap.c
 )
 
