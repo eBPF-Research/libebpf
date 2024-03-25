@@ -29,7 +29,7 @@ struct ebpf_map_ops {
 };
 
 struct ebpf_execution_context {
-    struct ebpf_map *maps[LIBEBPF_MAX_MAP_COUNT];
+    struct ebpf_map **maps;
     ebpf_spinlock_t map_alloc_lock;
     struct ebpf_map_ops map_ops[(int)__MAX_EBPF_MAP_TYPE];
     struct hashmap *ffi_func_name_mapper;

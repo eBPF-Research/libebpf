@@ -44,6 +44,10 @@ add_custom_command(
 add_library(libebpf STATIC ${CMAKE_CURRENT_BINARY_DIR}/libebpf.o)
 
 set_target_properties(libebpf PROPERTIES PREFIX "" LINKER_LANGUAGE C)
+target_include_directories(
+  libebpf
+  INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
 
 
 add_subdirectory(vm-test)

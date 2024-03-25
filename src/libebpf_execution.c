@@ -41,9 +41,17 @@ ebpf_execution_context_t *ebpf_execution_context__create() {
     ctx->map_ops[EBPF_MAP_TYPE_HASH] = HASH_MAP_OPS;
     ctx->map_ops[EBPF_MAP_TYPE_RINGBUF] = RINGBUF_MAP_OPS;
 
+    ctx->maps = _libebpf_global_malloc(sizeof(struct ebpf_map *) * LIBEBPF_MAX_MAP_COUNT);
+    if (!ctx->maps) {
+        ebpf_set_error_string("Unable to allocate memory for maps");
+        _libebpf_global_free(ctx);
+        return NULL;
+    }
+    memset(ctx->maps, 0, sizeof(struct ebpf_map *) * LIBEBPF_MAX_MAP_COUNT);
     ctx->ffi_funcs = _libebpf_global_malloc(sizeof(struct libebpf_ffi_function) * LIBEBPF_MAX_FFI_COUNT);
     if (!ctx->ffi_funcs) {
         ebpf_set_error_string("Unable to allocate space for ffi_funcs");
+        _libebpf_global_free(ctx->maps);
         _libebpf_global_free(ctx);
         return NULL;
     }
@@ -53,6 +61,7 @@ ebpf_execution_context_t *ebpf_execution_context__create() {
                                        10, 0, 0, libebpf_ffi_name_entry_hash, libebpf_ffi_name_entry_compare, libebpf_ffi_name_entry_free, NULL);
     if (!ctx->ffi_func_name_mapper) {
         ebpf_set_error_string("Unable to create ffi name lookup hashmap");
+        _libebpf_global_free(ctx->maps);
         _libebpf_global_free(ctx->ffi_funcs);
         _libebpf_global_free(ctx);
         return NULL;
@@ -63,18 +72,20 @@ ebpf_execution_context_t *ebpf_execution_context__create() {
 
 void ebpf_execution_context__destroy(ebpf_execution_context_t *ctx) {
     // Destroy maps
-    for (int i = 0; i < sizeof(ctx->maps) / sizeof(ctx->maps[0]); i++) {
+    for (int i = 0; i < LIBEBPF_MAX_MAP_COUNT; i++) {
         if (ctx->maps[i]) {
             ctx->map_ops[ctx->maps[i]->attr.type].map_free(ctx->maps[i]);
             _libebpf_global_free(ctx->maps[i]);
         }
     }
+    _libebpf_global_free(ctx->maps);
     for (int i = 0; i < LIBEBPF_MAX_FFI_COUNT; i++) {
         if (ctx->ffi_funcs[i].ptr) {
             _libebpf_global_free((void *)ctx->ffi_funcs[i].name);
         }
     }
     _libebpf_global_free(ctx->ffi_funcs);
+    
     hashmap_free(ctx->ffi_func_name_mapper);
     _libebpf_global_free(ctx);
 }
