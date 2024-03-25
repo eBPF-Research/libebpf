@@ -20,6 +20,7 @@ add_library(
   src/libebpf_map_array.c
   src/libebpf_map_ringbuf.c
   src/libebpf_execution_helpers.c
+  src/libebpf_ffi_functions.c
   src/utils/hashmap.c
 )
 target_compile_definitions(libebpf_objects PRIVATE -D_GNU_SOURCE)

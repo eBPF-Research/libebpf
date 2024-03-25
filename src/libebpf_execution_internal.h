@@ -32,8 +32,14 @@ struct ebpf_execution_context {
     struct ebpf_map **maps;
     ebpf_spinlock_t map_alloc_lock;
     struct ebpf_map_ops map_ops[(int)__MAX_EBPF_MAP_TYPE];
-    struct hashmap *ffi_func_name_mapper;
-    struct libebpf_ffi_function* ffi_funcs;
+    struct hashmap *ffi_func_name_hashmap;
+    struct libebpf_ffi_function *ffi_funcs;
+    ebpf_spinlock_t ffi_alloc_lock;
+};
+
+struct libebpf_ffi_name_entry {
+    const char *name;
+    int id;
 };
 
 extern struct ebpf_map_ops HASH_MAP_OPS;
