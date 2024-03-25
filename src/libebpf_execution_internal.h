@@ -1,12 +1,14 @@
 #ifndef _LIBEBPF_EXECUTION_INTERNAL_H
 #define _LIBEBPF_EXECUTION_INTERNAL_H
 
+#include "libebpf_ffi.h"
 #include "libebpf_internal.h"
 #include "libebpf_map.h"
+#include "utils/hashmap.h"
 #include "utils/spinlock.h"
 
 #define LIBEBPF_MAX_MAP_COUNT 100
-
+#define LIBEBPF_MAX_FFI_COUNT 100
 struct ebpf_map {
     struct ebpf_map_attr attr;
     void *map_private_data;
@@ -30,6 +32,8 @@ struct ebpf_execution_context {
     struct ebpf_map *maps[LIBEBPF_MAX_MAP_COUNT];
     ebpf_spinlock_t map_alloc_lock;
     struct ebpf_map_ops map_ops[(int)__MAX_EBPF_MAP_TYPE];
+    struct hashmap *ffi_func_name_mapper;
+    struct libebpf_ffi_function* ffi_funcs;
 };
 
 extern struct ebpf_map_ops HASH_MAP_OPS;
