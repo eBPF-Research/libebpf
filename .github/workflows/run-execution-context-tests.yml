@@ -1,0 +1,27 @@
+name: Run unit tests of execution context
+
+on:
+  push:
+    branches: "master"
+  pull_request: 
+    branches: "master"
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: 'recursive'
+    - name: Install dependencies
+      run: |
+        sudo apt-get install cmake make clang ninja 
+    - name: Build targets
+      run: |
+        cmake -S. -Bbuild -DCMAKE_BUILD_TYPE:STRING=Release -G Ninja
+        cmake --build ./build --config Release --target ebpf_execution_context_test
+    - name: Run tests
+      run: |
+        ./build/execution-test/ebpf_execution_context_test
