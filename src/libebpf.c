@@ -1,6 +1,7 @@
 #include "libebpf_insn.h"
 #include <asm-generic/errno-base.h>
 #include <string.h>
+#define _GNU_SOURCE
 #include <libebpf.h>
 #include <stdlib.h>
 #include <libebpf_internal.h>

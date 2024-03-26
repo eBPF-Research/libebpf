@@ -48,23 +48,6 @@ static inline int bit_test(uint64_t m, uint64_t pat) {
 static inline int bit_test_mask(uint64_t m, uint64_t msk, uint64_t pat) {
     return (m & msk) == pat;
 }
-
-/**
- * @brief Only for unit tests. Directly call a helper
- * 
- * @param vm 
- * @param idx 
- * @param a 
- * @param b 
- * @param c 
- * @param d 
- * @param e 
- * @return uint64_t 
- */
-static inline uint64_t ebpf_vm_call_helper(ebpf_vm_t *vm, int idx, uint64_t a, uint64_t b, uint64_t c, uint64_t d, uint64_t e) {
-    return vm->helpers[idx].fn(a, b, c, d, e);
-}
-
 extern ebpf_malloc _libebpf_global_malloc;
 extern ebpf_free _libebpf_global_free;
 extern ebpf_realloc _libebpf_global_realloc;
