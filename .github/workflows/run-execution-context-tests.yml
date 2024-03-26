@@ -17,7 +17,8 @@ jobs:
         submodules: 'recursive'
     - name: Install dependencies
       run: |
-        sudo apt-get install cmake make clang ninja 
+        sudo apt-get update
+        sudo apt-get install cmake make clang ninja-build 
     - name: Build targets
       run: |
         cmake -S. -Bbuild -DCMAKE_BUILD_TYPE:STRING=Release -G Ninja
