@@ -31,7 +31,7 @@ struct libebpf_ffi_call_argument_list {
     int64_t args[6];
 };
 /**
- * @brief Disable these helper definition when running unit tests, so we can provide our own liebpf_ffi_call and libebpf_ffi_lookup_by_name
+ * @brief Disable these helper definition when running unit tests, so we can provide our own libebpf_ffi_call and libebpf_ffi_lookup_by_name
  * 
  */
 #ifndef _LIBEBPF_UNIT_TEST
@@ -40,13 +40,13 @@ struct libebpf_ffi_call_argument_list {
  * 
  */
 static int (*libebpf_ffi_lookup_by_name)(const char *name) = (int (*)(const char *))(uintptr_t)LIBEBPF_FFI_HELPER_INDEX__LOOKUP_BY_NAME;
-static int64_t (*liebpf_ffi_call)(int func_id, struct libebpf_ffi_call_argument_list *args) =
+static int64_t (*libebpf_ffi_call)(int func_id, struct libebpf_ffi_call_argument_list *args) =
         (int64_t(*)(int, struct libebpf_ffi_call_argument_list *))LIBEBPF_FFI_HELPER_INDEX__CALL;
 #endif
 #define LIBEBPF_FFI_CALL_BY_ID_ARG6(id, arg1, arg2, arg3, arg4, arg5, arg6)                                                                          \
     ({                                                                                                                                               \
         struct libebpf_ffi_call_argument_list args = { .args = { arg1, arg2, arg3, arg4, arg5, arg6 } };                                             \
-        liebpf_ffi_call(id, &args);                                                                                                                  \
+        libebpf_ffi_call(id, &args);                                                                                                                  \
     })
 
 #define LIBEBPF_FFI_CALL_BY_ID_ARG5(id, arg1, arg2, arg3, arg4, arg5) LIBEBPF_FFI_CALL_BY_ID_ARG6(id, arg1, arg2, arg3, arg4, arg5, 0)

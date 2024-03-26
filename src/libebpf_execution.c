@@ -1,4 +1,5 @@
 #include "libebpf_execution_internal.h"
+#include "libebpf_export.h"
 #include "libebpf_ffi.h"
 #include "libebpf_map.h"
 #include "utils/hashmap.h"
@@ -24,7 +25,8 @@ static int libebpf_ffi_name_entry_compare(const void *e1, const void *e2, void *
     return strcmp(a->name, b->name);
 }
 static void libebpf_ffi_name_entry_free(void *v) {
-    _libebpf_global_free(v);
+    struct libebpf_ffi_name_entry *a = v;
+    _libebpf_global_free((void *)a->name);
 }
 ebpf_execution_context_t *ebpf_execution_context__create() {
     ebpf_execution_context_t *ctx = _libebpf_global_malloc(sizeof(ebpf_execution_context_t));
@@ -64,7 +66,16 @@ ebpf_execution_context_t *ebpf_execution_context__create() {
         _libebpf_global_free(ctx);
         return NULL;
     }
-
+    for (const struct libebpf_ffi_function *fn = &_start_libebpf_exported_function[0]; fn < &_end_libebpf_exported_function[0]; fn++) {
+        int err = ebpf_execution_context__register_ffi_function(ctx, fn->ptr, fn->name, fn->arg_types, fn->return_value_type);
+        if (err < 0) {
+            ebpf_set_error_string("Unable to register internal FFI function %s: %s", fn->name, _libebpf_global_error_string);
+            _libebpf_global_free(ctx->maps);
+            _libebpf_global_free(ctx->ffi_funcs);
+            _libebpf_global_free(ctx);
+            return NULL;
+        }
+    }
     return ctx;
 }
 
@@ -134,8 +145,8 @@ cleanup:
     return result;
 }
 
-int ebpf_execution_context__register_ffi_function(ebpf_execution_context_t *ctx, void *func, const char *name, enum libebpf_ffi_type arg_types[6],
-                                                  enum libebpf_ffi_type return_value_type) {
+int ebpf_execution_context__register_ffi_function(ebpf_execution_context_t *ctx, void *func, const char *name,
+                                                  const enum libebpf_ffi_type arg_types[6], enum libebpf_ffi_type return_value_type) {
     ebpf_spinlock_lock(&ctx->ffi_alloc_lock);
     int ret = -1;
 

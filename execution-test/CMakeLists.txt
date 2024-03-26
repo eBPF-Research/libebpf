@@ -4,6 +4,7 @@ add_executable(
     ebpf_execution_context_test
     ./test_map.cpp
     ./test_with_ebpf.cpp
+    ./test_ffi.cpp
 )
 
 add_dependencies(ebpf_execution_context_test
