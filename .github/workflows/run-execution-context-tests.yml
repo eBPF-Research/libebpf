@@ -18,11 +18,11 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install cmake make clang ninja-build 
+        sudo apt-get install cmake make clang-15 ninja-build 
     - name: Build targets
       run: |
-        cmake -S. -Bbuild -DCMAKE_BUILD_TYPE:STRING=Release -G Ninja
-        cmake --build ./build --config Release --target ebpf_execution_context_test
+        CC=clang-15 CXX=clang++-15 cmake -S. -Bbuild -DCMAKE_BUILD_TYPE:STRING=Release -G Ninja
+        CC=clang-15 CXX=clang++-15 cmake --build ./build --config Release --target ebpf_execution_context_test
     - name: Run tests
       run: |
         ./build/execution-test/ebpf_execution_context_test
