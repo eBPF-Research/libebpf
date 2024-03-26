@@ -1,6 +1,11 @@
 #include "libebpf_execution_internal.h"
+#include "libebpf_export.h"
+#include "libebpf_ffi.h"
 #include "libebpf_map.h"
+#include "utils/hashmap.h"
 #include "utils/spinlock.h"
+#include <errno.h>
+#include <stdint.h>
 #include <string.h>
 #include <libebpf_execution.h>
 #include "libebpf_internal.h"
@@ -8,6 +13,21 @@
 
 __thread ebpf_execution_context_t *ebpf_execution_context__thread_global_context;
 
+static uint64_t libebpf_ffi_name_entry_hash(const void *ptr, uint64_t s1, uint64_t s2) {
+    const struct libebpf_ffi_name_entry *ent = ptr;
+    int len = strlen(ent->name);
+    return hashmap_sip(ent->name, len, s1, s2);
+}
+
+static int libebpf_ffi_name_entry_compare(const void *e1, const void *e2, void *ctx) {
+    const struct libebpf_ffi_name_entry *a = e1;
+    const struct libebpf_ffi_name_entry *b = e2;
+    return strcmp(a->name, b->name);
+}
+static void libebpf_ffi_name_entry_free(void *v) {
+    struct libebpf_ffi_name_entry *a = v;
+    _libebpf_global_free((void *)a->name);
+}
 ebpf_execution_context_t *ebpf_execution_context__create() {
     ebpf_execution_context_t *ctx = _libebpf_global_malloc(sizeof(ebpf_execution_context_t));
     memset(ctx, 0, sizeof(*ctx));
@@ -16,20 +36,67 @@ ebpf_execution_context_t *ebpf_execution_context__create() {
         return NULL;
     }
     ebpf_spinlock_init(&ctx->map_alloc_lock);
+    ebpf_spinlock_init(&ctx->ffi_alloc_lock);
     ctx->map_ops[EBPF_MAP_TYPE_ARRAY] = ARRAY_MAP_OPS;
     ctx->map_ops[EBPF_MAP_TYPE_HASH] = HASH_MAP_OPS;
     ctx->map_ops[EBPF_MAP_TYPE_RINGBUF] = RINGBUF_MAP_OPS;
+
+    ctx->maps = _libebpf_global_malloc(sizeof(struct ebpf_map *) * LIBEBPF_MAX_MAP_COUNT);
+    if (!ctx->maps) {
+        ebpf_set_error_string("Unable to allocate memory for maps");
+        _libebpf_global_free(ctx);
+        return NULL;
+    }
+    memset(ctx->maps, 0, sizeof(struct ebpf_map *) * LIBEBPF_MAX_MAP_COUNT);
+    ctx->ffi_funcs = _libebpf_global_malloc(sizeof(struct libebpf_ffi_function) * LIBEBPF_MAX_FFI_COUNT);
+    if (!ctx->ffi_funcs) {
+        ebpf_set_error_string("Unable to allocate space for ffi_funcs");
+        _libebpf_global_free(ctx->maps);
+        _libebpf_global_free(ctx);
+        return NULL;
+    }
+    memset(ctx->ffi_funcs, 0, sizeof(struct libebpf_ffi_function) * LIBEBPF_MAX_FFI_COUNT);
+    ctx->ffi_func_name_hashmap =
+            hashmap_new_with_allocator(_libebpf_global_malloc, _libebpf_global_realloc, _libebpf_global_free, sizeof(struct libebpf_ffi_name_entry),
+                                       10, 0, 0, libebpf_ffi_name_entry_hash, libebpf_ffi_name_entry_compare, libebpf_ffi_name_entry_free, NULL);
+    if (!ctx->ffi_func_name_hashmap) {
+        ebpf_set_error_string("Unable to create ffi name lookup hashmap");
+        _libebpf_global_free(ctx->maps);
+        _libebpf_global_free(ctx->ffi_funcs);
+        _libebpf_global_free(ctx);
+        return NULL;
+    }
+    for (const struct libebpf_ffi_function *fn = &_start_libebpf_exported_function[0]; fn < &_end_libebpf_exported_function[0]; fn++) {
+        int err = ebpf_execution_context__register_ffi_function(ctx, fn->ptr, fn->name, fn->arg_types, fn->return_value_type);
+        if (err < 0) {
+            ebpf_set_error_string("Unable to register internal FFI function %s: %s", fn->name, _libebpf_global_error_string);
+            _libebpf_global_free(ctx->maps);
+            _libebpf_global_free(ctx->ffi_funcs);
+            _libebpf_global_free(ctx);
+            return NULL;
+        }
+    }
     return ctx;
 }
 
 void ebpf_execution_context__destroy(ebpf_execution_context_t *ctx) {
     // Destroy maps
-    for (int i = 0; i < sizeof(ctx->maps) / sizeof(ctx->maps[0]); i++) {
+    for (int i = 0; i < LIBEBPF_MAX_MAP_COUNT; i++) {
         if (ctx->maps[i]) {
             ctx->map_ops[ctx->maps[i]->attr.type].map_free(ctx->maps[i]);
             _libebpf_global_free(ctx->maps[i]);
         }
     }
+    _libebpf_global_free(ctx->maps);
+    // We don't need to clean them. They will be freed when the hashmap was destroyed.
+    // for (int i = 0; i < LIBEBPF_MAX_FFI_COUNT; i++) {
+    //     if (ctx->ffi_funcs[i].ptr) {
+    //         _libebpf_global_free((void *)ctx->ffi_funcs[i].name);
+    //     }
+    // }
+    _libebpf_global_free(ctx->ffi_funcs);
+
+    hashmap_free(ctx->ffi_func_name_hashmap);
     _libebpf_global_free(ctx);
 }
 
@@ -76,6 +143,61 @@ int ebpf_execution_context__map_create(ebpf_execution_context_t *ctx, const char
 cleanup:
     ebpf_spinlock_unlock(&ctx->map_alloc_lock);
     return result;
+}
+
+int ebpf_execution_context__register_ffi_function(ebpf_execution_context_t *ctx, void *func, const char *name,
+                                                  const enum libebpf_ffi_type arg_types[6], enum libebpf_ffi_type return_value_type) {
+    ebpf_spinlock_lock(&ctx->ffi_alloc_lock);
+    int ret = -1;
+
+    if (func == NULL) {
+        ebpf_set_error_string("FFI function could not be null pointer");
+        ret = -EINVAL;
+        goto cleanup;
+    }
+
+    for (int i = 0; i < LIBEBPF_MAX_FFI_COUNT; i++) {
+        if (!ctx->ffi_funcs[i].ptr) {
+            ret = i;
+            break;
+        }
+    }
+    if (ret == -1) {
+        ebpf_set_error_string("No available slot");
+        ret = -ENOSPC;
+        goto cleanup;
+    }
+    struct libebpf_ffi_function *fn = &ctx->ffi_funcs[ret];
+    fn->ptr = func;
+    memcpy(fn->arg_types, arg_types, sizeof(enum libebpf_ffi_type) * 6);
+    fn->return_value_type = return_value_type;
+    // Save a copy of the name string
+    // The string will also be used for hashmap
+    fn->name = _libebpf_global_malloc(strlen(name) + 1);
+    if (!fn->name) {
+        ebpf_set_error_string("Unable to allocate memory for function name");
+        ret = -ENOMEM;
+        goto cleanup;
+    }
+    strcpy(fn->name, name);
+    struct libebpf_ffi_name_entry entry = { .name = fn->name, .id = ret };
+    // Check if that element exists
+    if (hashmap_get(ctx->ffi_func_name_hashmap, &entry, NULL) != NULL) {
+        ebpf_set_error_string("There is a FFI function named %s exist", name);
+        _libebpf_global_free(fn->name);
+        ret = -EEXIST;
+        goto cleanup;
+    }
+    if (hashmap_set(ctx->ffi_func_name_hashmap, &entry) == NULL && hashmap_oom(ctx->ffi_func_name_hashmap)) {
+        ebpf_set_error_string("Unable to insert name into hashmap");
+        ret = -ENOMEM;
+        _libebpf_global_free(fn->name);
+        goto cleanup;
+    }
+
+cleanup:
+    ebpf_spinlock_unlock(&ctx->ffi_alloc_lock);
+    return ret;
 }
 
 int ebpf_execution_context__map_destroy(ebpf_execution_context_t *ctx, int map_id) {

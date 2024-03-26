@@ -10,8 +10,8 @@ project(
 )
 
 add_library(
-  libebpf
-  STATIC
+  libebpf_objects
+  OBJECT
   src/libebpf.c
   src/libebpf_vm.c
   src/libebpf_vm_verify.c
@@ -20,16 +20,36 @@ add_library(
   src/libebpf_map_array.c
   src/libebpf_map_ringbuf.c
   src/libebpf_execution_helpers.c
+  src/libebpf_ffi_functions.c
   src/utils/hashmap.c
 )
-
+target_compile_definitions(libebpf_objects PRIVATE -D_GNU_SOURCE)
 target_include_directories(
-  libebpf
+  libebpf_objects
   INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include
   PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-set_target_properties(libebpf PROPERTIES C_STANDARD 11 C_EXTENSIONS TRUE PREFIX "")
+set_target_properties(libebpf_objects PROPERTIES C_STANDARD 11 C_EXTENSIONS TRUE)
+
+set(SPACE " ")
+
+
+add_custom_command(
+  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/libebpf.o
+  DEPENDS  $<TARGET_OBJECTS:libebpf_objects> ${CMAKE_CURRENT_SOURCE_DIR}/src/libebpf.ld
+  COMMAND ${CMAKE_C_COMPILER} -r -T ${CMAKE_CURRENT_SOURCE_DIR}/src/libebpf.ld -o ${CMAKE_CURRENT_BINARY_DIR}/libebpf.o $<TARGET_OBJECTS:libebpf_objects>
+  COMMAND_EXPAND_LISTS
+)
+
+add_library(libebpf STATIC ${CMAKE_CURRENT_BINARY_DIR}/libebpf.o)
+
+set_target_properties(libebpf PROPERTIES PREFIX "" LINKER_LANGUAGE C)
+target_include_directories(
+  libebpf
+  INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
 
 add_subdirectory(vm-test)
 add_subdirectory(execution-test)
