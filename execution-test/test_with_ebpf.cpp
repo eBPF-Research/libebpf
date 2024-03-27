@@ -10,21 +10,21 @@
 #include <ostream>
 
 TEST_CASE("Test map operations with ebpf programs") {
-    std::unique_ptr<ebpf_execution_context_t, decltype(&ebpf_execution_context__destroy)> ctx(ebpf_execution_context__create(),
-                                                                                              ebpf_execution_context__destroy);
+    std::unique_ptr<ebpf_state_t, decltype(&ebpf_state__destroy)> ctx(ebpf_state__create(),
+                                                                                              ebpf_state__destroy);
     REQUIRE(ctx != nullptr);
     std::unique_ptr<ebpf_vm_t, decltype(&ebpf_vm_destroy)> vm(ebpf_vm_create(), ebpf_vm_destroy);
     REQUIRE(vm != nullptr);
     struct ebpf_map_attr attr {
         .type = EBPF_MAP_TYPE_HASH, .key_size = 8, .value_size = 8, .max_ents = 10, .flags = 0,
     };
-    int hash_map_id = ebpf_execution_context__map_create(ctx.get(), "hash_map", &attr);
+    int hash_map_id = ebpf_state__map_create(ctx.get(), "hash_map", &attr);
     uint64_t key = 1, value = 233;
-    REQUIRE(ebpf_execution_context__map_elem_update(ctx.get(), hash_map_id, &key, &value, 0) == 0);
+    REQUIRE(ebpf_state__map_elem_update(ctx.get(), hash_map_id, &key, &value, 0) == 0);
     key = 2;
     value = 456;
-    REQUIRE(ebpf_execution_context__map_elem_update(ctx.get(), hash_map_id, &key, &value, 0) == 0);
-    ebpf_execution_context__setup_internal_helpers(vm.get());
+    REQUIRE(ebpf_state__map_elem_update(ctx.get(), hash_map_id, &key, &value, 0) == 0);
+    ebpf_state__setup_internal_helpers(vm.get());
 
     REQUIRE(hash_map_id >= 0);
     struct libebpf_insn insns[] = { // r1 = map_by_fd(hash_map_id)
@@ -68,10 +68,10 @@ TEST_CASE("Test map operations with ebpf programs") {
                                     BPF_RAW_INSN(BPF_CLASS_JMP | BPF_JMP_EXIT | BPF_SOURCE_IMM, 0, 0, 0, 0)
     };
     REQUIRE(ebpf_vm_load_instructions(vm.get(), insns, std::size(insns)) == 0);
-    ebpf_execution_context__thread_global_context = ctx.get();
+    ebpf_state__thread_global_state = ctx.get();
     uint64_t ret;
     REQUIRE(ebpf_vm_run(vm.get(), nullptr, 0, &ret) == 0);
     key = 3;
-    REQUIRE(ebpf_execution_context__map_elem_lookup(ctx.get(), hash_map_id, &key, &value) == 0);
+    REQUIRE(ebpf_state__map_elem_lookup(ctx.get(), hash_map_id, &key, &value) == 0);
     REQUIRE(value == 233 + 456);
 }

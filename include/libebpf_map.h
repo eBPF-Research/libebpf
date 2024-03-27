@@ -12,7 +12,7 @@ extern "C" {
  * All maps are ensured to be thread safe. Locks are spin lock.
  * EBPF_MAP_TYPE_HASH - Hashmap for storing fixed-size (key, value) pairs
  * BPF_MAP_TYPE_ARRAY - Array for storing indexed values
- * BPF_MAP_TYPE_RINGBUF - Ringbuf map, with which eBPF programs could send data to ebpf_execution_context. Users could call a specified function to
+ * BPF_MAP_TYPE_RINGBUF - Ringbuf map, with which eBPF programs could send data to ebpf_state. Users could call a specified function to
  * retrive data.
  */
 enum ebpf_map_type {
@@ -56,14 +56,14 @@ struct ebpf_map_attr {
 };
 
 /**
- * @brief Create a map in the specified execution context
+ * @brief Create a map in the specified ebpf_state
  *
  * @param ctx The context
  * @param attr Attributes of the map
  * @param map_name Name of the map
  * @return int A non-negative map id if succeeded, otherwise a negative number. See ebpf_error_string for error details.
  */
-int ebpf_execution_context__map_create(ebpf_execution_context_t *ctx, const char *map_name, struct ebpf_map_attr *attr);
+int ebpf_state__map_create(ebpf_state_t *ctx, const char *map_name, struct ebpf_map_attr *attr);
 
 /**
  * @brief Destroy a specified map
@@ -72,7 +72,7 @@ int ebpf_execution_context__map_create(ebpf_execution_context_t *ctx, const char
  * @param map_id ID of the map
  * @return int 0 if succeeded. Otherwise failed.
  */
-int ebpf_execution_context__map_destroy(ebpf_execution_context_t *ctx, int map_id);
+int ebpf_state__map_destroy(ebpf_state_t *ctx, int map_id);
 
 /**
  * @brief Lookup a key in a certain map
@@ -83,7 +83,7 @@ int ebpf_execution_context__map_destroy(ebpf_execution_context_t *ctx, int map_i
  * @param value Buffer to the value. Must be in size of at least value_size
  * @return int 0 if succeeded, and value buffer will be updated. Otherwise failed.
  */
-int ebpf_execution_context__map_elem_lookup(ebpf_execution_context_t *ctx, int map_id, const void *key, void *value);
+int ebpf_state__map_elem_lookup(ebpf_state_t *ctx, int map_id, const void *key, void *value);
 
 /**
  * @brief Update a (key, value) pair in a certain map
@@ -95,7 +95,7 @@ int ebpf_execution_context__map_elem_lookup(ebpf_execution_context_t *ctx, int m
  * @param flags Map-specified flags
  * @return int 0 if succeeded, otherwise failed.
  */
-int ebpf_execution_context__map_elem_update(ebpf_execution_context_t *ctx, int map_id, const void *key, const void *value, uint64_t flags);
+int ebpf_state__map_elem_update(ebpf_state_t *ctx, int map_id, const void *key, const void *value, uint64_t flags);
 
 /**
  * @brief Delete an element from the map
@@ -105,7 +105,7 @@ int ebpf_execution_context__map_elem_update(ebpf_execution_context_t *ctx, int m
  * @param key Buffer to the key
  * @return int 0 if succeeded, otherwise failed
  */
-int ebpf_execution_context__map_elem_delete(ebpf_execution_context_t *ctx, int map_id, const void *key);
+int ebpf_state__map_elem_delete(ebpf_state_t *ctx, int map_id, const void *key);
 
 /**
  * @brief Get the next key after the given key
@@ -116,7 +116,7 @@ int ebpf_execution_context__map_elem_delete(ebpf_execution_context_t *ctx, int m
  * @param next_key Buffer to store the nexy key
  * @return int -ENOENT if key is the last key. Other negative values mean an error. Positive if succeeded
  */
-int ebpf_execution_context__map_get_next_key(ebpf_execution_context_t *ctx, int map_id, const void *key, void *next_key);
+int ebpf_state__map_get_next_key(ebpf_state_t *ctx, int map_id, const void *key, void *next_key);
 
 /**
  * @brief Get the opaque pointer to the private data of a ringbuf map. Useful if you want to call ringbuf_map_* functions
@@ -125,7 +125,7 @@ int ebpf_execution_context__map_get_next_key(ebpf_execution_context_t *ctx, int 
  * @param map_id ID of the map
  * @return struct ringbuf_map_private_data* the pointer if succeeded, otherwise NULL
  */
-struct ringbuf_map_private_data *ebpf_execution_context__get_ringbuf_map_private_data(ebpf_execution_context_t *ctx, int map_id);
+struct ringbuf_map_private_data *ebpf_state__get_ringbuf_map_private_data(ebpf_state_t *ctx, int map_id);
 
 #ifdef __cplusplus
 }

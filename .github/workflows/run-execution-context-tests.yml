@@ -1,4 +1,4 @@
-name: Run unit tests of execution context
+name: Run unit tests of ebpf_state
 
 on:
   push:
@@ -22,7 +22,7 @@ jobs:
     - name: Build targets
       run: |
         CC=clang-15 CXX=clang++-15 cmake -S. -Bbuild -DCMAKE_BUILD_TYPE:STRING=Release -G Ninja
-        CC=clang-15 CXX=clang++-15 cmake --build ./build --config Release --target ebpf_execution_context_test
+        CC=clang-15 CXX=clang++-15 cmake --build ./build --config Release --target ebpf_state_test
     - name: Run tests
       run: |
-        ./build/execution-test/ebpf_execution_context_test
+        ./build/execution-test/ebpf_state_test
