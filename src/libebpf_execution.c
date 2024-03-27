@@ -11,7 +11,7 @@
 #include "libebpf_internal.h"
 #include <errno.h>
 
-__thread ebpf_execution_context_t *ebpf_execution_context__thread_global_context;
+__thread ebpf_state_t *ebpf_state__thread_global_state;
 
 static uint64_t libebpf_ffi_name_entry_hash(const void *ptr, uint64_t s1, uint64_t s2) {
     const struct libebpf_ffi_name_entry *ent = ptr;
@@ -28,8 +28,8 @@ static void libebpf_ffi_name_entry_free(void *v) {
     struct libebpf_ffi_name_entry *a = v;
     _libebpf_global_free((void *)a->name);
 }
-ebpf_execution_context_t *ebpf_execution_context__create() {
-    ebpf_execution_context_t *ctx = _libebpf_global_malloc(sizeof(ebpf_execution_context_t));
+ebpf_state_t *ebpf_state__create() {
+    ebpf_state_t *ctx = _libebpf_global_malloc(sizeof(ebpf_state_t));
     memset(ctx, 0, sizeof(*ctx));
     if (!ctx) {
         ebpf_set_error_string("malloc returned NULL");
@@ -67,7 +67,7 @@ ebpf_execution_context_t *ebpf_execution_context__create() {
         return NULL;
     }
     for (const struct libebpf_ffi_function *fn = &_start_libebpf_exported_function[0]; fn < &_end_libebpf_exported_function[0]; fn++) {
-        int err = ebpf_execution_context__register_ffi_function(ctx, fn->ptr, fn->name, fn->arg_types, fn->return_value_type);
+        int err = ebpf_state__register_ffi(ctx, fn->ptr, fn->name, fn->arg_types, fn->return_value_type);
         if (err < 0) {
             ebpf_set_error_string("Unable to register internal FFI function %s: %s", fn->name, _libebpf_global_error_string);
             _libebpf_global_free(ctx->maps);
@@ -79,7 +79,7 @@ ebpf_execution_context_t *ebpf_execution_context__create() {
     return ctx;
 }
 
-void ebpf_execution_context__destroy(ebpf_execution_context_t *ctx) {
+void ebpf_state__destroy(ebpf_state_t *ctx) {
     // Destroy maps
     for (int i = 0; i < LIBEBPF_MAX_MAP_COUNT; i++) {
         if (ctx->maps[i]) {
@@ -100,7 +100,7 @@ void ebpf_execution_context__destroy(ebpf_execution_context_t *ctx) {
     _libebpf_global_free(ctx);
 }
 
-int ebpf_execution_context__map_create(ebpf_execution_context_t *ctx, const char *map_name, struct ebpf_map_attr *attr) {
+int ebpf_state__map_create(ebpf_state_t *ctx, const char *map_name, struct ebpf_map_attr *attr) {
     ebpf_spinlock_lock(&ctx->map_alloc_lock);
     int result = -1;
     int idx = -1;
@@ -145,7 +145,7 @@ cleanup:
     return result;
 }
 
-int ebpf_execution_context__register_ffi_function(ebpf_execution_context_t *ctx, void *func, const char *name,
+int ebpf_state__register_ffi(ebpf_state_t *ctx, void *func, const char *name,
                                                   const enum libebpf_ffi_type arg_types[6], enum libebpf_ffi_type return_value_type) {
     ebpf_spinlock_lock(&ctx->ffi_alloc_lock);
     int ret = -1;
@@ -200,7 +200,7 @@ cleanup:
     return ret;
 }
 
-int ebpf_execution_context__map_destroy(ebpf_execution_context_t *ctx, int map_id) {
+int ebpf_state__map_destroy(ebpf_state_t *ctx, int map_id) {
     ebpf_spinlock_lock(&ctx->map_alloc_lock);
     int result = 0;
     if (!ctx->maps[map_id] || map_id < 0 || map_id >= LIBEBPF_MAX_MAP_COUNT) {
@@ -216,7 +216,7 @@ cleanup:
     return result;
 }
 
-int ebpf_execution_context__map_elem_lookup(ebpf_execution_context_t *ctx, int map_id, const void *key, void *value) {
+int ebpf_state__map_elem_lookup(ebpf_state_t *ctx, int map_id, const void *key, void *value) {
     if (map_id < 0 || map_id >= LIBEBPF_MAX_MAP_COUNT || !ctx->maps[map_id]) {
         ebpf_set_error_string("Invalid map_id: %d", map_id);
         return -EINVAL;
@@ -225,7 +225,7 @@ int ebpf_execution_context__map_elem_lookup(ebpf_execution_context_t *ctx, int m
     return map->ops->elem_lookup(map, key, value);
 }
 
-int ebpf_execution_context__map_elem_update(ebpf_execution_context_t *ctx, int map_id, const void *key, const void *value, uint64_t flags) {
+int ebpf_state__map_elem_update(ebpf_state_t *ctx, int map_id, const void *key, const void *value, uint64_t flags) {
     if (map_id < 0 || map_id >= LIBEBPF_MAX_MAP_COUNT || !ctx->maps[map_id]) {
         ebpf_set_error_string("Invalid map_id: %d", map_id);
         return -EINVAL;
@@ -233,7 +233,7 @@ int ebpf_execution_context__map_elem_update(ebpf_execution_context_t *ctx, int m
     struct ebpf_map *map = ctx->maps[map_id];
     return map->ops->elem_update(map, key, value, flags);
 }
-int ebpf_execution_context__map_elem_delete(ebpf_execution_context_t *ctx, int map_id, const void *key) {
+int ebpf_state__map_elem_delete(ebpf_state_t *ctx, int map_id, const void *key) {
     if (map_id < 0 || map_id >= LIBEBPF_MAX_MAP_COUNT || !ctx->maps[map_id]) {
         ebpf_set_error_string("Invalid map_id: %d", map_id);
         return -EINVAL;
@@ -242,7 +242,7 @@ int ebpf_execution_context__map_elem_delete(ebpf_execution_context_t *ctx, int m
     return map->ops->elem_delete(map, key);
 }
 
-int ebpf_execution_context__map_get_next_key(ebpf_execution_context_t *ctx, int map_id, const void *key, void *next_key) {
+int ebpf_state__map_get_next_key(ebpf_state_t *ctx, int map_id, const void *key, void *next_key) {
     if (map_id < 0 || map_id >= LIBEBPF_MAX_MAP_COUNT || !ctx->maps[map_id]) {
         ebpf_set_error_string("Invalid map_id: %d", map_id);
         return -EINVAL;
@@ -251,7 +251,7 @@ int ebpf_execution_context__map_get_next_key(ebpf_execution_context_t *ctx, int 
     return map->ops->map_get_next_key(map, key, next_key);
 }
 
-struct ringbuf_map_private_data *ebpf_execution_context__get_ringbuf_map_private_data(ebpf_execution_context_t *ctx, int map_id) {
+struct ringbuf_map_private_data *ebpf_state__get_ringbuf_map_private_data(ebpf_state_t *ctx, int map_id) {
     if (map_id < 0 || map_id >= LIBEBPF_MAX_MAP_COUNT || !ctx->maps[map_id]) {
         ebpf_set_error_string("Invalid map_id: %d", map_id);
         return NULL;

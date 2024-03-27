@@ -64,7 +64,7 @@ struct libebpf_ffi_function {
  * @param return_value_type Return type of the given FFI function
  * @return Negative value if failed. Otherwise the function ID
  */
-int ebpf_execution_context__register_ffi_function(ebpf_execution_context_t *ctx, void *func, const char *name,
+int ebpf_state__register_ffi(ebpf_state_t *ctx, void *func, const char *name,
                                                   const enum libebpf_ffi_type arg_types[6], enum libebpf_ffi_type return_value_type);
 #ifdef __cplusplus
 }

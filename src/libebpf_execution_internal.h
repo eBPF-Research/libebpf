@@ -28,7 +28,7 @@ struct ebpf_map_ops {
     void *(*elem_lookup_from_helper)(struct ebpf_map *map, const void *key);
 };
 
-struct ebpf_execution_context {
+struct ebpf_state {
     struct ebpf_map **maps;
     ebpf_spinlock_t map_alloc_lock;
     struct ebpf_map_ops map_ops[(int)__MAX_EBPF_MAP_TYPE];

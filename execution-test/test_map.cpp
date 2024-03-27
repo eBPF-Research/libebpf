@@ -23,12 +23,12 @@ struct hashmap_value {
 };
 
 TEST_CASE("Test hash map") {
-    ebpf_execution_context_t *ctx = ebpf_execution_context__create();
+    ebpf_state_t *ctx = ebpf_state__create();
     REQUIRE(ctx != nullptr);
     struct ebpf_map_attr attr {
         .type = EBPF_MAP_TYPE_HASH, .key_size = 4, .value_size = sizeof(hashmap_value), .max_ents = 100, .flags = 0,
     };
-    int id = ebpf_execution_context__map_create(ctx, "my_map", &attr);
+    int id = ebpf_state__map_create(ctx, "my_map", &attr);
     REQUIRE(id >= 0);
     // Insert
     for (int i = 1; i <= 10; i++) {
@@ -38,7 +38,7 @@ TEST_CASE("Test hash map") {
         };
         std::string str = std::to_string(i);
         strcpy(val.c, str.c_str());
-        REQUIRE(ebpf_execution_context__map_elem_update(ctx, id, &i, &val, 0) == 0);
+        REQUIRE(ebpf_state__map_elem_update(ctx, id, &i, &val, 0) == 0);
     }
     // Query
     std::vector<int> vec;
@@ -49,7 +49,7 @@ TEST_CASE("Test hash map") {
     std::shuffle(vec.begin(), vec.end(), gen);
     for (int x : vec) {
         hashmap_value out_buf;
-        REQUIRE(ebpf_execution_context__map_elem_lookup(ctx, id, &x, &out_buf) == 0);
+        REQUIRE(ebpf_state__map_elem_lookup(ctx, id, &x, &out_buf) == 0);
         REQUIRE(out_buf.a == x);
         REQUIRE(out_buf.b == ((((uint64_t)x) << 32) | x));
         std::string str = std::to_string(x);
@@ -59,21 +59,21 @@ TEST_CASE("Test hash map") {
     // Delete the first 3 elements
     for (int i = 0; i < 3; i++) {
         int x = vec[i];
-        REQUIRE(ebpf_execution_context__map_elem_delete(ctx, id, &x) == 0);
+        REQUIRE(ebpf_state__map_elem_delete(ctx, id, &x) == 0);
     }
     // Check if we deleted successfully?
     for (int i = 0; i < 3; i++) {
         int x = vec[i];
         hashmap_value buf;
-        REQUIRE(ebpf_execution_context__map_elem_lookup(ctx, id, &x, &buf) == -ENOENT);
+        REQUIRE(ebpf_state__map_elem_lookup(ctx, id, &x, &buf) == -ENOENT);
     }
     // Iterate over the remained elements
     std::map<int, hashmap_value> map;
     int *key = nullptr;
     int next_key;
-    while (ebpf_execution_context__map_get_next_key(ctx, id, key, &next_key) == 0) {
+    while (ebpf_state__map_get_next_key(ctx, id, key, &next_key) == 0) {
         hashmap_value buf;
-        REQUIRE(ebpf_execution_context__map_elem_lookup(ctx, id, &next_key, &buf) == 0);
+        REQUIRE(ebpf_state__map_elem_lookup(ctx, id, &next_key, &buf) == 0);
         map[next_key] = buf;
         key = &next_key;
     }
@@ -88,35 +88,35 @@ TEST_CASE("Test hash map") {
         std::string str = std::to_string(x);
         REQUIRE(str == val.c);
     }
-    REQUIRE(ebpf_execution_context__map_destroy(ctx, id) == 0);
-    ebpf_execution_context__destroy(ctx);
+    REQUIRE(ebpf_state__map_destroy(ctx, id) == 0);
+    ebpf_state__destroy(ctx);
 }
 
 TEST_CASE("Test array map") {
-    ebpf_execution_context_t *ctx = ebpf_execution_context__create();
+    ebpf_state_t *ctx = ebpf_state__create();
     REQUIRE(ctx != nullptr);
     struct ebpf_map_attr attr {
         .type = EBPF_MAP_TYPE_ARRAY, .key_size = 4, .value_size = 8, .max_ents = 100, .flags = 0,
     };
-    int id = ebpf_execution_context__map_create(ctx, "my_map", &attr);
+    int id = ebpf_state__map_create(ctx, "my_map", &attr);
     REQUIRE(id >= 0);
 
     for (uint32_t i = 0; i < 100; i++) {
         uint64_t x = ((uint64_t)i << 32) | i;
-        REQUIRE(ebpf_execution_context__map_elem_update(ctx, id, &i, &x, 0) == 0);
+        REQUIRE(ebpf_state__map_elem_update(ctx, id, &i, &x, 0) == 0);
     }
     uint32_t key;
-    REQUIRE(ebpf_execution_context__map_get_next_key(ctx, id, nullptr, &key) == 0);
+    REQUIRE(ebpf_state__map_get_next_key(ctx, id, nullptr, &key) == 0);
     REQUIRE(key == 0);
     for (uint32_t i = 0; i < 99; i++) {
-        REQUIRE(ebpf_execution_context__map_get_next_key(ctx, id, &i, &key) == 0);
+        REQUIRE(ebpf_state__map_get_next_key(ctx, id, &i, &key) == 0);
         REQUIRE(key == i + 1);
     }
     key = 99;
-    REQUIRE(ebpf_execution_context__map_get_next_key(ctx, id, &key, &key) == -ENOENT);
-    REQUIRE(ebpf_execution_context__map_destroy(ctx, id) == 0);
-    REQUIRE(ebpf_execution_context__map_get_next_key(ctx, id, &key, &key) < 0);
-    ebpf_execution_context__destroy(ctx);
+    REQUIRE(ebpf_state__map_get_next_key(ctx, id, &key, &key) == -ENOENT);
+    REQUIRE(ebpf_state__map_destroy(ctx, id) == 0);
+    REQUIRE(ebpf_state__map_get_next_key(ctx, id, &key, &key) < 0);
+    ebpf_state__destroy(ctx);
 }
 
 static int handle_event(void *ctx, void *data, int len) {
@@ -133,12 +133,12 @@ bool operator<(const std::vector<uint8_t> &a, const std::vector<uint8_t> &b) {
 }
 
 TEST_CASE("Test ringbuf map") {
-    ebpf_execution_context_t *ctx = ebpf_execution_context__create();
+    ebpf_state_t *ctx = ebpf_state__create();
     REQUIRE(ctx != nullptr);
     struct ebpf_map_attr attr {
         .type = EBPF_MAP_TYPE_RINGBUF, .max_ents = 256 * 1024, .flags = 0,
     };
-    int id = ebpf_execution_context__map_create(ctx, "my_map", &attr);
+    int id = ebpf_state__map_create(ctx, "my_map", &attr);
     REQUIRE(id >= 0);
 
     std::mt19937 gen;
@@ -154,7 +154,7 @@ TEST_CASE("Test ringbuf map") {
             curr.push_back(rand_bytes(gen));
         rand_data.push_back(curr);
     }
-    auto priv_data = ebpf_execution_context__get_ringbuf_map_private_data(ctx, id);
+    auto priv_data = ebpf_state__get_ringbuf_map_private_data(ctx, id);
     REQUIRE(priv_data != nullptr);
     auto producer = std::thread([=]() {
         std::vector<void *> buffers;
@@ -194,29 +194,29 @@ TEST_CASE("Test ringbuf map") {
     producer.join();
     consumer.join();
 
-    REQUIRE(ebpf_execution_context__map_destroy(ctx, id) == 0);
+    REQUIRE(ebpf_state__map_destroy(ctx, id) == 0);
 
-    ebpf_execution_context__destroy(ctx);
+    ebpf_state__destroy(ctx);
 }
 
 TEST_CASE("Test hashmap kernel helpers") {
-    ebpf_execution_context_t *ctx = ebpf_execution_context__create();
+    ebpf_state_t *ctx = ebpf_state__create();
     REQUIRE(ctx != nullptr);
     struct ebpf_map_attr attr {
         .type = EBPF_MAP_TYPE_HASH, .key_size = 4, .value_size = sizeof(hashmap_value), .max_ents = 100, .flags = 0,
     };
-    int id = ebpf_execution_context__map_create(ctx, "my_map", &attr);
+    int id = ebpf_state__map_create(ctx, "my_map", &attr);
     REQUIRE(id >= 0);
     {
         int key = 111;
         hashmap_value value{ .a = 233, .b = 456, .c = "aaaa" };
-        REQUIRE(ebpf_execution_context__map_elem_update(ctx, id, &key, &value, 0) == 0);
+        REQUIRE(ebpf_state__map_elem_update(ctx, id, &key, &value, 0) == 0);
     }
     int key = 111;
     hashmap_value *buf = (hashmap_value *)ctx->map_ops[EBPF_MAP_TYPE_HASH].elem_lookup_from_helper(ctx->maps[id], &key);
     REQUIRE(buf != nullptr);
-    REQUIRE(ebpf_execution_context__map_elem_delete(ctx, id, &key) == 0);
+    REQUIRE(ebpf_state__map_elem_delete(ctx, id, &key) == 0);
     buf->a = 112;
     buf->b = 233;
-    ebpf_execution_context__destroy(ctx);
+    ebpf_state__destroy(ctx);
 }

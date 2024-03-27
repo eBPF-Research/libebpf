@@ -13,7 +13,7 @@
 #define MAP_FD(ptr) (int)(ptr >> 32)
 
 static uint64_t bpf_map_lookup_elem(uint64_t map, uint64_t key, uint64_t _1, uint64_t _2, uint64_t _3) {
-    ebpf_execution_context_t *ctx = ebpf_execution_context__thread_global_context;
+    ebpf_state_t *ctx = ebpf_state__thread_global_state;
     int fd = MAP_FD(map);
     if (fd >= 0 && fd <= LIBEBPF_MAX_MAP_COUNT && ctx->maps[fd]) {
         return (uintptr_t)ctx->maps[fd]->ops->elem_lookup_from_helper(ctx->maps[fd], (const void *)(uintptr_t)key);
@@ -24,7 +24,7 @@ static uint64_t bpf_map_lookup_elem(uint64_t map, uint64_t key, uint64_t _1, uin
 }
 
 static uint64_t bpf_map_update_elem(uint64_t map, uint64_t key, uint64_t value, uint64_t flags, uint64_t _1) {
-    ebpf_execution_context_t *ctx = ebpf_execution_context__thread_global_context;
+    ebpf_state_t *ctx = ebpf_state__thread_global_state;
     int fd = MAP_FD(map);
     if (fd >= 0 && fd <= LIBEBPF_MAX_MAP_COUNT && ctx->maps[fd]) {
         return (uintptr_t)ctx->maps[fd]->ops->elem_update(ctx->maps[fd], (const void *)(uintptr_t)key, (const void *)(uintptr_t)value, 0);
@@ -34,7 +34,7 @@ static uint64_t bpf_map_update_elem(uint64_t map, uint64_t key, uint64_t value, 
     }
 }
 static uint64_t bpf_map_delete_elem(uint64_t map, uint64_t key, uint64_t _1, uint64_t _2, uint64_t _3) {
-    ebpf_execution_context_t *ctx = ebpf_execution_context__thread_global_context;
+    ebpf_state_t *ctx = ebpf_state__thread_global_state;
     int fd = MAP_FD(map);
     if (fd >= 0 && fd <= LIBEBPF_MAX_MAP_COUNT && ctx->maps[fd]) {
         return (uintptr_t)ctx->maps[fd]->ops->elem_delete(ctx->maps[fd], (const void *)(uintptr_t)key);
@@ -44,7 +44,7 @@ static uint64_t bpf_map_delete_elem(uint64_t map, uint64_t key, uint64_t _1, uin
     }
 }
 static uint64_t bpf_ringbuf_reserve(uint64_t map, uint64_t size, uint64_t flags, uint64_t _1, uint64_t _2) {
-    ebpf_execution_context_t *ctx = ebpf_execution_context__thread_global_context;
+    ebpf_state_t *ctx = ebpf_state__thread_global_state;
     int fd = MAP_FD(map);
     if (fd >= 0 && fd <= LIBEBPF_MAX_MAP_COUNT && ctx->maps[fd]) {
         struct ebpf_map *map = ctx->maps[fd];
@@ -63,7 +63,7 @@ static uint64_t bpf_ringbuf_reserve(uint64_t map, uint64_t size, uint64_t flags,
 static uint64_t bpf_ringbuf_submit(uint64_t buf, uint64_t flags, uint64_t _1, uint64_t _2, uint64_t _3) {
     int32_t *ptr = (int32_t *)(uintptr_t)buf;
     int fd = ptr[-1];
-    ebpf_execution_context_t *ctx = ebpf_execution_context__thread_global_context;
+    ebpf_state_t *ctx = ebpf_state__thread_global_state;
 
     if (fd >= 0 && fd <= LIBEBPF_MAX_MAP_COUNT && ctx->maps[fd]) {
         struct ebpf_map *map = ctx->maps[fd];
@@ -78,7 +78,7 @@ static uint64_t bpf_ringbuf_submit(uint64_t buf, uint64_t flags, uint64_t _1, ui
 static uint64_t bpf_ringbuf_discard(uint64_t buf, uint64_t flags, uint64_t _1, uint64_t _2, uint64_t _3) {
     int32_t *ptr = (int32_t *)(uintptr_t)buf;
     int fd = ptr[-1];
-    ebpf_execution_context_t *ctx = ebpf_execution_context__thread_global_context;
+    ebpf_state_t *ctx = ebpf_state__thread_global_state;
 
     if (fd >= 0 && fd <= LIBEBPF_MAX_MAP_COUNT && ctx->maps[fd]) {
         struct ebpf_map *map = ctx->maps[fd];
@@ -92,7 +92,7 @@ static uint64_t bpf_ringbuf_discard(uint64_t buf, uint64_t flags, uint64_t _1, u
 }
 
 static uint64_t map_by_fd(int fd) {
-    ebpf_execution_context_t *ctx = ebpf_execution_context__thread_global_context;
+    ebpf_state_t *ctx = ebpf_state__thread_global_state;
     if (fd >= 0 && fd <= LIBEBPF_MAX_MAP_COUNT && ctx->maps[fd]) {
         return ((uint64_t)fd) << 32;
     } else {
@@ -102,7 +102,7 @@ static uint64_t map_by_fd(int fd) {
 }
 static char *map_val(uint64_t map_ptr) {
     int fd = MAP_FD(map_ptr);
-    ebpf_execution_context_t *ctx = ebpf_execution_context__thread_global_context;
+    ebpf_state_t *ctx = ebpf_state__thread_global_state;
     if (fd >= 0 && fd <= LIBEBPF_MAX_MAP_COUNT && ctx->maps[fd]) {
         if (ctx->maps[fd]->attr.type == EBPF_MAP_TYPE_ARRAY) {
             struct ebpf_map *map = ctx->maps[fd];
@@ -119,7 +119,7 @@ static char *map_val(uint64_t map_ptr) {
 }
 
 static uint64_t helper_libebpf_ffi_lookup_by_name(uint64_t name, uint64_t _1, uint64_t _2, uint64_t _3, uint64_t _4) {
-    ebpf_execution_context_t *ctx = ebpf_execution_context__thread_global_context;
+    ebpf_state_t *ctx = ebpf_state__thread_global_state;
     struct libebpf_ffi_name_entry entry = { .name = (const char *)name, .id = -1 };
     const struct libebpf_ffi_name_entry *ent = hashmap_get(ctx->ffi_func_name_hashmap, &entry, NULL);
     if (ent == NULL) {
@@ -214,7 +214,7 @@ static int64_t store_argument_to_int64(enum libebpf_ffi_type type, union libebpf
 
 static uint64_t helper_libebpf_ffi_call(uint64_t func_id, uint64_t args, uint64_t _1, uint64_t _2, uint64_t _3) {
     int id = func_id;
-    ebpf_execution_context_t *ctx = ebpf_execution_context__thread_global_context;
+    ebpf_state_t *ctx = ebpf_state__thread_global_state;
 
     if (id < 0 || id > LIBEBPF_MAX_FFI_COUNT || !ctx->ffi_funcs[id].ptr) {
         ebpf_set_error_string("Invalid ffi function id: %d", id);
@@ -231,7 +231,7 @@ static uint64_t helper_libebpf_ffi_call(uint64_t func_id, uint64_t args, uint64_
     return store_argument_to_int64(ent->return_value_type, result);
 }
 
-void ebpf_execution_context__setup_internal_helpers(ebpf_vm_t *vm) {
+void ebpf_state__setup_internal_helpers(ebpf_vm_t *vm) {
     ebpf_vm_set_ld64_helpers(vm, map_by_fd, NULL, map_val, NULL, NULL);
     ebpf_vm_register_external_helper(vm, 1, "bpf_map_lookup_elem", bpf_map_lookup_elem);
     ebpf_vm_register_external_helper(vm, 2, "bpf_map_update_elem", bpf_map_update_elem);
