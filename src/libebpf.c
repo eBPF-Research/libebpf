@@ -163,7 +163,7 @@ static int prepare_translated_code(ebpf_vm_t *vm) {
 
 static int prepare_executable_page(ebpf_vm_t *vm) {
     int err;
-    err = prepare_executable_page(vm);
+    err = prepare_translated_code(vm);
     if (err < 0) {
         goto out;
     }

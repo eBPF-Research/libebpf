@@ -1,3 +1,4 @@
+#include "catch2/catch_message.hpp"
 #include "catch2/internal/catch_stdstreams.hpp"
 #include "libebpf.h"
 #include "libebpf_insn.h"
@@ -10,8 +11,7 @@
 #include <ostream>
 
 TEST_CASE("Test map operations with ebpf programs") {
-    std::unique_ptr<ebpf_state_t, decltype(&ebpf_state__destroy)> ctx(ebpf_state__create(),
-                                                                                              ebpf_state__destroy);
+    std::unique_ptr<ebpf_state_t, decltype(&ebpf_state__destroy)> ctx(ebpf_state__create(), ebpf_state__destroy);
     REQUIRE(ctx != nullptr);
     std::unique_ptr<ebpf_vm_t, decltype(&ebpf_vm_destroy)> vm(ebpf_vm_create(), ebpf_vm_destroy);
     REQUIRE(vm != nullptr);
@@ -74,4 +74,20 @@ TEST_CASE("Test map operations with ebpf programs") {
     key = 3;
     REQUIRE(ebpf_state__map_elem_lookup(ctx.get(), hash_map_id, &key, &value) == 0);
     REQUIRE(value == 233 + 456);
+}
+
+TEST_CASE("Test execution with JIT") {
+    std::unique_ptr<ebpf_state_t, decltype(&ebpf_state__destroy)> ctx(ebpf_state__create(), ebpf_state__destroy);
+    REQUIRE(ctx != nullptr);
+    std::unique_ptr<ebpf_vm_t, decltype(&ebpf_vm_destroy)> vm(ebpf_vm_create(), ebpf_vm_destroy);
+    struct libebpf_insn insns[] = { // r1 += r2
+                                    BPF_RAW_INSN(BPF_CLASS_ALU64 | BPF_SOURCE_REG | BPF_ALU_ADD, 1, 2, 0, 0),
+                                    // r0 = r1
+                                    BPF_RAW_INSN(BPF_CLASS_ALU64 | BPF_SOURCE_REG | BPF_ALU_MOV_MOVSX, 0, 1, 0, 0)
+    };
+    REQUIRE(ebpf_vm_load_instructions(vm.get(), insns, std::size(insns)) == 0);
+    auto func = ebpf_vm_compile(vm.get());
+    INFO(ebpf_error_string());
+    REQUIRE(func);
+    REQUIRE(func((void*)100, (size_t)5000) == 5000 + 100);
 }

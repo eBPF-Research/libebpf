@@ -28,7 +28,7 @@ typedef struct ebpf_vm ebpf_vm_t;
  * @brief Function prototype for a jitted ebpf program
  *
  */
-typedef int (*ebpf_jit_fn)(void *mem, size_t mem_len, uint64_t *return_value);
+typedef uint64_t (*ebpf_jit_fn)(void *mem, size_t mem_len);
 
 /**
  * @brief Function prototype for external helper

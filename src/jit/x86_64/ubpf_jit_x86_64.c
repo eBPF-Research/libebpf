@@ -827,7 +827,7 @@ int ebpf_translate(struct ebpf_vm *vm, uint8_t **buffer, size_t *size) {
     struct jit_state state;
     int result = -1;
     state.offset = 0;
-    state.size = *size;
+    *size = state.size = LIBEBPF_MAX_INSTRUCTION_COUNT * 8;
     state.buf = _libebpf_global_malloc(LIBEBPF_MAX_INSTRUCTION_COUNT * 8);
     state.pc_locs = _libebpf_global_malloc((LIBEBPF_MAX_INSTRUCTION_COUNT + 1) * sizeof(state.pc_locs[0]));
     state.jumps = _libebpf_global_malloc(LIBEBPF_MAX_INSTRUCTION_COUNT * sizeof(state.jumps[0]));
