@@ -1,5 +1,7 @@
 #include "libebpf_insn.h"
+#include "libebpf_vm.h"
 #include <asm-generic/errno-base.h>
+#include <stdbool.h>
 #include <string.h>
 #include <libebpf.h>
 #include <stdlib.h>
@@ -40,6 +42,8 @@ void ebpf_vm_destroy(ebpf_vm_t *vm) {
     _libebpf_global_free(vm->helpers);
     if (vm->insns)
         _libebpf_global_free(vm->insns);
+    if (vm->begin_of_local_function)
+        _libebpf_global_free(vm->begin_of_local_function);
     _libebpf_global_free(vm);
 }
 
@@ -63,17 +67,38 @@ int ebpf_vm_load_instructions(ebpf_vm_t *vm, const struct libebpf_insn *code, si
         return -EEXIST;
     }
     vm->insns = _libebpf_global_malloc(sizeof(struct libebpf_insn) * code_len);
+    vm->begin_of_local_function = _libebpf_global_malloc(sizeof(bool) * code_len);
     if (!vm->insns) {
         ebpf_set_error_string("Failed to call malloc");
         return -ENOMEM;
     }
+    if (!vm->begin_of_local_function) {
+        ebpf_set_error_string("Failed to call malloc");
+        _libebpf_global_free(vm->insns);
+        return -ENOMEM;
+    }
+    vm->insn_cnt = code_len;
+    memset(vm->begin_of_local_function, 0, sizeof(bool) * vm->insn_cnt);
     memcpy(vm->insns, code, sizeof(struct libebpf_insn) * code_len);
+
+    for (size_t i = 0; i < vm->insn_cnt; i++) {
+        if (code[i].code == (BPF_CLASS_JMP | BPF_SOURCE_K | BPF_JMP_CALL) || code[i].code == (BPF_CLASS_JMP | BPF_SOURCE_X | BPF_JMP_CALL) ||
+            code[i].code == (BPF_CLASS_JMP32 | BPF_SOURCE_K | BPF_JMP_CALL) || code[i].code == (BPF_CLASS_JMP32 | BPF_SOURCE_X | BPF_JMP_CALL)) {
+            if (code[i].src_reg == 1) {
+                // Call to a local function
+                uint32_t target = i + vm->insns[i].imm + 1;
+                vm->begin_of_local_function[target] = true;
+            }
+        }
+    }
     return 0;
 }
 void ebpf_vm_unload_instructions(ebpf_vm_t *vm) {
     if (vm->insns) {
         _libebpf_global_free(vm->insns);
         vm->insns = NULL;
+        _libebpf_global_free(vm->begin_of_local_function);
+        vm->begin_of_local_function = NULL;
         vm->insn_cnt = 0;
     }
 }
@@ -85,4 +110,12 @@ void ebpf_vm_set_ld64_helpers(ebpf_vm_t *vm, ebpf_map_by_fd_callback map_by_fd, 
     vm->map_by_fd = map_by_fd;
     vm->map_by_idx = map_by_idx;
     vm->map_val = map_val;
+}
+
+static int prepare_translated_code(ebpf_vm_t* vm){
+    
+}
+
+ebpf_jit_fn ebpf_vm_compile(ebpf_vm_t *vm){
+    
 }

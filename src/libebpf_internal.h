@@ -13,15 +13,30 @@ struct ebpf_external_helper_definition {
 };
 
 struct ebpf_vm {
+    // Helper definitions
     struct ebpf_external_helper_definition *helpers;
+    // Count of loaded instructions
     size_t insn_cnt;
+    // Loaded instructions. NULL means not loaded yet
     struct libebpf_insn *insns;
+    // LDDW helpers
     ebpf_map_by_fd_callback map_by_fd;
     ebpf_map_by_idx_callback map_by_idx;
     ebpf_map_val_callback map_val;
     ebpf_code_addr_callback code_addr;
     ebpf_var_addr_callback var_addr;
+    // Enable bounds check?
     bool bounds_check_enabled;
+    // Whether the pc marks the start of a local function
+    bool* begin_of_local_function;
+
+    // Translated code
+    void* translated_code;
+    size_t translated_code_size;
+
+    // Mapped pagefor execution
+    void* jit_mapped_page;
+
 };
 
 extern char _libebpf_global_error_string[1024];
