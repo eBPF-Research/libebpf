@@ -148,11 +148,11 @@ ebpf_jit_fn ebpf_vm_compile(ebpf_vm_t *vm);
  * @brief Translate the loaded eBPF byte code to native code
  * 
  * @param vm The VM instance
- * @param buffer buffer to output
+ * @param buffer buffer to output. ebpf_translate will allocate it. Use _libebpf_global_free to free it
  * @param size size of the generated code, in bytes
  * @return int 0 if succeeded
  */
-int ebpf_translate(struct ebpf_vm *vm, uint8_t *buffer, size_t *size);
+int ebpf_translate(struct ebpf_vm *vm, uint8_t **buffer, size_t *size);
 
 
 #ifdef __cplusplus

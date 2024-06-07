@@ -1,15 +1,43 @@
 #include "libebpf_insn.h"
 #include "libebpf_vm.h"
-#include <asm-generic/errno-base.h>
+#include <errno.h>
 #include <stdbool.h>
 #include <string.h>
 #include <libebpf.h>
 #include <stdlib.h>
 #include <libebpf_internal.h>
 
+#define IS_UNIX_LIKE defined(__unix__) || defined(__linux__)
+#ifdef IS_UNIX_LIKE
+#include <sys/mman.h>
+#endif
 ebpf_malloc _libebpf_global_malloc = &malloc;
 ebpf_free _libebpf_global_free = &free;
 ebpf_realloc _libebpf_global_realloc = &realloc;
+#ifdef IS_UNIX_LIKE
+static void *allocate_and_copy(void *buf, size_t bufsize) {
+    void *mem = mmap(0, bufsize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (mem == MAP_FAILED) {
+        ebpf_set_error_string("Unable to mmap");
+        return NULL;
+    }
+    memcpy(mem, buf, bufsize);
+    if (mprotect(mem, bufsize, PROT_READ | PROT_EXEC) < 0) {
+        ebpf_set_error_string("Unable to set mprotect");
+        munmap(mem, bufsize);
+        return NULL;
+    }
+    return mem;
+}
+
+ebpf_allocate_execuable_memory_and_copy _libebpf_executable_allocator = &allocate_and_copy;
+ebpf_release_executable_memory _libebpf_executor_release = &munmap;
+#else
+
+ebpf_allocate_execuable_memory_and_copy _libebpf_executable_allocator = NULL;
+ebpf_release_executable_memory _libebpf_executor_release = NULL;
+#endif
+
 char _libebpf_global_error_string[1024] = "";
 
 void ebpf_set_global_memory_allocator(ebpf_malloc malloc, ebpf_free free, ebpf_realloc realloc) {
@@ -44,6 +72,11 @@ void ebpf_vm_destroy(ebpf_vm_t *vm) {
         _libebpf_global_free(vm->insns);
     if (vm->begin_of_local_function)
         _libebpf_global_free(vm->begin_of_local_function);
+    if (vm->translated_code)
+        _libebpf_global_free(vm->translated_code);
+    if (vm->jit_mapped_page) {
+        _libebpf_executor_release(vm->jit_mapped_page, vm->jit_size);
+    }
     _libebpf_global_free(vm);
 }
 
@@ -101,6 +134,16 @@ void ebpf_vm_unload_instructions(ebpf_vm_t *vm) {
         vm->begin_of_local_function = NULL;
         vm->insn_cnt = 0;
     }
+    if (vm->translated_code) {
+        _libebpf_global_free(vm->translated_code);
+        vm->translated_code = NULL;
+        vm->translated_code_size = 0;
+    }
+    if (vm->jit_mapped_page) {
+        _libebpf_executor_release(vm->jit_mapped_page, vm->jit_size);
+        vm->jit_mapped_page = NULL;
+        vm->jit_size = 0;
+    }
 }
 
 void ebpf_vm_set_ld64_helpers(ebpf_vm_t *vm, ebpf_map_by_fd_callback map_by_fd, ebpf_map_by_idx_callback map_by_idx, ebpf_map_val_callback map_val,
@@ -112,10 +155,42 @@ void ebpf_vm_set_ld64_helpers(ebpf_vm_t *vm, ebpf_map_by_fd_callback map_by_fd, 
     vm->map_val = map_val;
 }
 
-static int prepare_translated_code(ebpf_vm_t* vm){
-    
+static int prepare_translated_code(ebpf_vm_t *vm) {
+    if (vm->translated_code)
+        return 0;
+    return ebpf_translate(vm, &vm->translated_code, &vm->translated_code_size);
 }
 
-ebpf_jit_fn ebpf_vm_compile(ebpf_vm_t *vm){
-    
+static int prepare_executable_page(ebpf_vm_t *vm) {
+    int err;
+    err = prepare_executable_page(vm);
+    if (err < 0) {
+        goto out;
+    }
+    if (_libebpf_executable_allocator != NULL) {
+        void *page = _libebpf_executable_allocator(vm->translated_code, vm->translated_code_size);
+        if (!page) {
+            err = -1;
+            goto out;
+        }
+        vm->jit_mapped_page = page;
+        vm->jit_size = vm->translated_code_size;
+    } else {
+        ebpf_set_error_string("Executable page allocator has not been set");
+        err = -1;
+        goto out;
+    }
+
+out:
+    return err;
+}
+
+ebpf_jit_fn ebpf_vm_compile(ebpf_vm_t *vm) {
+    if (prepare_translated_code(vm) < 0) {
+        return NULL;
+    }
+    if (prepare_executable_page(vm) < 0) {
+        return NULL;
+    }
+    return (ebpf_jit_fn)vm->jit_mapped_page;
 }

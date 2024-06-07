@@ -11,6 +11,18 @@ extern "C" {
 #endif
 
 /**
+ * @brief Function prototype for allocating a piece of executable memory and copy the given buffer onto it
+ *
+ */
+typedef void *(*ebpf_allocate_execuable_memory_and_copy)(void *buffer, size_t bufsize);
+
+/**
+ * @brief Function prototype for releasing a piece of executable memory
+ *
+ */
+typedef int (*ebpf_release_executable_memory)(void *mem, size_t len);
+
+/**
  * @brief Function prototype for the global custom memory allocator
  *
  */
@@ -37,6 +49,14 @@ typedef void *(*ebpf_realloc)(void *, size_t);
  * @param realloc The realloc function
  */
 void ebpf_set_global_memory_allocator(ebpf_malloc malloc, ebpf_free free, ebpf_realloc realloc);
+
+/**
+ * @brief Set functions which will be used for JIT
+ *
+ * @param allocate Function to allocate a piece of executable memory and copy buffer to it
+ * @param release Function to release a piece of executable memory
+ */
+void ebpf_set_executable_memory_allocator(ebpf_allocate_execuable_memory_and_copy *allocate, ebpf_release_executable_memory *release);
 
 /**
  * @brief Get the global error string

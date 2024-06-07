@@ -823,46 +823,47 @@ static bool resolve_patchable_relatives(struct jit_state *state) {
     return true;
 }
 
-int ebpf_translate(struct ebpf_vm *vm, uint8_t *buffer, size_t *size) {
+int ebpf_translate(struct ebpf_vm *vm, uint8_t **buffer, size_t *size) {
     struct jit_state state;
     int result = -1;
-
     state.offset = 0;
     state.size = *size;
-    state.buf = buffer;
+    state.buf = _libebpf_global_malloc(LIBEBPF_MAX_INSTRUCTION_COUNT * 8);
     state.pc_locs = _libebpf_global_malloc((LIBEBPF_MAX_INSTRUCTION_COUNT + 1) * sizeof(state.pc_locs[0]));
     state.jumps = _libebpf_global_malloc(LIBEBPF_MAX_INSTRUCTION_COUNT * sizeof(state.jumps[0]));
     state.loads = _libebpf_global_malloc(LIBEBPF_MAX_INSTRUCTION_COUNT * sizeof(state.loads[0]));
     state.num_jumps = 0;
     state.num_loads = 0;
-
     if (!state.pc_locs || !state.jumps) {
         ebpf_set_error_string("Out of memory");
-        goto out;
+        goto err;
     }
 
     if (translate(vm, &state) < 0) {
-        goto out;
+        goto err;
     }
 
     if (state.num_jumps == LIBEBPF_MAX_INSTRUCTION_COUNT) {
         ebpf_set_error_string("Excessive number of jump targets");
-        goto out;
+        goto err;
     }
 
     if (state.offset == state.size) {
         ebpf_set_error_string("Target buffer too small");
-        goto out;
+        goto err;
     }
 
     if (!resolve_patchable_relatives(&state)) {
         ebpf_set_error_string("Could not patch the relative addresses in the JIT'd code.");
-        goto out;
+        goto err;
     }
 
     result = 0;
     *size = state.offset;
-
+    *buffer = state.buf;
+    goto out;
+err:
+    _libebpf_global_free(state.buf);
 out:
     _libebpf_global_free(state.pc_locs);
     _libebpf_global_free(state.jumps);

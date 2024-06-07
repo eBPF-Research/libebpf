@@ -28,15 +28,15 @@ struct ebpf_vm {
     // Enable bounds check?
     bool bounds_check_enabled;
     // Whether the pc marks the start of a local function
-    bool* begin_of_local_function;
+    bool *begin_of_local_function;
 
     // Translated code
-    void* translated_code;
+    uint8_t *translated_code;
     size_t translated_code_size;
 
     // Mapped pagefor execution
-    void* jit_mapped_page;
-
+    void *jit_mapped_page;
+    size_t jit_size;
 };
 
 extern char _libebpf_global_error_string[1024];
@@ -66,15 +66,15 @@ static inline int bit_test_mask(uint64_t m, uint64_t msk, uint64_t pat) {
 
 /**
  * @brief Only for unit tests. Directly call a helper
- * 
- * @param vm 
- * @param idx 
- * @param a 
- * @param b 
- * @param c 
- * @param d 
- * @param e 
- * @return uint64_t 
+ *
+ * @param vm
+ * @param idx
+ * @param a
+ * @param b
+ * @param c
+ * @param d
+ * @param e
+ * @return uint64_t
  */
 static inline uint64_t ebpf_vm_call_helper(ebpf_vm_t *vm, int idx, uint64_t a, uint64_t b, uint64_t c, uint64_t d, uint64_t e) {
     return vm->helpers[idx].fn(a, b, c, d, e);
@@ -83,4 +83,7 @@ static inline uint64_t ebpf_vm_call_helper(ebpf_vm_t *vm, int idx, uint64_t a, u
 extern ebpf_malloc _libebpf_global_malloc;
 extern ebpf_free _libebpf_global_free;
 extern ebpf_realloc _libebpf_global_realloc;
+
+extern ebpf_allocate_execuable_memory_and_copy _libebpf_executable_allocator;
+extern ebpf_release_executable_memory _libebpf_executor_release;
 #endif
