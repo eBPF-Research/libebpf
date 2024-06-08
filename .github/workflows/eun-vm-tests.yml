@@ -1,4 +1,4 @@
-name: Run unit tests of ebpf_state
+name: Run ubpf vm tests
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
   pull_request: 
     branches: "master"
   workflow_dispatch:
-    
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
@@ -20,11 +20,18 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install cmake make clang-15 ninja-build 
+        sudo apt-get install cmake make clang-15 ninja-build
     - name: Build targets
       run: |
         CC=clang-15 CXX=clang++-15 cmake -S. -Bbuild -DCMAKE_BUILD_TYPE:STRING=Release -G Ninja
-        CC=clang-15 CXX=clang++-15 cmake --build ./build --config Release --target ebpf_state_test
-    - name: Run tests
-      run: |
-        ./build/execution-test/ebpf_state_test
+        CC=clang-15 CXX=clang++-15 cmake --build ./build --config Release --target libebpf_test_runner
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.8'
+    - run: python --version
+    - run: |
+        cd vm-test
+        python -m venv env
+        source ./env/bin/activate
+        pip install -r requirements.txt
+        pytest
