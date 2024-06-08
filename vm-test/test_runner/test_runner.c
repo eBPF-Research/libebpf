@@ -174,7 +174,6 @@ load:
         if (ebpf_vm_run(vm, mem, mem_len, &ret) < 0) {
             ret = UINT64_MAX;
             fprintf(stderr, "%s", ebpf_error_string());
-            return 1;
         }
     }
 

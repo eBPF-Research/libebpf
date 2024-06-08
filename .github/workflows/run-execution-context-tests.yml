@@ -6,12 +6,12 @@ on:
   pull_request: 
     branches: "master"
   workflow_dispatch:
-    
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 jobs:
-  build:
+  test:
     runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v2

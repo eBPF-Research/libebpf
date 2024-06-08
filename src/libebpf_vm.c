@@ -23,7 +23,7 @@ static inline bool ebpf_runtime_bound_check(const struct ebpf_vm *vm, void *addr
     } else if (addr >= stack && ((char *)addr + size) <= ((char *)stack + EBPF_STACK_SIZE)) {
         return true;
     } else {
-        ebpf_set_error_string("ebpf error: out of bounds memory %s at PC %u, addr %p, size %d\nmem %p/%zd stack %p/%d\n", type, cur_pc, addr, size,
+        ebpf_set_error_string("ebpf error: out of bounds memory %s at PC %u, addr %p, size %d, mem %p/%zd stack %p/%d", type, cur_pc, addr, size,
                               mem, mem_len, stack, EBPF_STACK_SIZE);
         return false;
     }
