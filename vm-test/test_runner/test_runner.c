@@ -59,14 +59,15 @@ int main(int argc, char **argv) {
     bool reload = false;
 
     int opt;
-    while ((opt = getopt_long(argc, argv, "hm:UR", longopts, NULL)) != -1) {
+    bool jit = false;
+    while ((opt = getopt_long(argc, argv, "hm:URj", longopts, NULL)) != -1) {
         switch (opt) {
         case 'm':
             mem_filename = optarg;
             break;
-            // case 'j':
-            //     jit = true;
-            //     break;
+        case 'j':
+            jit = true;
+            break;
             //         case 'r':
             // #if defined(__x86_64__) || defined(_M_X64)
             //             ebpf_set_register_offset(atoi(optarg));
@@ -161,22 +162,21 @@ load:
 
     uint64_t ret;
 
-    // if (jit) {
-    //     ebpf_jit_fn fn = ebpf_compile(vm, &errmsg);
-    //     if (fn == NULL) {
-    //         fprintf(stderr, "Failed to compile: %s\n", errmsg);
-    //         free(errmsg);
-    //         free(mem);
-    //         return 1;
-    //     }
-    //     ret = fn(mem, mem_len);
-    // } else {
-
-    // }
-    if (ebpf_vm_run(vm, mem, mem_len, &ret) < 0) {
-        ret = UINT64_MAX;
-        fprintf(stderr, "%s", ebpf_error_string());
+    if (jit) {
+        ebpf_jit_fn fn = ebpf_vm_compile(vm);
+        if (fn == NULL) {
+            fprintf(stderr, "Failed to compile: %s\n", errmsg);
+            free(mem);
+            return 1;
+        }
+        ret = fn(mem, mem_len);
+    } else {
+        if (ebpf_vm_run(vm, mem, mem_len, &ret) < 0) {
+            ret = UINT64_MAX;
+            fprintf(stderr, "%s", ebpf_error_string());
+        }
     }
+
     printf("0x%" PRIx64 "\n", ret);
 
     ebpf_vm_destroy(vm);

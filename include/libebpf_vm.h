@@ -13,6 +13,7 @@ extern "C" {
 #define EBPF_STACK_SIZE ((size_t)512)
 #define MAX_LOCAL_FUNCTION_LEVEL 20
 
+#define LIBEBPF_MAX_INSTRUCTION_COUNT 65536
 
 
 /**
@@ -27,7 +28,7 @@ typedef struct ebpf_vm ebpf_vm_t;
  * @brief Function prototype for a jitted ebpf program
  *
  */
-typedef int (*ebpf_jit_fn)(void *mem, size_t mem_len, uint64_t *return_value);
+typedef uint64_t (*ebpf_jit_fn)(void *mem, size_t mem_len);
 
 /**
  * @brief Function prototype for external helper
@@ -142,6 +143,16 @@ int ebpf_vm_run(ebpf_vm_t *vm, void *mem, size_t mem_len, uint64_t *return_value
  * @return ebpf_jit_fn A pointer to the compiled function. NULL if failed. Use ebpf_error_string to get the error details.
  */
 ebpf_jit_fn ebpf_vm_compile(ebpf_vm_t *vm);
+
+/**
+ * @brief Translate the loaded eBPF byte code to native code
+ * 
+ * @param vm The VM instance
+ * @param buffer buffer to output. ebpf_translate will allocate it. Use _libebpf_global_free to free it
+ * @param size size of the generated code, in bytes
+ * @return int 0 if succeeded
+ */
+int ebpf_translate(struct ebpf_vm *vm, uint8_t **buffer, size_t *size);
 
 
 #ifdef __cplusplus

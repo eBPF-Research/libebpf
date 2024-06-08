@@ -8,10 +8,7 @@ project(
   VERSION 0.1.0
   LANGUAGES C CXX
 )
-
-add_library(
-  libebpf_objects
-  OBJECT
+set(LIBEBPF_SOURCE_LIST   
   src/libebpf.c
   src/libebpf_vm.c
   src/libebpf_vm_verify.c
@@ -22,12 +19,21 @@ add_library(
   src/libebpf_execution_helpers.c
   src/libebpf_ffi_functions.c
   src/utils/hashmap.c
+  src/jit/x86_64/ubpf_jit_x86_64.c
+  src/jit/x86_64/helper_adaptor.c
+  )
+
+
+add_library(
+  libebpf_objects
+  OBJECT
+  ${LIBEBPF_SOURCE_LIST}
 )
 target_compile_definitions(libebpf_objects PRIVATE -D_GNU_SOURCE)
 target_include_directories(
   libebpf_objects
   INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include
-  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src
+  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src 
 )
 
 set_target_properties(libebpf_objects PROPERTIES C_STANDARD 11 C_EXTENSIONS TRUE)
