@@ -1,5 +1,4 @@
 #include "catch2/catch_message.hpp"
-#include "catch2/internal/catch_stdstreams.hpp"
 #include "libebpf.h"
 #include "libebpf_insn.h"
 #include "libebpf_map.h"
@@ -8,7 +7,6 @@
 #include <iterator>
 #include <libebpf_execution.h>
 #include <memory>
-#include <ostream>
 
 TEST_CASE("Test map operations with ebpf programs") {
     std::unique_ptr<ebpf_state_t, decltype(&ebpf_state__destroy)> ctx(ebpf_state__create(), ebpf_state__destroy);
@@ -77,8 +75,6 @@ TEST_CASE("Test map operations with ebpf programs") {
 }
 
 TEST_CASE("Test execution with JIT") {
-    std::unique_ptr<ebpf_state_t, decltype(&ebpf_state__destroy)> ctx(ebpf_state__create(), ebpf_state__destroy);
-    REQUIRE(ctx != nullptr);
     std::unique_ptr<ebpf_vm_t, decltype(&ebpf_vm_destroy)> vm(ebpf_vm_create(), ebpf_vm_destroy);
     struct libebpf_insn insns[] = { // r1 += r2
                                     BPF_RAW_INSN(BPF_CLASS_ALU64 | BPF_SOURCE_REG | BPF_ALU_ADD, 1, 2, 0, 0),
@@ -89,5 +85,5 @@ TEST_CASE("Test execution with JIT") {
     auto func = ebpf_vm_compile(vm.get());
     INFO(ebpf_error_string());
     REQUIRE(func);
-    REQUIRE(func((void*)100, (size_t)5000) == 5000 + 100);
+    REQUIRE(func((void *)100, (size_t)5000) == 5000 + 100);
 }
