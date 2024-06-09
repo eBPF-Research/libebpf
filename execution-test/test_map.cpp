@@ -1,3 +1,5 @@
+#include "catch2/catch_message.hpp"
+#include "libebpf.h"
 #include "libebpf_execution.h"
 #include "libebpf_map.h"
 #include "libebpf_map_ringbuf.h"
@@ -25,6 +27,7 @@ struct hashmap_value {
 TEST_CASE("Test hash map") {
     ebpf_state_t *ctx = ebpf_state__create();
     REQUIRE(ctx != nullptr);
+    INFO(ebpf_error_string());
     struct ebpf_map_attr attr {
         .type = EBPF_MAP_TYPE_HASH, .key_size = 4, .value_size = sizeof(hashmap_value), .max_ents = 100, .flags = 0,
     };

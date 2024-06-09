@@ -90,10 +90,43 @@ int ebpf_vm_register_external_helper(ebpf_vm_t *vm, size_t index, const char *na
     return 0;
 }
 
+#define TEST_REQUIRE(v)                                                                                                                              \
+    if (!vm->v) {                                                                                                                                    \
+        ebpf_set_error_string("Required " #v " by LDDW at %p", i);                                                                                   \
+        return -EINVAL;                                                                                                                              \
+    }
+
 int ebpf_vm_load_instructions(ebpf_vm_t *vm, const struct libebpf_insn *code, size_t code_len) {
     int err;
     if ((err = ebpf_vm_verify(vm, code, code_len)) < 0) {
         return err;
+    }
+    // Check for long lddws
+    for (size_t i = 0; i < vm->insn_cnt; i++) {
+        if (code[i].code == (BPF_CLASS_LD | BPF_LS_SIZE_DW | BPF_LS_MODE_IMM)) {
+            if (i + 1 == vm->insn_cnt) {
+                ebpf_set_error_string("LDDW found at pc %d, which is the last instruction", i);
+                return -EINVAL;
+            }
+            if (code[i].src_reg == 1) {
+                TEST_REQUIRE(map_by_fd);
+            } else if (code[i].src_reg == 2) {
+                TEST_REQUIRE(map_by_fd);
+                TEST_REQUIRE(map_val);
+            } else if (code[i].src_reg == 3) {
+                TEST_REQUIRE(var_addr);
+            } else if (code[i].src_reg == 4) {
+                TEST_REQUIRE(code_addr);
+            } else if (code[i].src_reg == 5) {
+                TEST_REQUIRE(map_by_idx);
+            } else if (code[i].src_reg == 6) {
+                TEST_REQUIRE(map_val);
+                TEST_REQUIRE(map_by_idx);
+            } else if (code[i].src_reg != 0) {
+                ebpf_set_error_string("Unexpected source register %d of lddw at %d", code[i].src_reg, i);
+                return -EINVAL;
+            }
+        }
     }
     if (vm->insns) {
         ebpf_set_error_string("code has already been loaded into this VM. Use ebpf_unload_code() if you need to reuse this VM");
@@ -122,6 +155,27 @@ int ebpf_vm_load_instructions(ebpf_vm_t *vm, const struct libebpf_insn *code, si
                 uint32_t target = i + vm->insns[i].imm + 1;
                 vm->begin_of_local_function[target] = true;
             }
+        } else if (vm->insns[i].code == (BPF_CLASS_LD | BPF_LS_SIZE_DW | BPF_LS_MODE_IMM) && vm->insns[i].src_reg != 0) {
+            uint32_t imm1 = vm->insns[i].imm;
+            uint32_t imm2 = vm->insns[i + 1].imm;
+
+            uint64_t result = 0;
+            if (vm->insns[i].src_reg == 1) {
+                result = vm->map_by_fd(imm1);
+            } else if (vm->insns[i].src_reg == 2) {
+                result = (uintptr_t)(vm->map_val(vm->map_by_fd(imm1)) + imm2);
+            } else if (vm->insns[i].src_reg == 3) {
+                result = (uintptr_t)vm->var_addr(imm1);
+            } else if (vm->insns[i].src_reg == 4) {
+                result = (uintptr_t)vm->code_addr(imm1);
+            } else if (vm->insns[i].src_reg == 5) {
+                result = (uintptr_t)vm->map_by_idx(imm1);
+            } else if (vm->insns[i].src_reg == 6) {
+                result = (uintptr_t)(vm->map_val(vm->map_by_idx(imm1)) + imm2);
+            }
+            vm->insns[i].src_reg = 0;
+            vm->insns[i].imm = result & 0xffffffff;
+            vm->insns[i + 1].imm = (result >> 32);
         }
     }
     return 0;
@@ -154,6 +208,8 @@ void ebpf_vm_set_ld64_helpers(ebpf_vm_t *vm, ebpf_map_by_fd_callback map_by_fd, 
     vm->map_by_idx = map_by_idx;
     vm->map_val = map_val;
 }
+
+#ifdef LIBEBPF_ENABLE_JIT
 
 static int prepare_translated_code(ebpf_vm_t *vm) {
     if (vm->translated_code)
@@ -194,3 +250,12 @@ ebpf_jit_fn ebpf_vm_compile(ebpf_vm_t *vm) {
     }
     return (ebpf_jit_fn)vm->jit_mapped_page;
 }
+
+#else
+
+ebpf_jit_fn ebpf_vm_compile(ebpf_vm_t *vm) {
+    ebpf_set_error_string("JIT is not supported on the current platform");
+    return NULL;
+}
+
+#endif

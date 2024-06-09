@@ -21,7 +21,6 @@
 #include "libebpf_internal.h"
 #include "libebpf_vm.h"
 #include <stdint.h>
-#include <stdlib.h>
 #include <stdbool.h>
 #include <unistd.h>
 #include <assert.h>
@@ -128,25 +127,25 @@ static uint32_t emit_retpoline(struct jit_state *state) {
 }
 
 /* For testing, this changes the mapping between x86 and eBPF registers */
-void ubpf_set_register_offset(int x) {
-    int i;
-    if (x < REGISTER_MAP_SIZE) {
-        int tmp[REGISTER_MAP_SIZE];
-        memcpy(tmp, register_map, sizeof(register_map));
-        for (i = 0; i < REGISTER_MAP_SIZE; i++) {
-            register_map[i] = tmp[(i + x) % REGISTER_MAP_SIZE];
-        }
-    } else {
-        /* Shuffle array */
-        unsigned int seed = x;
-        for (i = 0; i < REGISTER_MAP_SIZE - 1; i++) {
-            int j = i + (rand_r(&seed) % (REGISTER_MAP_SIZE - i));
-            int tmp = register_map[j];
-            register_map[j] = register_map[i];
-            register_map[i] = tmp;
-        }
-    }
-}
+// void ubpf_set_register_offset(int x) {
+//     int i;
+//     if (x < REGISTER_MAP_SIZE) {
+//         int tmp[REGISTER_MAP_SIZE];
+//         memcpy(tmp, register_map, sizeof(register_map));
+//         for (i = 0; i < REGISTER_MAP_SIZE; i++) {
+//             register_map[i] = tmp[(i + x) % REGISTER_MAP_SIZE];
+//         }
+//     } else {
+//         /* Shuffle array */
+//         unsigned int seed = x;
+//         for (i = 0; i < REGISTER_MAP_SIZE - 1; i++) {
+//             int j = i + (rand_r(&seed) % (REGISTER_MAP_SIZE - i));
+//             int tmp = register_map[j];
+//             register_map[j] = register_map[i];
+//             register_map[i] = tmp;
+//         }
+//     }
+// }
 
 static int translate(struct ebpf_vm *vm, struct jit_state *state) {
     int i;
