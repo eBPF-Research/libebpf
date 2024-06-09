@@ -55,8 +55,6 @@ target_include_directories(
 
 set_target_properties(libebpf_objects PROPERTIES C_STANDARD 11 C_EXTENSIONS TRUE)
 
-set(SPACE " ")
-
 add_custom_command(
   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/libebpf.o
   DEPENDS $<TARGET_OBJECTS:libebpf_objects> ${CMAKE_CURRENT_SOURCE_DIR}/src/libebpf.ld

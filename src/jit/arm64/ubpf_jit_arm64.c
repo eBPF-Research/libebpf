@@ -1163,4 +1163,5 @@ out:
     _libebpf_global_free(state.pc_locs);
     _libebpf_global_free(state.jumps);
     _libebpf_global_free(state.loads);
+    return result;
 }
