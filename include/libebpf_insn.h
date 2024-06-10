@@ -39,6 +39,8 @@ struct libebpf_insn {
 #define BPF_SOURCE_IMM BPF_SOURCE_K
 #define BPF_SOURCE_REG BPF_SOURCE_X
 
+#define BPF_SOURCE_MASK 0x08
+
 #define BPF_ALU_ADD 0x00
 #define BPF_ALU_SUB 0x10
 #define BPF_ALU_MUL 0x20

@@ -86,6 +86,7 @@ static int ringbuf_map__alloc(struct ebpf_map *map, struct ebpf_map_attr *attr) 
     data->data = data->raw_buffer + 2 * ARG_PAGE_SIZE;
     data->attr = &map->attr;
     data->self_map_id = map->self_id;
+    ebpf_spinlock_init(&data->reserve_lock);
     map->map_private_data = data;
     return 0;
 }

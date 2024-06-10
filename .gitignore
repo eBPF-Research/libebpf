@@ -37,3 +37,4 @@ Catch2
 
 /build
 /testb*
+libebpf*.tar
