@@ -1,0 +1,1 @@
+python3 compile_code.py -s samples/test1.c -f samples/test1.h
